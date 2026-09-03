@@ -1,0 +1,51 @@
+/* ============================================================
+   STREET BAZAR — store theme scoping, dark themes & responsive
+   app layouts (loaded after styles.css)
+   ============================================================ */
+
+/* owner ke theme ke fonts store surface par apply hotay hain */
+.store-page { font-family: var(--st-b, var(--font-b)); }
+.store-page h1, .store-page h2, .store-page h3, .store-page h4,
+.store-page .h1, .store-page .h2, .store-page .h3, .store-page .h4,
+.store-page .price, .store-page .pcard-title { font-family: var(--st-d, var(--font-d)); }
+.store-page .pcard, .store-page .scard, .store-page .panel,
+.store-page .opt-box, .store-page .card { border-radius: var(--st-radius, 18px); }
+.store-page .store-tabs button.active { background: var(--st-primary, var(--ink)); color: #fff; }
+.store-page .btn-grad { background: linear-gradient(115deg, var(--st-accent, #D94E28), var(--st-primary, #1E293B)); }
+
+/* dark store themes */
+.store-page.dark { color: #EDE6DA; }
+.store-page.dark h1, .store-page.dark h2, .store-page.dark h3, .store-page.dark h4,
+.store-page.dark .h1, .store-page.dark .h2, .store-page.dark .h3, .store-page.dark .h4,
+.store-page.dark .pcard-title { color: #fff; }
+.store-page.dark .muted, .store-page.dark .rate-row, .store-page.dark .scard-meta { color: rgba(237,230,218,.62); }
+.store-page.dark .store-tabs { background: #141A26; border-color: rgba(255,255,255,.08); }
+.store-page.dark .store-tabs button { color: rgba(237,230,218,.62); }
+.store-page.dark .store-tabs button.active { background: var(--st-accent); color: #12161f; }
+.store-page.dark .chip { background: rgba(255,255,255,.06); border-color: rgba(255,255,255,.14); color: #EDE6DA; }
+.store-page.dark .chip.active { background: var(--st-accent); color: #12161f; }
+.store-page.dark .pcard, .store-page.dark .panel, .store-page.dark .opt-box,
+.store-page.dark .card, .store-page.dark .scard, .store-page.dark .chatbox { background: #171E2B; border-color: rgba(255,255,255,.09); }
+.store-page.dark .divider { background: rgba(255,255,255,.1); }
+.store-page.dark .input, .store-page.dark .select, .store-page.dark .textarea { background: #10151F; border-color: rgba(255,255,255,.14); color: #EDE6DA; }
+.store-page.dark .btn-ghost { background: rgba(255,255,255,.07); border-color: rgba(255,255,255,.16); color: #EDE6DA; }
+.store-page.dark .link-more { background: rgba(255,255,255,.07); border-color: rgba(255,255,255,.14); color: #EDE6DA; }
+.store-page.dark .price-old { color: rgba(237,230,218,.5); }
+.store-page.dark .empty { background: rgba(255,255,255,.03); border-color: rgba(255,255,255,.12); }
+.store-page.dark .chat-body { background: #121824; }
+.store-page.dark .chat-foot { background: #171E2B; border-color: rgba(255,255,255,.08); }
+.store-page.dark .msg.them { background: #1E2637; border-color: rgba(255,255,255,.08); color: #EDE6DA; }
+
+/* responsive two-column app layouts */
+@media (max-width: 980px) {
+  .cs-grid { grid-template-columns: 1fr !important; }
+  .ai-promo { grid-template-columns: 1fr !important; }
+  .ai-promo > div:last-child { min-height: 170px; }
+  .wh-grid { grid-template-columns: 1fr !important; }
+}
+@media (max-width: 560px) {
+  .hero-stats > div { min-width: 42%; }
+  .store-hero-in { flex-direction: column; align-items: flex-start; }
+  .store-logo { width: 64px; height: 64px; font-size: 22px; }
+  .steps .step span:last-child { display: none; }
+}
