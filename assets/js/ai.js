@@ -14,11 +14,13 @@ const pick = (arr, seedStr) => arr[hash(seedStr) % arr.length]
 /* ---------------- real API ---------------- */
 async function api(system, user, maxTokens = 800) {
   const apiKey = getAIKey()
+  if (!apiKey) throw new Error('API key nahi mili')
+
   const { base, model } = state.settings.ai || {}
 
-  // Check if Gemini key (starts with AIza) or explicit Gemini model/provider
-  const isGemini = apiKey.startsWith('AIza') || (base && base.includes('googleapis')) || (model && model.includes('gemini'))
-  
+  // Auto-detect Gemini key (starts with AIza or not sk-) vs OpenAI key
+  const isGemini = apiKey.startsWith('AIza') || !apiKey.startsWith('sk-') || (base && base.includes('googleapis')) || (model && model.includes('gemini'))
+
   if (isGemini) {
     const geminiModel = model && model.includes('gemini') ? model : 'gemini-1.5-flash'
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent?key=${apiKey}`
@@ -30,8 +32,11 @@ async function api(system, user, maxTokens = 800) {
         contents: [{ parts: [{ text: promptText }] }]
       }),
     })
-    if (!res.ok) throw new Error('Gemini API Error ' + res.status)
-    const data = await res.json()
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) {
+      const msg = data.error?.message || ('Error ' + res.status)
+      throw new Error('Gemini: ' + msg)
+    }
     return data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || ''
   }
 
@@ -45,8 +50,11 @@ async function api(system, user, maxTokens = 800) {
       temperature: 0.8, max_tokens: maxTokens,
     }),
   })
-  if (!res.ok) throw new Error('AI API ' + res.status)
-  const data = await res.json()
+  const data = await res.json().catch(() => ({}))
+  if (!res.ok) {
+    const msg = data.error?.message || ('Error ' + res.status)
+    throw new Error('OpenAI: ' + msg)
+  }
   return data.choices?.[0]?.message?.content?.trim() || ''
 }
 
@@ -57,7 +65,8 @@ async function think(kind, system, offline, label = '') {
       const out = await api(system.prompt, system.user)
       if (out) return { text: out, source: 'live' }
     } catch (e) {
-      console.warn('AI API failed, using Bazar Brain:', e.message)
+      console.warn('AI API failed, using Bazar Brain fallback:', e.message)
+      toast('AI API Error: ' + e.message, 'err')
     }
   }
   return { text: await offline(), source: 'brain' }

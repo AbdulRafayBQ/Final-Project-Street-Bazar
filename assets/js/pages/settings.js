@@ -91,10 +91,18 @@ settingsPage.mount = (params, query, root) => {
   root.querySelector('#test-ai').addEventListener('click', async () => {
     const key = root.querySelector('#ai-key').value.trim()
     if (!key) return toast('Pehle API key dalein — warna Bazar Brain chal raha hai', 'err')
-    toast('Testing…')
-    const { genTitleOnly } = await import('../ai.js')
-    const t = await genTitleOnly({ rough: 'test leather wallet', category: 'Fashion' })
-    toast('AI responded: ' + t.slice(0, 40) + '…', 'ai')
+    toast('Testing AI API…')
+    try {
+      const { assistantReply } = await import('../ai.js')
+      const res = await assistantReply({ question: 'Hello! Respond in 5 words.' })
+      if (res.source === 'live') {
+        toast('🎉 Live AI Success: ' + res.text.slice(0, 45) + '…', 'ok')
+      } else {
+        toast('⚠️ API fail ho gayi, fallback active hai. Key aur Model verify karein.', 'err')
+      }
+    } catch (err) {
+      toast('AI Error: ' + err.message, 'err')
+    }
   })
 
   root.querySelector('#save-sb').addEventListener('click', async () => {
