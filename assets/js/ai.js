@@ -4,7 +4,7 @@
 
 import { state, logAI, CATEGORIES, productById, storeById, ratingOf, productReviews, currentUser } from './store.js'
 import { isAIConnected, getAIKey } from './db.js'
-import { money, num } from './ui.js'
+import { money, num, toast } from './ui.js'
 
 const T = (s) => String(s || '')
 const cap = (s) => T(s).charAt(0).toUpperCase() + T(s).slice(1)
