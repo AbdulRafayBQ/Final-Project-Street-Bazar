@@ -34,7 +34,13 @@ export default async function handler(req, res) {
     body: JSON.stringify(body),
   })
   const data = await response.json().catch(() => ({}))
-  if (!response.ok) return json(res, response.status, { error: data.error?.message || `AI provider ${response.status}` })
+  if (!response.ok) {
+    const providerError = data.error?.message || data.error?.status || data.message || `AI provider ${response.status}`
+    const accessHint = /denied|permission|forbidden|unauthorized|access/i.test(providerError)
+      ? ' AI provider ne is project/key ko access nahi diya; API key, provider project, billing/quota aur enabled API check karein.'
+      : ''
+    return json(res, response.status, { error: `${providerError}${accessHint}` })
+  }
   const text = isGemini
     ? data.candidates?.[0]?.content?.parts?.[0]?.text
     : isAnthropic ? data.content?.[0]?.text : data.choices?.[0]?.message?.content

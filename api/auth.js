@@ -61,6 +61,9 @@ export default async function handler(req, res) {
       const responseKeys = Object.keys(auth || {}).join(', ') || 'empty response'
       throw new Error(`Supabase returned no user (${responseKeys}). This email may already be registered, or the Auth anon key/project URL do not belong to the same Supabase project.`)
     }
+    if (action === 'signup' && (!auth.access_token || !user.email_confirmed_at)) {
+      return json(res, 200, { pending_verification: true, email, name, role })
+    }
     const adminEmails = (process.env.ADMIN_EMAILS || '').split(',').map((item) => item.trim().toLowerCase()).filter(Boolean)
     const assignedRole = adminEmails.includes(String(user.email || email).toLowerCase()) ? 'admin' : (role === 'owner' ? 'owner' : 'customer')
     const profile = {
