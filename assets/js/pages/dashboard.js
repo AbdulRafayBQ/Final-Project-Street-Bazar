@@ -2,7 +2,7 @@
 
 import { icon, esc, money, num, toast, modal, closeModal, timeAgo, spinner, confirmBox } from '../ui.js'
 import { statCard, emptyLogin } from '../components.js'
-import { myStores, storeById, storeProducts, storeOrders, storeRevenue, storeSales, currentUser, lowStock, productById, updateProduct, updateStore, advanceOrder, addStock, storeThreads, threadById, markThreadRead, userById, createProduct, save } from '../store.js'
+import { myStores, storeById, storeProducts, storeOrders, storeRevenue, storeSales, currentUser, lowStock, productById, updateProduct, updateStore, advanceOrder, addStock, storeThreads, threadById, markThreadRead, userById, save } from '../store.js'
 import { genStockPlan, parseStock, chatReply, genProductCopy } from '../ai.js'
 import { navigate } from '../router.js'
 
@@ -445,23 +445,25 @@ function bindWarehouse(pageRoot, holder, sid) {
     const { rows, source } = await genStockPlan({ rough: raw, storeName: storeById(sid)?.name || 'Store' })
     btn()
     out.innerHTML = `
-      <div class="ai-out"><span class="lbl">AI · ${source === 'live' ? 'live model' : 'Bazar Brain'} · ${rows.length} rows</span>Inventory entries tayyar hain. "Add to warehouse" dabate hi stock update ho jayega (naye items products ban jayenge).</div>
+      <div class="ai-out"><span class="lbl">AI · ${source === 'live' ? 'live model' : 'Bazar Brain'} · ${rows.length} rows</span>Existing products ka stock update hoga. Naya product banane ke liye pehle Add Product se listing publish karein.</div>
       <div class="table-wrap" style="margin-top:10px"><table style="min-width:auto">
         <thead><tr><th>Item</th><th>Qty</th><th>Price</th></tr></thead>
         <tbody>${rows.map((r) => `<tr><td>${esc(r.name)}</td><td>${r.qty}</td><td>${r.price ? money(r.price) : '—'}</td></tr>`).join('')}</tbody>
       </table></div>
       <button class="btn btn-primary btn-block" id="bulk-apply" style="margin-top:12px">${icon('box', '', 15)} <span>Add ${rows.length} entries to warehouse</span></button>`
     out.querySelector('#bulk-apply').addEventListener('click', () => {
+      const missing = []
       rows.forEach((r) => {
-        const existing = storeProducts(sid).find((p) => p.title.toLowerCase() === r.name.toLowerCase())
-        if (existing) addStock(existing.id, r.qty)
-        else createProduct({
-          store: sid, title: r.name, description: 'Added from warehouse bulk import.', price: r.price || 1200,
-          stock: r.qty, sku: r.sku, categories: [storeById(sid)?.categories?.[0] || 'Fashion'], tags: [],
-          media: [{ type: 'image', url: './images/p-kurta.png' }],
+        const requested = r.name.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
+        const existing = storeProducts(sid).find((p) => {
+          const title = p.title.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
+          return title === requested || title.includes(requested) || requested.includes(title)
         })
+        if (existing) addStock(existing.id, r.qty)
+        else missing.push(r.name)
       })
-      toast(rows.length + ' entries warehouse mein add ho gaye', 'ok')
+      if (missing.length) toast(`${missing.join(', ')} product listing mein nahi mila. Pehle product add karein.`, 'err')
+      else toast(rows.length + ' products ka stock update ho gaya', 'ok')
       refreshWarehouse(pageRoot, holder, sid)
     })
   })
