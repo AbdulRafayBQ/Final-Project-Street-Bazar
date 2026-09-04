@@ -19,6 +19,9 @@ export default async function handler(req, res) {
       const key = process.env.HF_TOKEN
       if (!key) return json(res, 503, { error: 'HF_TOKEN is not configured on Vercel' })
       const configuredModel = process.env.HF_IMAGE_MODEL || 'black-forest-labs/FLUX.1-Kontext-dev'
+      if (/flux\.1[-_]kontext/i.test(configuredModel)) {
+        return json(res, 503, { error: 'FLUX.1-Kontext is an image-editing model, but Hugging Face hf-inference does not support it. Select a supported image-editing provider or configure a Hugging Face Inference Endpoint for this model. No random replacement image was generated.' })
+      }
       const models = [...new Set([configuredModel, 'black-forest-labs/FLUX.1-Kontext-dev'])]
       const reference = await imageInput(image)
       if (!reference) return json(res, 400, { error: 'A reference product image is required for editing.' })
