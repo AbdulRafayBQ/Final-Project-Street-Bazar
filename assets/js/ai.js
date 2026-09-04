@@ -1,7 +1,7 @@
 /* Street Bazar — AI engine.
    Uses the Vercel server proxy when configured, otherwise falls back to "Bazar Brain". */
 
-import { state, logAI, CATEGORIES, productById, storeById, ratingOf, productReviews, currentUser } from './store.js'
+import { state, logAI, CATEGORIES, productById, storeById, ratingOf, productReviews, currentUser, searchAll } from './store.js'
 import { isAIConnected } from './db.js'
 import { money, num, toast } from './ui.js'
 
@@ -211,7 +211,11 @@ export async function genCategorySuggestion({ rough, storeName }) {
 }
 
 export async function assistantReply({ question }) {
-  const r = await think('assistant', { prompt: 'You are the Street Bazar in-app assistant. Answer briefly (max 60 words), helpful and friendly, English mixed with Roman Urdu. You can inspect the demo catalog.', user: question }, async () => {
+  const catalog = state.products.filter((p) => p.status !== 'hidden').map((p) => {
+    const store = storeById(p.store)
+    return `${p.title} | ${store?.name || 'Store'} | Rs ${p.price} | ${p.stock > 0 ? 'in stock' : 'out of stock'} | ${[...(p.categories || []), ...(p.tags || [])].join(', ')}`
+  }).join('\n')
+  const r = await think('assistant', { prompt: `You are the Street Bazar in-app assistant. Answer briefly (max 80 words), helpful and friendly, English mixed with Roman Urdu. Only recommend products from this live catalog; never invent a product/store. For price requests, find exact or nearest available prices and say the real price. Catalog:\n${catalog}`, user: question }, async () => {
     const q = T(question).toLowerCase()
     if (q.includes('sale') || q.includes('offer')) {
       const list = state.stores.filter((s) => s.sale && s.sale.until > Date.now())
@@ -227,7 +231,13 @@ export async function assistantReply({ question }) {
       return 'Budget picks:\n' + cheap.map((p) => '• ' + p.title + ' — ' + money(p.price)).join('\n')
     }
     if (q.includes('track') || q.includes('order')) return 'Track page par Order ID (SB-XXXXXX) daliye — status, courier note aur expected delivery sab aa jayega.'
-    const hit = state.products.find((p) => q.split(/\s+/).some((w) => w.length > 3 && p.title.toLowerCase().includes(w)))
+    const words = q.split(/\s+/).filter((w) => w.length > 2 && !['under', 'price', 'chahiye', 'mujhe', 'please'].includes(w))
+    const maxPrice = Number(q.match(/(?:under|below|less than)\s*(?:rs\.?\s*)?(\d+)/)?.[1] || 0)
+    const candidates = state.products.filter((p) => p.status !== 'hidden').map((p) => {
+      const text = `${p.title} ${(p.tags || []).join(' ')} ${(p.categories || []).join(' ')}`.toLowerCase()
+      return { p, score: words.filter((word) => text.includes(word)).length + (maxPrice && p.price <= maxPrice ? 1 : 0) }
+    }).filter((entry) => entry.score > 0).sort((a, b) => b.score - a.score || (maxPrice ? Math.abs(a.p.price - maxPrice) - Math.abs(b.p.price - maxPrice) : 0))
+    const hit = candidates[0]?.p || searchAll(question).products[0]
     if (hit) return chatReply({ question, productId: hit.id, storeId: hit.store })
     return 'Main poore catalog ko search kar sakta hoon — product ka naam, category ya store batayein. Jaise "custom cover", "namkeen" ya "wholesale kurta".'
   }, question)

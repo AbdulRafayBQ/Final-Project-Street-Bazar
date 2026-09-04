@@ -4,7 +4,7 @@
 import { toast } from './ui.js'
 import { state, save } from './store.js'
 
-export const TABLES = ['users', 'profiles', 'stores', 'products', 'reviews', 'orders', 'follows', 'threads', 'cart_items', 'saved_products']
+export const TABLES = ['users', 'profiles', 'stores', 'products', 'reviews', 'orders', 'follows', 'threads', 'cart_items', 'saved_products', 'warehouse_items']
 
 export const SQL_SCHEMA = `-- Street Bazar · Supabase schema (SQL Editor me paste karein)
 create extension if not exists "pgcrypto";

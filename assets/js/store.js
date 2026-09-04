@@ -423,7 +423,7 @@ function seed() {
   const likes = [{ id: 'l-1', user: 'u-ali', product: 'p-chai' }]
 
   return {
-    version: 1, isDemo: true, users, stores, products, reviews, orders, follows, threads, likes,
+    version: 1, isDemo: true, users, stores, products, reviews, orders, follows, threads, likes, warehouse: [],
     cart: [], notifications: [
       { id: 'n-1', to: 'u-ali', title: 'Gully Lab added a new drop', body: 'Gully Oversized Hoodie ab live hai.', at: now - 8 * 3600000, read: false, link: '#/product/p-hoodie' },
       { id: 'n-2', to: 'u-ali', title: 'Order SB-4F2K9X shipped', body: 'Noor Attire ne order dispatch kar diya hai.', at: now - 8 * 3600000, read: false, link: '#/track/SB-4F2K9X' },
@@ -589,7 +589,14 @@ export function createProduct(data) {
     wholesale: data.wholesale || { on: false, tiers: [] }, sales: 0, rating: 0,
     createdAt: Date.now(), status: 'active',
   }
-  state.products.unshift(p); save(); return p
+  state.products.unshift(p)
+  const store = storeById(p.store)
+  if (store?.owner) {
+    state.warehouse = state.warehouse || []
+    state.warehouse.unshift({ id: uid('w'), owner: store.owner, name: p.title, qty: p.stock, sku: p.sku, cost: 0, location: '', product: p.id, updatedAt: Date.now() })
+  }
+  save()
+  return p
 }
 export function updateProduct(id, data) {
   const p = productById(id); if (!p) return null
@@ -597,8 +604,32 @@ export function updateProduct(id, data) {
 }
 export function addStock(pid, qty) {
   const p = productById(pid); if (!p) return
-  p.stock = (p.stock || 0) + Number(qty); save()
+  p.stock = Math.max(0, (p.stock || 0) + Number(qty)); save()
+  const linked = (state.warehouse || []).find((item) => item.product === pid)
+  if (linked) { linked.qty = p.stock; linked.updatedAt = Date.now(); save() }
 }
+
+export function addWarehouseItem({ owner, name, qty = 0, sku = '', cost = 0, location = '', product = null }) {
+  const item = { id: uid('w'), owner, name: String(name).trim(), qty: Math.max(0, Number(qty) || 0), sku, cost: Number(cost) || 0, location, product, updatedAt: Date.now() }
+  state.warehouse = state.warehouse || []
+  state.warehouse.unshift(item)
+  save()
+  return item
+}
+
+export function updateWarehouseItem(id, data) {
+  const item = (state.warehouse || []).find((entry) => entry.id === id)
+  if (!item) return null
+  Object.assign(item, data, { qty: Math.max(0, Number(data.qty ?? item.qty) || 0), updatedAt: Date.now() })
+  if (item.product) {
+    const product = productById(item.product)
+    if (product) product.stock = item.qty
+  }
+  save()
+  return item
+}
+
+export const ownerWarehouse = (owner = state.session) => (state.warehouse || []).filter((item) => item.owner === owner)
 
 export function addReview({ product, store, rating, text }) {
   const u = currentUser(); if (!u) throw new Error('Review ke liye login karein')
@@ -655,7 +686,15 @@ export function placeOrder({ address, etaDays = 4 }) {
     etaDays, address, stores, createdAt: Date.now(),
   }
   state.orders.unshift(order)
-  state.cart.forEach((i) => { const p = productById(i.product); if (p) { p.stock = Math.max(0, p.stock - i.qty); p.sales = (p.sales || 0) + i.qty } })
+  state.cart.forEach((i) => {
+    const p = productById(i.product)
+    if (p) {
+      p.stock = Math.max(0, p.stock - i.qty)
+      p.sales = (p.sales || 0) + i.qty
+      const linked = (state.warehouse || []).find((item) => item.product === p.id)
+      if (linked) { linked.qty = p.stock; linked.updatedAt = Date.now() }
+    }
+  })
   stores.forEach((sid) => { const s = storeById(sid); if (s) notify(s.owner, 'New order ' + id, u.name + ' ne ' + moneyPlain(total) + ' ka order kiya', '#/dashboard') })
   state.cart = []; save(); return order
 }

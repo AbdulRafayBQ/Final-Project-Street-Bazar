@@ -2,7 +2,7 @@
 
 import { icon, esc, money, num, toast, modal, closeModal, timeAgo, spinner, confirmBox } from '../ui.js'
 import { statCard, emptyLogin } from '../components.js'
-import { myStores, storeById, storeProducts, storeOrders, storeRevenue, storeSales, currentUser, lowStock, productById, updateProduct, updateStore, advanceOrder, addStock, storeThreads, threadById, markThreadRead, userById, save } from '../store.js'
+import { myStores, storeById, storeProducts, storeOrders, storeRevenue, storeSales, currentUser, lowStock, productById, updateProduct, updateStore, advanceOrder, addStock, storeThreads, threadById, markThreadRead, userById, save, ownerWarehouse, addWarehouseItem, updateWarehouseItem } from '../store.js'
 import { genStockPlan, parseStock, chatReply, genProductCopy } from '../ai.js'
 import { navigate } from '../router.js'
 
@@ -361,6 +361,7 @@ warehousePage.mount = (params, query, root) => {
 function warehouseInner(sid) {
   const s = storeById(sid)
   const products = storeProducts(sid)
+  const privateItems = ownerWarehouse()
   const low = products.filter((p) => p.stock <= 8)
   const value = products.reduce((a, p) => a + p.stock * p.price, 0)
   const units = products.reduce((a, p) => a + p.stock, 0)
@@ -388,7 +389,8 @@ function warehouseInner(sid) {
             <div class="${p.stock <= 8 ? 'low' : ''}">${num(p.stock)} pcs</div>
             <div class="tiny muted">${num(p.sales)} sold</div>
             <div class="wrap-flex" style="gap:6px">
-              <button class="btn btn-sm btn-ghost" data-restock="${p.id}:10">+10</button>
+            <button class="btn btn-sm btn-ghost" data-restock="${p.id}:-10">-10</button>
+            <button class="btn btn-sm btn-ghost" data-restock="${p.id}:10">+10</button>
               <button class="btn btn-sm btn-ghost" data-restock="${p.id}:25">+25</button>
             </div>
             <button class="btn btn-sm btn-ghost" data-restock-custom="${p.id}">${icon('edit', '', 14)} Set</button>
@@ -409,11 +411,40 @@ function warehouseInner(sid) {
           ${low.map((p) => `<div class="row-between tiny"><span>${esc(p.title)}</span><b class="low">${p.stock} left</b></div>`).join('')}
         </div>` : ''}
     </div>
+    <div class="panel" style="grid-column:1/-1">
+      <div class="row-between"><div><h3 class="h4">Private warehouse stock</h3><div class="tiny muted">Ye inventory store par publish nahi hoti — physical stock ke liye.</div></div><button class="btn btn-sm btn-ghost" data-warehouse-add>${icon('plus', '', 14)} Add item</button></div>
+      <div class="table-wrap" style="margin-top:12px"><table><thead><tr><th>Item</th><th>SKU</th><th>Qty</th><th>Location</th><th></th></tr></thead><tbody>
+        ${privateItems.length ? privateItems.map((item) => `<tr><td><b>${esc(item.name)}</b></td><td>${esc(item.sku || '—')}</td><td><b>${num(item.qty)}</b></td><td>${esc(item.location || '—')}</td><td><button class="btn btn-sm btn-ghost" data-warehouse-edit="${item.id}">Edit</button></td></tr>`).join('') : '<tr><td colspan="5" class="muted">Private warehouse empty hai.</td></tr>'}
+      </tbody></table></div>
+    </div>
   </div>`
 }
 
 function bindWarehouse(pageRoot, holder, sid) {
   if (!holder) return
+  holder.querySelector('[data-warehouse-add]')?.addEventListener('click', () => {
+    modal({
+      title: 'Add private warehouse item',
+      body: '<div class="stack"><input class="input" id="wh-name" placeholder="Item name"><input class="input" id="wh-qty" type="number" min="0" placeholder="Quantity"><input class="input" id="wh-sku" placeholder="SKU (optional)"><input class="input" id="wh-location" placeholder="Location (optional)"></div>',
+      foot: '<button class="btn btn-ghost" data-close>Cancel</button><button class="btn btn-primary" id="wh-save">Save</button>',
+      onOpen: (el) => el.querySelector('#wh-save').addEventListener('click', () => {
+        const name = el.querySelector('#wh-name').value.trim()
+        if (!name) return toast('Item name zaroori hai', 'err')
+        addWarehouseItem({ owner: currentUser().id, name, qty: el.querySelector('#wh-qty').value, sku: el.querySelector('#wh-sku').value.trim(), location: el.querySelector('#wh-location').value.trim() })
+        closeModal(); refreshWarehouse(pageRoot, holder, sid)
+      }),
+    })
+  })
+  holder.querySelectorAll('[data-warehouse-edit]').forEach((button) => button.addEventListener('click', () => {
+    const item = ownerWarehouse().find((entry) => entry.id === button.dataset.warehouseEdit)
+    if (!item) return
+    modal({
+      title: 'Update warehouse quantity',
+      body: `<div class="field"><span class="label">${esc(item.name)}</span><input class="input" id="wh-qty" type="number" min="0" value="${item.qty}"></div>`,
+      foot: '<button class="btn btn-ghost" data-close>Cancel</button><button class="btn btn-primary" id="wh-save">Update</button>',
+      onOpen: (el) => el.querySelector('#wh-save').addEventListener('click', () => { updateWarehouseItem(item.id, { qty: el.querySelector('#wh-qty').value }); closeModal(); refreshWarehouse(pageRoot, holder, sid) }),
+    })
+  }))
   holder.querySelectorAll('[data-restock]').forEach((b) => b.addEventListener('click', () => {
     const [pid, qty] = b.dataset.restock.split(':')
     addStock(pid, qty)
@@ -445,7 +476,7 @@ function bindWarehouse(pageRoot, holder, sid) {
     const { rows, source } = await genStockPlan({ rough: raw, storeName: storeById(sid)?.name || 'Store' })
     btn()
     out.innerHTML = `
-      <div class="ai-out"><span class="lbl">AI · ${source === 'live' ? 'live model' : 'Bazar Brain'} · ${rows.length} rows</span>Existing products ka stock update hoga. Naya product banane ke liye pehle Add Product se listing publish karein.</div>
+      <div class="ai-out"><span class="lbl">AI · ${source === 'live' ? 'live model' : 'Bazar Brain'} · ${rows.length} rows</span>Existing listings ka stock update hoga; baqi items private warehouse mein add honge. Koi item store par automatically publish nahi hoga.</div>
       <div class="table-wrap" style="margin-top:10px"><table style="min-width:auto">
         <thead><tr><th>Item</th><th>Qty</th><th>Price</th></tr></thead>
         <tbody>${rows.map((r) => `<tr><td>${esc(r.name)}</td><td>${r.qty}</td><td>${r.price ? money(r.price) : '—'}</td></tr>`).join('')}</tbody>
@@ -460,10 +491,9 @@ function bindWarehouse(pageRoot, holder, sid) {
           return title === requested || title.includes(requested) || requested.includes(title)
         })
         if (existing) addStock(existing.id, r.qty)
-        else missing.push(r.name)
+        else addWarehouseItem({ owner: currentUser().id, name: r.name, qty: r.qty, cost: r.price, sku: r.sku })
       })
-      if (missing.length) toast(`${missing.join(', ')} product listing mein nahi mila. Pehle product add karein.`, 'err')
-      else toast(rows.length + ' products ka stock update ho gaya', 'ok')
+      toast(rows.length + ' warehouse entries update ho gayi', 'ok')
       refreshWarehouse(pageRoot, holder, sid)
     })
   })

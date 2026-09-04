@@ -58,7 +58,7 @@ export async function productPage(params) {
             ${off ? `<span class="badge badge-sale">${off}% OFF</span>` : ''}
             ${p.customizable?.on ? `<span class="badge badge-violet">${icon('wand', '', 12)} Customizable</span>` : ''}
             ${p.wholesale?.on ? `<span class="badge badge-teal">${icon('scale', '', 12)} Wholesale</span>` : ''}
-            ${p.stock <= 8 ? `<span class="badge badge-rejected">Only ${num(p.stock)} left</span>` : `<span class="badge badge-live">${icon('check', '', 12)} In stock</span>`}
+            ${p.stock <= 0 ? '<span class="badge badge-rejected">Out of stock</span>' : `<span class="badge badge-live">${icon('check', '', 12)} In stock</span>`}
           </div>
           <h1 class="h2" style="margin-top:12px">${esc(p.title)}</h1>
           <div class="row" style="gap:12px;margin-top:10px;flex-wrap:wrap">
@@ -108,7 +108,7 @@ export async function productPage(params) {
         </div>
 
         <div class="progress"><i style="width:${Math.min(100, (p.stock / 120) * 100)}%"></i></div>
-        <div class="tiny muted">${num(p.stock)} pcs available${p.wholesale?.on ? ' · wholesale ke liye quantity 12+' : ''}</div>
+        <div class="tiny muted">${p.stock <= 0 ? 'Out of stock' : 'In stock'}${p.wholesale?.on ? ' · wholesale ke liye quantity 12+' : ''}</div>
 
         <div class="trust-row">
           <div>${icon('truck', '', 15)} Delivery 2–5 days</div>

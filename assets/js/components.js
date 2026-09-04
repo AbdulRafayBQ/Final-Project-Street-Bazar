@@ -19,7 +19,7 @@ export function productCard(p) {
   const off = p.compareAt && p.compareAt > p.price ? Math.round((1 - p.price / p.compareAt) * 100) : 0
   const isNew = Date.now() - new Date(p.createdAt).getTime() < 7 * 86400000
   const liked = likedProducts().includes(p.id)
-  const low = p.stock <= 8
+  const out = p.stock <= 0
   const m = p.media?.[0] || { type: 'image', url: './images/p-kurta.png' }
 
   return `<article class="pcard reveal">
@@ -30,7 +30,7 @@ export function productCard(p) {
       <div class="pcard-badges">
         ${off ? `<span class="badge badge-sale">${off}% OFF</span>` : ''}
         ${isNew ? `<span class="badge badge-new">New</span>` : ''}
-        ${low ? `<span class="badge badge-rejected">Only ${num(p.stock)} left</span>` : ''}
+        ${out ? '<span class="badge badge-rejected">Out of stock</span>' : ''}
       </div>
       <button class="pcard-fav ${liked ? 'on' : ''}" data-like="${p.id}" aria-label="Save">${icon('heart', '', 17)}</button>
       ${p.media?.length > 1 ? `<span class="media-count">${icon('image', '', 12)} ${p.media.length}</span>` : ''}

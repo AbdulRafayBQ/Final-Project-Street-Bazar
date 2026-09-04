@@ -79,6 +79,17 @@ create table if not exists saved_products (
   product_id text, created_at timestamptz default now()
 );
 
+create table if not exists warehouse_items (
+  id text primary key,
+  owner_id uuid references users(id),
+  name text not null,
+  qty int not null default 0,
+  sku text,
+  cost numeric default 0,
+  location text,
+  updated_at timestamptz default now()
+);
+
 create table if not exists app_state (
   key text primary key,
   payload jsonb not null,
@@ -95,4 +106,5 @@ alter table follows enable row level security;
 alter table threads enable row level security;
 alter table cart_items enable row level security;
 alter table saved_products enable row level security;
+alter table warehouse_items enable row level security;
 alter table app_state enable row level security;
