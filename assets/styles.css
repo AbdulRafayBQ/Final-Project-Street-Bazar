@@ -206,7 +206,7 @@ h1,h2,h3,h4,.dsp{font-family:var(--font-d);font-weight:700;letter-spacing:-.02em
   border-bottom:1px solid rgba(228,215,194,.8)}
 .hd{height:var(--header-h);display:flex;align-items:center;gap:16px}
 .logo{display:flex;align-items:center;gap:12px;flex:none;width:190px;min-width:190px;overflow:hidden}
-.hd .logo img{width:34px;height:34px !important;object-fit:contain;opacity:1;filter:brightness(.24) contrast(1.35)}
+.hd .logo img{width:34px;height:34px !important;object-fit:contain;opacity:1}
 .logo-wordmark{font-family:var(--font-d);font-weight:800;font-size:16px;letter-spacing:-.045em;color:var(--ink);white-space:nowrap;line-height:1}
 .logo-wordmark b{color:#D65332;font-weight:800}
 .logo-mark{width:38px;height:38px;border-radius:12px;background:var(--ink);display:grid;place-items:center;box-shadow:var(--shadow-s);transition:.3s var(--ease)}
