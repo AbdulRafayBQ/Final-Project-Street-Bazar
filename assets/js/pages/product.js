@@ -243,7 +243,9 @@ productPage.mount = (params, query, root) => {
     status.textContent = 'AI image generate ho rahi hai…'
     try {
       const response = await fetch('/api/image', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ prompt, image: p.media?.[0]?.url || '' }) })
-      const data = await response.json()
+      const raw = await response.text()
+      let data = {}
+      try { data = raw ? JSON.parse(raw) : {} } catch { data = { error: raw.slice(0, 240) || `Image service returned HTTP ${response.status}` } }
       if (!response.ok || !data.url) throw new Error(data.error || 'Image generate nahi hui')
       customizedImage = data.url
       root.querySelector('[data-custom-preview]').src = customizedImage
