@@ -266,6 +266,12 @@ addProductPage.mount = (params, query, root) => {
     if (!title) return toast('Title zaroori hai', 'err')
     if (!price) return toast('Price dalna zaroori hai', 'err')
     if (root.querySelector('#p-stock').value === '') return toast('Stock likhein (0 bhi chalega)', 'err')
+    if (wsOn.checked) {
+      const validTiers = tiers.filter((tier) => tier.qty > 0 && tier.price > 0)
+      if (!validTiers.length) return toast('Wholesale ke liye quantity aur price set karein', 'err')
+      if (validTiers.some((tier) => tier.price >= price)) return toast('Wholesale price retail price se kam honi chahiye', 'err')
+      tiers = validTiers.sort((a, b) => a.qty - b.qty)
+    }
     const btn = spinner(e.currentTarget)
     await new Promise((r) => setTimeout(r, 500))
     const data = {

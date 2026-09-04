@@ -435,8 +435,14 @@ function titleFor(path) {
 
 /* ---------------- boot ---------------- */
 async function restoreGoogleSession() {
-  const accessToken = new URLSearchParams(window.location.hash.split('?')[1] || '').get('access_token')
+  const params = new URLSearchParams(window.location.hash.replace(/^#\/?/, ''))
+  const accessToken = params.get('access_token')
   if (!accessToken) return
+  if (params.get('type') === 'recovery') {
+    sessionStorage.setItem('street-bazar-recovery-token', accessToken)
+    window.location.hash = '#/auth?reset=1'
+    return
+  }
   try {
     const result = await authRequest('oauth', { access_token: accessToken })
     state.users.push(result.user)

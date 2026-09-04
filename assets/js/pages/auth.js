@@ -56,7 +56,7 @@ export async function authPage(params, query) {
 }
 
 authPage.mount = (params, query, root) => {
-  let mode = 'signin'
+  let mode = query.reset ? 'reset' : 'signin'
   const body = root.querySelector('[data-auth-body]')
   const redirect = query.next ? '#' + query.next : '#/'
 
@@ -69,6 +69,22 @@ authPage.mount = (params, query, root) => {
         <div class="field"><span class="label">Password</span><div class="password-wrap"><input class="input" id="au-pass" type="password" placeholder="••••••••"><button type="button" class="password-toggle" data-password-toggle>Show</button></div></div>
         <button class="btn btn-primary btn-lg btn-block" id="au-go"><span>Sign in</span> ${icon('arrow', '', 16)}</button>
         <button class="btn btn-ghost btn-lg btn-block" id="google-auth">${icon('google', '', 17)} Continue with Google</button>
+        <button class="btn-link-sm" id="forgot-password" style="align-self:flex-start">Forgot password?</button>
+      </div>`,
+    forgot: () => `
+      <h2 class="h3">Reset password</h2>
+      <p class="muted small" style="margin:8px 0 18px">Email dein, hum reset link bhej denge.</p>
+      <div class="stack">
+        <div class="field"><span class="label">Email</span><input class="input" id="au-email" type="email" placeholder="you@email.com"></div>
+        <button class="btn btn-grad btn-lg btn-block" id="au-go">Send reset link</button>
+        <button class="btn btn-ghost" id="au-back">Back to sign in</button>
+      </div>`,
+    reset: () => `
+      <h2 class="h3">Set new password</h2>
+      <p class="muted small" style="margin:8px 0 18px">Apna naya password set karein.</p>
+      <div class="stack">
+        <div class="field"><span class="label">New password</span><div class="password-wrap"><input class="input" id="au-pass" type="password" placeholder="6+ characters"><button type="button" class="password-toggle" data-password-toggle>Show</button></div></div>
+        <button class="btn btn-grad btn-lg btn-block" id="au-go">Update password</button>
       </div>`,
     signup: () => `
       <h2 class="h3">Bazaar mein aapka swagat hai</h2>
@@ -117,12 +133,24 @@ authPage.mount = (params, query, root) => {
       } catch (err) { btn(); toast(err.message, 'err') }
     })
     body.querySelector('#au-back')?.addEventListener('click', () => { pendingSignup = null; paint() })
+    body.querySelector('#forgot-password')?.addEventListener('click', () => { mode = 'forgot'; paint() })
     body.querySelector('#au-go')?.addEventListener('click', async (e) => {
       const btn = spinner(e.currentTarget)
       const email = body.querySelector('#au-email').value.trim()
-      const pass = body.querySelector('#au-pass').value
+      const pass = body.querySelector('#au-pass')?.value || ''
       await new Promise((r) => setTimeout(r, 500))
       try {
+        if (mode === 'forgot') {
+          await authRequest('forgot', { email })
+          btn(); toast('Password reset email bhej di gayi', 'ok'); return
+        }
+        if (mode === 'reset') {
+          const token = sessionStorage.getItem('street-bazar-recovery-token')
+          if (!token) throw new Error('Reset link expired. Dobara reset email mangwayein.')
+          await authRequest('reset', { access_token: token, password: pass })
+          sessionStorage.removeItem('street-bazar-recovery-token')
+          mode = 'signin'; btn(); paint(); toast('Password update ho gaya', 'ok'); return
+        }
         if (mode === 'signin') {
           let u
           const result = await authRequest('login', { email, password: pass })
