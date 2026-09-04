@@ -404,12 +404,13 @@ function warehouseInner(sid) {
     <div class="panel">
       <div class="row"><span class="ai-orb">${icon('sparkles', '', 20)}</span><div><b class="h4">AI bulk stock</b><div class="tiny muted">Paste list, AI sab set kar dega</div></div></div>
       <p class="tiny muted" style="margin:12px 0">Har line: <b>name, qty, price</b>. AI quantity ko samajh kar inventory entries banayega. New private items ke liye product image required hai.</p>
-      <textarea class="textarea" id="bulk-in" placeholder="Leather Wallet Brown, 25, 1450&#10;Leather Wallet Black, 30, 1450&#10;Card Holder, 40, 850"></textarea>
+      <label class="label" style="margin-top:10px">Add stock to</label>
+      <select class="select" id="bulk-destination"><option value="store">Store inventory (existing published product only)</option><option value="private">Private inventory (never published automatically)</option></select>
+      <textarea class="textarea" id="bulk-in" style="margin-top:10px" placeholder="Polo shirt, 300, 1499"></textarea>
       <div class="field" style="margin-top:10px">
         <span class="label">Product image <b style="color:var(--red)">(required for new warehouse items)</b></span>
-        <input class="input" id="bulk-image-url" type="url" placeholder="Paste image URL">
         <input class="input" id="bulk-image-file" type="file" accept="image/*" style="margin-top:8px">
-        <div class="tiny muted" id="bulk-image-help" style="margin-top:6px">Upload an image or paste an image URL. This image will be attached to new private inventory items.</div>
+        <div class="tiny muted" id="bulk-image-help" style="margin-top:6px">Upload an image. This image will be attached to new inventory items.</div>
       </div>
       <button class="btn btn-grad btn-block" id="bulk-run" style="margin-top:10px">${icon('sparkles', '', 15)} <span>Parse with AI</span></button>
       <div id="bulk-out" style="margin-top:14px"></div>
@@ -423,7 +424,7 @@ function warehouseInner(sid) {
     <div class="panel" style="grid-column:1/-1">
       <div class="row-between"><div><h3 class="h4">Private warehouse stock</h3><div class="tiny muted">Ye inventory store par publish nahi hoti — physical stock ke liye.</div></div><button class="btn btn-sm btn-ghost" data-warehouse-add>${icon('plus', '', 14)} Add item</button></div>
       <div class="table-wrap" style="margin-top:12px"><table><thead><tr><th>Item</th><th>SKU</th><th>Qty</th><th>Location</th><th></th></tr></thead><tbody>
-        ${privateItems.length ? privateItems.map((item) => `<tr><td><div class="row"><img src="${esc(item.image || './images/p-kurta.png')}" alt="" style="width:36px;height:36px;object-fit:cover;border-radius:9px"><b>${esc(item.name)}</b></div></td><td>${esc(item.sku || '—')}</td><td><b>${num(item.qty)}</b></td><td>${esc(item.location || '—')}</td><td><button class="btn btn-sm btn-ghost" data-warehouse-edit="${item.id}">Edit</button> <button class="btn btn-sm btn-danger" data-warehouse-delete="${item.id}">${icon('trash', '', 13)}</button></td></tr>`).join('') : '<tr><td colspan="5" class="muted">Private warehouse empty hai.</td></tr>'}
+        ${privateItems.length ? privateItems.map((item) => `<tr><td><div class="row"><img src="${esc(item.image || './images/p-kurta.png')}" alt="" style="width:36px;height:36px;object-fit:cover;border-radius:9px"><b>${esc(item.name)}</b></div></td><td>${esc(item.sku || '—')}</td><td><b>${num(item.qty)}</b></td><td>${esc(item.location || '—')}</td><td><a class="btn btn-sm btn-ghost" href="#/add-product?warehouseId=${encodeURIComponent(item.id)}">Publish product</a> <button class="btn btn-sm btn-ghost" data-warehouse-edit="${item.id}">Edit</button> <button class="btn btn-sm btn-danger" data-warehouse-delete="${item.id}">${icon('trash', '', 13)}</button></td></tr>`).join('') : '<tr><td colspan="5" class="muted">Private warehouse empty hai.</td></tr>'}
       </tbody></table></div>
     </div>
   </div>`
@@ -444,15 +445,19 @@ function bindWarehouse(pageRoot, holder, sid) {
   holder.querySelector('[data-warehouse-add]')?.addEventListener('click', () => {
     modal({
       title: 'Add private warehouse item',
-      body: '<div class="stack"><input class="input" id="wh-name" placeholder="Item name"><input class="input" id="wh-qty" type="number" min="0" placeholder="Quantity"><label class="label">Product image <b style="color:var(--red)">(required)</b></label><input class="input" id="wh-image" type="url" placeholder="Paste product image URL"><div class="tiny muted">A product image is required before this warehouse item can be saved.</div><input class="input" id="wh-sku" placeholder="SKU (optional)"><input class="input" id="wh-location" placeholder="Location (optional)"></div>',
+      body: '<div class="stack"><input class="input" id="wh-name" placeholder="Item name"><input class="input" id="wh-qty" type="number" min="0" placeholder="Quantity"><label class="label">Product image <b style="color:var(--red)">(required)</b></label><input class="input" id="wh-image" type="file" accept="image/*"><div class="tiny muted">A product image is required before this warehouse item can be saved.</div><input class="input" id="wh-sku" placeholder="SKU (optional)"><input class="input" id="wh-location" placeholder="Location (optional)"></div>',
       foot: '<button class="btn btn-ghost" data-close>Cancel</button><button class="btn btn-primary" id="wh-save">Save</button>',
       onOpen: (el) => el.querySelector('#wh-save').addEventListener('click', () => {
         const name = el.querySelector('#wh-name').value.trim()
         if (!name) return toast('Item name is required.', 'err')
-        const image = el.querySelector('#wh-image').value.trim()
-        if (!image) return toast('Product image is required.', 'err')
-        addWarehouseItem({ owner: currentUser().id, name, qty: el.querySelector('#wh-qty').value, image, sku: el.querySelector('#wh-sku').value.trim(), location: el.querySelector('#wh-location').value.trim() })
-        closeModal(); refreshWarehouse(pageRoot, holder, sid)
+        const file = el.querySelector('#wh-image').files?.[0]
+        if (!file) return toast('Product image is required.', 'err')
+        const reader = new FileReader()
+        reader.onload = () => {
+          addWarehouseItem({ owner: currentUser().id, name, qty: el.querySelector('#wh-qty').value, image: String(reader.result || ''), sku: el.querySelector('#wh-sku').value.trim(), location: el.querySelector('#wh-location').value.trim() })
+          closeModal(); refreshWarehouse(pageRoot, holder, sid)
+        }
+        reader.readAsDataURL(file)
       }),
     })
   })
@@ -496,15 +501,16 @@ function bindWarehouse(pageRoot, holder, sid) {
   holder.querySelector('#bulk-run')?.addEventListener('click', async (e) => {
     const raw = holder.querySelector('#bulk-in').value.trim()
     if (!raw) return toast('Pehle list paste karein', 'err')
-    const image = holder.dataset.bulkImage || holder.querySelector('#bulk-image-url').value.trim()
+    const image = holder.dataset.bulkImage || ''
     if (!image) return toast('Product image is required. Upload an image or paste an image URL.', 'err')
+    const destination = holder.querySelector('#bulk-destination').value
     const btn = spinner(e.currentTarget)
     const out = holder.querySelector('#bulk-out')
     out.innerHTML = '<div class="ai-out"><span class="lbl">AI is reading your list…</span>Rows parse ho rahe hain…</div>'
     const { rows, source } = await genStockPlan({ rough: raw, storeName: storeById(sid)?.name || 'Store' })
     btn()
     out.innerHTML = `
-      <div class="ai-out"><span class="lbl">AI · ${source === 'live' ? 'live model' : 'Bazar Brain'} · ${rows.length} rows</span>Existing listings ka stock update hoga; baqi items private warehouse mein add honge. Koi item store par automatically publish nahi hoga.</div>
+      <div class="ai-out"><span class="lbl">AI · ${source === 'live' ? 'live model' : 'Bazar Brain'} · ${rows.length} rows</span>${destination === 'store' ? 'Selected published products ka stock update hoga. New products publish nahi honge.' : 'Private inventory mein existing item ki quantity merge hogi. Koi product automatically publish nahi hoga.'}</div>
       <div class="table-wrap" style="margin-top:10px"><table style="min-width:auto">
         <thead><tr><th>Item</th><th>Qty</th><th>Price</th></tr></thead>
         <tbody>${rows.map((r) => `<tr><td>${esc(r.name)}</td><td>${r.qty}</td><td>${r.price ? money(r.price) : '—'}</td></tr>`).join('')}</tbody>
@@ -518,8 +524,12 @@ function bindWarehouse(pageRoot, holder, sid) {
           const title = p.title.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
           return title === requested || title.includes(requested) || requested.includes(title)
         })
-        if (existing) addStock(existing.id, r.qty)
-        else addWarehouseItem({ owner: currentUser().id, name: r.name, qty: r.qty, cost: r.price, sku: r.sku, image: r.image || image })
+        if (destination === 'store') {
+          if (existing) addStock(existing.id, r.qty)
+          else missing.push(r.name + ' (not published)')
+        } else {
+          addWarehouseItem({ owner: currentUser().id, name: r.name, qty: r.qty, cost: r.price, sku: r.sku, image: r.image || image })
+        }
       })
       toast((rows.length - missing.length) + ' entries update ho gayi' + (missing.length ? `. Image missing: ${missing.join(', ')}` : ''), missing.length ? 'err' : 'ok')
       refreshWarehouse(pageRoot, holder, sid)

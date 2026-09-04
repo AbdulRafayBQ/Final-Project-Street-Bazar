@@ -253,14 +253,17 @@ productPage.mount = (params, query, root) => {
       const w = image.width * scale; const h = image.height * scale
       const x = (canvas.width - w) / 2; const y = (canvas.height - h) / 2
       ctx.drawImage(image, x, y, w, h)
-      if (customState.color !== '#ffffff') { ctx.globalAlpha = 0.28; ctx.fillStyle = customState.color; ctx.fillRect(x, y, w, h); ctx.globalAlpha = 1 }
+      const garmentX = x + w * 0.18; const garmentY = y + h * 0.12; const garmentW = w * 0.64; const garmentH = h * 0.76
+      ctx.save(); ctx.beginPath(); ctx.rect(garmentX, garmentY, garmentW, garmentH); ctx.clip()
+      if (customState.color !== '#ffffff') { ctx.globalAlpha = 0.28; ctx.fillStyle = customState.color; ctx.fillRect(garmentX, garmentY, garmentW, garmentH); ctx.globalAlpha = 1 }
       if (customState.design) {
         const design = new Image()
-        design.onload = () => { ctx.globalAlpha = 0.55; ctx.globalCompositeOperation = 'multiply'; ctx.drawImage(design, x, y, w, h); ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1; finish() }
+        design.onload = () => { ctx.globalAlpha = 0.55; ctx.globalCompositeOperation = 'multiply'; ctx.drawImage(design, garmentX, garmentY, garmentW, garmentH); ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1; finish() }
         design.src = customState.design
       } else finish()
       function finish() {
-        if (customState.text) { ctx.fillStyle = '#111'; ctx.font = 'bold 28px sans-serif'; ctx.textAlign = 'center'; ctx.fillText(customState.text.slice(0, 36), canvas.width / 2, y + h * 0.55) }
+        if (customState.text) { ctx.fillStyle = '#111'; ctx.font = 'bold 28px sans-serif'; ctx.textAlign = 'center'; ctx.fillText(customState.text.slice(0, 36), garmentX + garmentW / 2, garmentY + garmentH * 0.55) }
+        ctx.restore()
         try { customizedImage = canvas.toDataURL('image/png'); } catch { customizedImage = p.media?.[0]?.url || '' }
       }
     }

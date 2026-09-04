@@ -1,7 +1,7 @@
 /* Street Bazar — Add / Edit product with AI listing tools */
 
 import { icon, esc, money, toast, spinner, bindMediaPicker, closeModal } from '../ui.js'
-import { myStores, storeById, createProduct, updateProduct, productById, currentUser, allCategories, CATEGORIES } from '../store.js'
+import { myStores, storeById, createProduct, updateProduct, productById, currentUser, allCategories, CATEGORIES, state } from '../store.js'
 import { genProductCopy, genTitleOnly, suggestPrice, aiStatusText } from '../ai.js'
 import { navigate } from '../router.js'
 
@@ -114,15 +114,20 @@ function mediaMarkup(list) {
   return `
     <label class="drop" for="p-files">${icon('upload')}<div><b>Upload photos / videos</b></div><div class="hint">JPG, PNG, WEBP, MP4 — multiple select karein</div></label>
     <input type="file" id="p-files" accept="image/*,video/*" multiple hidden>
-    <input class="input" id="p-media-url" data-media-url placeholder="…ya direct link paste karein + Enter" style="margin-top:8px">
     <div class="media-grid" id="p-media-list" data-media-list style="margin-top:10px"></div>`
 }
 
 addProductPage.mount = (params, query, root) => {
   const editing = params.pid ? productById(params.pid) : null
-  let media = editing?.media ? [...editing.media.map((m) => ({ ...m }))] : []
+  const warehouseDraft = query.warehouseId ? state.warehouse?.find((item) => item.id === query.warehouseId) : null
+  let media = editing?.media ? [...editing.media.map((m) => ({ ...m }))] : warehouseDraft?.image ? [{ type: 'image', url: warehouseDraft.image }] : []
   let options = editing?.customizable?.options ? JSON.parse(JSON.stringify(editing.customizable.options)) : [{ name: 'Size', choices: [{ label: 'M', delta: 0 }, { label: 'L', delta: 0 }] }]
   let tiers = editing?.wholesale?.tiers ? [...editing.wholesale.tiers] : [{ qty: 12, price: 0 }]
+  if (warehouseDraft) {
+    root.querySelector('#p-title').value = warehouseDraft.name
+    root.querySelector('#p-stock').value = warehouseDraft.qty
+    root.querySelector('#p-sku').value = warehouseDraft.sku || ''
+  }
 
   bindMediaPicker(root.querySelector('#p-media'), media, (m) => { media = m; paintPreview() })
 
