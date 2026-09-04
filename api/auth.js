@@ -2,6 +2,8 @@ const json = (res, status, body) => {
   res.status(status).setHeader('Content-Type', 'application/json').send(JSON.stringify(body))
 }
 
+const authKey = () => process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_ANON_KEY || process.env.SUPABASE_PUBLISHABLE_KEY
+
 const supabaseRequest = async (path, options = {}, requestKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_ANON_KEY || process.env.SUPABASE_PUBLISHABLE_KEY) => {
   const base = (process.env.SUPABASE_URL || '').trim().replace(/\/$/, '')
   const key = String(requestKey || '').trim()
@@ -18,7 +20,7 @@ const supabaseRequest = async (path, options = {}, requestKey = process.env.SUPA
 export default async function handler(req, res) {
   if (req.method === 'GET' && req.query?.action === 'google') {
     const base = (process.env.SUPABASE_URL || '').trim().replace(/\/$/, '')
-    const key = process.env.SUPABASE_ANON_KEY || process.env.SUPABASE_PUBLISHABLE_KEY
+    const key = authKey()
     if (!base || !key) return json(res, 503, { error: 'Supabase environment variables are not configured' })
     const redirect = req.query.redirect || `${req.headers['x-forwarded-proto'] || 'https'}://${req.headers.host}/`
     const params = new URLSearchParams({ provider: 'google', redirect_to: redirect })
@@ -43,7 +45,7 @@ export default async function handler(req, res) {
       await supabaseRequest('/auth/v1/otp', {
         method: 'POST',
         body: JSON.stringify({ email: normalizedEmail, create_user: false }),
-      }, process.env.SUPABASE_ANON_KEY || process.env.SUPABASE_PUBLISHABLE_KEY)
+      }, authKey())
       return json(res, 200, { sent: true })
     } else if (action === 'reset') {
       if (!access_token || !password || password.length < 6) return json(res, 400, { error: 'Verification code and new password are required' })
@@ -51,33 +53,33 @@ export default async function handler(req, res) {
         method: 'PUT',
         headers: { Authorization: 'Bearer ' + access_token },
         body: JSON.stringify({ password }),
-      }, process.env.SUPABASE_ANON_KEY || process.env.SUPABASE_PUBLISHABLE_KEY)
+      }, authKey())
       return json(res, 200, { reset: true })
     } else if (action === 'oauth_code') {
       auth = await supabaseRequest('/auth/v1/token?grant_type=pkce', {
         method: 'POST',
         body: JSON.stringify({ auth_code: code, code_verifier }),
-      }, process.env.SUPABASE_ANON_KEY || process.env.SUPABASE_PUBLISHABLE_KEY)
+      }, authKey())
       auth.user = await supabaseRequest('/auth/v1/user', {
         method: 'GET',
         headers: { Authorization: 'Bearer ' + auth.access_token },
-      }, process.env.SUPABASE_ANON_KEY || process.env.SUPABASE_PUBLISHABLE_KEY)
+      }, authKey())
     } else if (action === 'oauth') {
       auth = await supabaseRequest('/auth/v1/user', {
         method: 'GET',
         headers: { Authorization: 'Bearer ' + access_token },
-      }, process.env.SUPABASE_ANON_KEY || process.env.SUPABASE_PUBLISHABLE_KEY)
+      }, authKey())
       auth.access_token = access_token
     } else if (action === 'verify') {
       auth = await supabaseRequest('/auth/v1/verify', {
         method: 'POST',
         body: JSON.stringify({ type, email: normalizedEmail, token }),
-      }, process.env.SUPABASE_ANON_KEY || process.env.SUPABASE_PUBLISHABLE_KEY)
+      }, authKey())
     } else if (action === 'signup') {
       auth = await supabaseRequest('/auth/v1/signup', {
         method: 'POST',
         body: JSON.stringify({ email: normalizedEmail, password, data: { name, role } }),
-      }, process.env.SUPABASE_ANON_KEY || process.env.SUPABASE_PUBLISHABLE_KEY)
+      }, authKey())
       if (auth.user && Array.isArray(auth.user.identities) && auth.user.identities.length === 0) {
         return json(res, 409, { error: 'Is email par account pehle se registered hai. Sign in ya Forgot password use karein.' })
       }
@@ -85,7 +87,7 @@ export default async function handler(req, res) {
       auth = await supabaseRequest('/auth/v1/token?grant_type=password', {
         method: 'POST',
         body: JSON.stringify({ email: normalizedEmail, password }),
-      }, process.env.SUPABASE_ANON_KEY || process.env.SUPABASE_PUBLISHABLE_KEY)
+      }, authKey())
     } else {
       return json(res, 400, { error: 'Unsupported auth action' })
     }
