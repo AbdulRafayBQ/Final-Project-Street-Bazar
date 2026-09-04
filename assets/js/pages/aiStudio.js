@@ -2,7 +2,7 @@
 
 import { icon, esc, money, num, toast, timeAgo, spinner, closeModal } from '../ui.js'
 import { myStores, storeById, storeProducts, createProduct, addStock, currentUser, state, CATEGORIES, allCategories } from '../store.js'
-import { genProductCopy, genTitleOnly, suggestPrice, genStockPlan, genCategorySuggestion, assistantReply, aiStatusText } from '../ai.js'
+import { genProductCopy, genTitleOnly, suggestPrice, genStockPlan, genCategorySuggestion, aiStatusText } from '../ai.js'
 import { isAIConnected } from '../db.js'
 import { navigate } from '../router.js'
 
@@ -10,7 +10,6 @@ const TOOLS = [
   { id: 'copy', label: 'Product copy', icon: 'wand', hint: 'Idea se title + description + tags + price' },
   { id: 'stock', label: 'Bulk stock', icon: 'box', hint: 'Paste list → AI warehouse entries' },
   { id: 'cat', label: 'Category guess', icon: 'grid', hint: 'Sahi category AI choose kare' },
-  { id: 'chat', label: 'Store assistant', icon: 'chat', hint: 'Catalog se kuch bhi poochein' },
 ]
 
 export async function aiStudioPage() {
@@ -105,17 +104,6 @@ aiStudioPage.mount = (params, query, root) => {
       <div class="field"><span class="label">Product note</span><input class="input" id="cat-in" placeholder="e.g. handmade ceramic mug with truck art"></div>
       <button class="btn btn-grad" id="cat-run" style="margin-top:12px">${icon('grid', '', 16)} <span>Suggest categories</span></button>
       <div id="cat-out" style="margin-top:16px"></div>`,
-    chat: () => `
-      <div class="row-between"><h3 class="h3">Store assistant</h3><span class="badge badge-violet">${icon('sparkles', '', 12)} AI</span></div>
-      <p class="muted small" style="margin:8px 0 18px">Catalog ke bare mein kuch bhi poochein — sales, follow, budget picks, product details.</p>
-      <div class="chatbox" style="height:420px">
-        <div class="chat-head"><span class="ai-orb" style="width:34px;height:34px;border-radius:12px">${icon('sparkles', '', 16)}</span>
-          <div style="flex:1"><b class="small">Bazar AI</b><div class="sub">${aiStatusText()}</div></div></div>
-        <div class="chat-body" data-ai-body>
-          <div class="msg ai"><div class="who">Bazar AI</div>Assalam! Main poora catalog jaanta hoon. Poochein — "budget picks", "sale kya chal raha hai" ya koi product naam.<div class="time">abhi</div></div>
-        </div>
-        <div class="chat-foot"><input class="input" data-ai-input placeholder="Sawaal poochein…"><button class="btn btn-primary" data-ai-send>${icon('send', '', 16)}</button></div>
-      </div>`,
   }
 
   const paint = () => {
@@ -213,24 +201,6 @@ aiStudioPage.mount = (params, query, root) => {
       })
     }
 
-    if (active === 'chat') {
-      const chatBody = body.querySelector('[data-ai-body]')
-      const input = body.querySelector('[data-ai-input]')
-      const send = async () => {
-        const q = input.value.trim()
-        if (!q) return
-        input.value = ''
-        chatBody.insertAdjacentHTML('beforeend', `<div class="msg me"><div class="who">You</div>${esc(q)}<div class="time">abhi</div></div>`)
-        chatBody.insertAdjacentHTML('beforeend', `<div class="msg ai" data-typing><div class="who">Bazar AI</div><span class="typing"><i></i><i></i><i></i></span></div>`)
-        chatBody.scrollTop = chatBody.scrollHeight
-        const res = await assistantReply({ question: q })
-        body.querySelector('[data-typing]')?.remove()
-        chatBody.insertAdjacentHTML('beforeend', `<div class="msg ai"><div class="who">Bazar AI · ${res.source === 'live' ? 'live' : 'brain'}</div>${esc(res.text).replace(/\n/g, '<br>')}<div class="time">abhi</div></div>`)
-        chatBody.scrollTop = chatBody.scrollHeight
-      }
-      body.querySelector('[data-ai-send]').addEventListener('click', send)
-      input.addEventListener('keydown', (e) => { if (e.key === 'Enter') send() })
-    }
   }
 
   root.querySelectorAll('[data-tool]').forEach((b) => b.addEventListener('click', () => { active = b.dataset.tool; paint() }))

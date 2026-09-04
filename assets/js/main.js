@@ -19,7 +19,6 @@ import { authPage } from './pages/auth.js'
 import { adminPage } from './pages/admin.js'
 import { settingsPage } from './pages/settings.js'
 import { termsPage } from './pages/terms.js'
-import { assistantReply, aiStatusText } from './ai.js'
 
 /* ---------------- header ---------------- */
 function renderHeader() {
@@ -471,7 +470,6 @@ function boot() {
   renderFooter()
   renderMobileNav()
   bindGlobals()
-  renderFloatingAIWidget()
   startRouter()
 
   const loader = $('#loader')

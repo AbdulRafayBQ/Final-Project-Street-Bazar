@@ -87,8 +87,10 @@ create table if not exists warehouse_items (
   sku text,
   cost numeric default 0,
   location text,
+  image_url text,
   updated_at timestamptz default now()
 );
+alter table warehouse_items add column if not exists image_url text;
 
 create table if not exists app_state (
   key text primary key,

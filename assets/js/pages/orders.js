@@ -24,7 +24,7 @@ export async function ordersPage() {
               <div class="tiny muted">${dateSafe(o.createdAt)} · ${o.items.length} item${o.items.length > 1 ? 's' : ''} · ${money(o.total)}</div></div>
             </div>
             <div class="row" style="gap:10px">
-              <span class="badge ${o.status === 4 ? 'badge-live' : 'badge-pending'}">${ORDER_STEPS[o.status]}</span>
+              <span class="badge ${o.status === 4 ? 'badge-live' : o.status === 5 ? 'badge-rejected' : 'badge-pending'}">${o.status === 5 ? 'Cancelled' : ORDER_STEPS[o.status]}</span>
               <a class="btn btn-sm btn-ghost" href="#/track/${o.id}">${icon('truck', '', 14)} Track</a>
             </div>
           </div>
@@ -94,7 +94,8 @@ export async function trackPage(params, query) {
         </div>
         <div class="progress" style="margin:18px 0 26px"><i style="width:${(o.status / 4) * 100}%"></i></div>
         ${orderTimeline(o)}
-        ${isOwner ? `<div class="divider"></div><div class="row-between"><span class="small muted">Store owner: status update karein</span><button class="btn btn-sm btn-primary" data-owner-advance="${o.id}"><span>Advance status</span> ${icon('arrow', '', 13)}</button></div>` : ''}
+        ${o.status === 5 ? `<div class="divider"></div><p class="small" style="color:var(--red)"><b>Cancelled:</b> ${esc(o.cancelReason || '')}</p>` : ''}
+        ${isOwner && o.status < 2 ? `<div class="divider"></div><div class="row-between"><span class="small muted">Store owner: status update karein</span><button class="btn btn-sm btn-primary" data-owner-advance="${o.id}"><span>Advance status</span> ${icon('arrow', '', 13)}</button></div>` : ''}
       </div>
 
       <div class="stack">

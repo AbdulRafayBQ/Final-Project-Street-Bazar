@@ -2,7 +2,7 @@
 
 import { icon, esc, money, num, toast, modal, closeModal, timeAgo, spinner, confirmBox } from '../ui.js'
 import { statCard, emptyLogin } from '../components.js'
-import { myStores, storeById, storeProducts, storeOrders, storeRevenue, storeSales, currentUser, lowStock, productById, updateProduct, updateStore, advanceOrder, addStock, storeThreads, threadById, markThreadRead, userById, save, ownerWarehouse, addWarehouseItem, updateWarehouseItem } from '../store.js'
+import { myStores, storeById, storeProducts, storeOrders, storeRevenue, storeSales, currentUser, lowStock, productById, updateProduct, updateStore, advanceOrder, cancelOrder, addStock, storeThreads, threadById, markThreadRead, userById, save, ownerWarehouse, addWarehouseItem, updateWarehouseItem, deleteWarehouseItem } from '../store.js'
 import { genStockPlan, parseStock, chatReply, genProductCopy } from '../ai.js'
 import { navigate } from '../router.js'
 
@@ -105,11 +105,11 @@ export async function dashboardPage() {
               <tr>
                 <td><a href="#/track/${o.id}"><b>${o.id}</b></a></td>
                 <td>${esc(userById(o.user)?.name || 'Customer')}</td>
-                <td>${num(o.items.reduce((a, i) => a + i.qty, 0))}</td>
+                <td><div class="row" style="gap:6px">${o.items.map((i) => `<img src="${esc(i.customizedImage || i.image)}" alt="" title="${esc(i.title)}${i.customizedImage ? ' · AI customized' : ''}" style="width:34px;height:34px;border-radius:8px;object-fit:cover">`).join('')}<span>${num(o.items.reduce((a, i) => a + i.qty, 0))}</span></div></td>
                 <td><b>${money(o.total)}</b></td>
-                <td><span class="badge ${o.status === 4 ? 'badge-live' : 'badge-pending'}">${['Placed', 'Packed', 'Shipped', 'Out for delivery', 'Delivered'][o.status]}</span></td>
+                <td><span class="badge ${o.status === 4 ? 'badge-live' : o.status === 5 ? 'badge-rejected' : 'badge-pending'}">${o.status === 5 ? 'Cancelled' : ['Placed', 'Packed', 'Shipped', 'Out for delivery', 'Delivered'][o.status]}</span></td>
                 <td class="muted tiny">${timeAgo(o.createdAt)}</td>
-                <td><button class="btn btn-sm btn-ghost" data-advance="${o.id}" ${o.status === 4 ? 'disabled' : ''}>Advance ${icon('arrow', '', 13)}</button></td>
+                <td><button class="btn btn-sm btn-ghost" data-advance="${o.id}" ${o.status >= 4 ? 'disabled' : ''}>Advance ${icon('arrow', '', 13)}</button> ${o.status < 2 ? `<button class="btn btn-sm btn-danger" data-cancel-order="${o.id}">Cancel</button>` : ''}</td>
               </tr>`).join('')}</tbody>
           </table></div>` : `<div class="empty"><p class="muted">Abhi koi order nahi. Customers order karte hi yahan dikhega.</p></div>`}
         </div>
@@ -197,6 +197,9 @@ dashboardPage.mount = (params, query, root) => {
     advanceOrder(b.dataset.advance)
     toast('Order status update ho gaya', 'ok')
     navigate('#/dashboard')
+  }))
+  root.querySelectorAll('[data-cancel-order]').forEach((b) => b.addEventListener('click', () => {
+    modal({ title: 'Cancel order', body: '<textarea class="textarea" id="cancel-reason" placeholder="Customer ko reason batayein"></textarea>', foot: '<button class="btn btn-ghost" data-close>Back</button><button class="btn btn-danger" id="cancel-go">Cancel order</button>', onOpen: (el) => el.querySelector('#cancel-go').addEventListener('click', () => { const reason = el.querySelector('#cancel-reason').value.trim(); if (!reason) return toast('Reason likhna zaroori hai', 'err'); cancelOrder(b.dataset.cancelOrder, reason); closeModal(); toast('Customer ko cancellation notification bhej di', 'ok'); navigate('#/dashboard') }) })
   }))
 
   root.querySelectorAll('[data-reply]').forEach((b) => b.addEventListener('click', () => openReply(b.dataset.reply)))
@@ -414,7 +417,7 @@ function warehouseInner(sid) {
     <div class="panel" style="grid-column:1/-1">
       <div class="row-between"><div><h3 class="h4">Private warehouse stock</h3><div class="tiny muted">Ye inventory store par publish nahi hoti — physical stock ke liye.</div></div><button class="btn btn-sm btn-ghost" data-warehouse-add>${icon('plus', '', 14)} Add item</button></div>
       <div class="table-wrap" style="margin-top:12px"><table><thead><tr><th>Item</th><th>SKU</th><th>Qty</th><th>Location</th><th></th></tr></thead><tbody>
-        ${privateItems.length ? privateItems.map((item) => `<tr><td><b>${esc(item.name)}</b></td><td>${esc(item.sku || '—')}</td><td><b>${num(item.qty)}</b></td><td>${esc(item.location || '—')}</td><td><button class="btn btn-sm btn-ghost" data-warehouse-edit="${item.id}">Edit</button></td></tr>`).join('') : '<tr><td colspan="5" class="muted">Private warehouse empty hai.</td></tr>'}
+        ${privateItems.length ? privateItems.map((item) => `<tr><td><div class="row"><img src="${esc(item.image || './images/p-kurta.png')}" alt="" style="width:36px;height:36px;object-fit:cover;border-radius:9px"><b>${esc(item.name)}</b></div></td><td>${esc(item.sku || '—')}</td><td><b>${num(item.qty)}</b></td><td>${esc(item.location || '—')}</td><td><button class="btn btn-sm btn-ghost" data-warehouse-edit="${item.id}">Edit</button> <button class="btn btn-sm btn-danger" data-warehouse-delete="${item.id}">${icon('trash', '', 13)}</button></td></tr>`).join('') : '<tr><td colspan="5" class="muted">Private warehouse empty hai.</td></tr>'}
       </tbody></table></div>
     </div>
   </div>`
@@ -425,12 +428,14 @@ function bindWarehouse(pageRoot, holder, sid) {
   holder.querySelector('[data-warehouse-add]')?.addEventListener('click', () => {
     modal({
       title: 'Add private warehouse item',
-      body: '<div class="stack"><input class="input" id="wh-name" placeholder="Item name"><input class="input" id="wh-qty" type="number" min="0" placeholder="Quantity"><input class="input" id="wh-sku" placeholder="SKU (optional)"><input class="input" id="wh-location" placeholder="Location (optional)"></div>',
+      body: '<div class="stack"><input class="input" id="wh-name" placeholder="Item name"><input class="input" id="wh-qty" type="number" min="0" placeholder="Quantity"><input class="input" id="wh-image" type="url" placeholder="Product image URL (required)"><input class="input" id="wh-sku" placeholder="SKU (optional)"><input class="input" id="wh-location" placeholder="Location (optional)"></div>',
       foot: '<button class="btn btn-ghost" data-close>Cancel</button><button class="btn btn-primary" id="wh-save">Save</button>',
       onOpen: (el) => el.querySelector('#wh-save').addEventListener('click', () => {
         const name = el.querySelector('#wh-name').value.trim()
         if (!name) return toast('Item name zaroori hai', 'err')
-        addWarehouseItem({ owner: currentUser().id, name, qty: el.querySelector('#wh-qty').value, sku: el.querySelector('#wh-sku').value.trim(), location: el.querySelector('#wh-location').value.trim() })
+        const image = el.querySelector('#wh-image').value.trim()
+        if (!image) return toast('Product image lazmi hai', 'err')
+        addWarehouseItem({ owner: currentUser().id, name, qty: el.querySelector('#wh-qty').value, image, sku: el.querySelector('#wh-sku').value.trim(), location: el.querySelector('#wh-location').value.trim() })
         closeModal(); refreshWarehouse(pageRoot, holder, sid)
       }),
     })
@@ -444,6 +449,11 @@ function bindWarehouse(pageRoot, holder, sid) {
       foot: '<button class="btn btn-ghost" data-close>Cancel</button><button class="btn btn-primary" id="wh-save">Update</button>',
       onOpen: (el) => el.querySelector('#wh-save').addEventListener('click', () => { updateWarehouseItem(item.id, { qty: el.querySelector('#wh-qty').value }); closeModal(); refreshWarehouse(pageRoot, holder, sid) }),
     })
+  }))
+  holder.querySelectorAll('[data-warehouse-delete]').forEach((button) => button.addEventListener('click', () => {
+    deleteWarehouseItem(button.dataset.warehouseDelete)
+    toast('Warehouse item delete ho gaya', 'ok')
+    refreshWarehouse(pageRoot, holder, sid)
   }))
   holder.querySelectorAll('[data-restock]').forEach((b) => b.addEventListener('click', () => {
     const [pid, qty] = b.dataset.restock.split(':')
@@ -491,9 +501,10 @@ function bindWarehouse(pageRoot, holder, sid) {
           return title === requested || title.includes(requested) || requested.includes(title)
         })
         if (existing) addStock(existing.id, r.qty)
-        else addWarehouseItem({ owner: currentUser().id, name: r.name, qty: r.qty, cost: r.price, sku: r.sku })
+        else if (r.image) addWarehouseItem({ owner: currentUser().id, name: r.name, qty: r.qty, cost: r.price, sku: r.sku, image: r.image })
+        else missing.push(r.name)
       })
-      toast(rows.length + ' warehouse entries update ho gayi', 'ok')
+      toast((rows.length - missing.length) + ' entries update ho gayi' + (missing.length ? `. Image missing: ${missing.join(', ')}` : ''), missing.length ? 'err' : 'ok')
       refreshWarehouse(pageRoot, holder, sid)
     })
   })

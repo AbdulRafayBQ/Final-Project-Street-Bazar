@@ -422,6 +422,8 @@ function seed() {
 
   const likes = [{ id: 'l-1', user: 'u-ali', product: 'p-chai' }]
 
+  stores.forEach((store) => { store.demo = true })
+  products.forEach((product) => { product.demo = true })
   return {
     version: 1, isDemo: true, users, stores, products, reviews, orders, follows, threads, likes, warehouse: [],
     cart: [], notifications: [
@@ -609,8 +611,10 @@ export function addStock(pid, qty) {
   if (linked) { linked.qty = p.stock; linked.updatedAt = Date.now(); save() }
 }
 
-export function addWarehouseItem({ owner, name, qty = 0, sku = '', cost = 0, location = '', product = null }) {
-  const item = { id: uid('w'), owner, name: String(name).trim(), qty: Math.max(0, Number(qty) || 0), sku, cost: Number(cost) || 0, location, product, updatedAt: Date.now() }
+export function addWarehouseItem({ owner, name, qty = 0, sku = '', cost = 0, location = '', product = null, image = '' }) {
+  const existing = (state.warehouse || []).find((entry) => entry.owner === owner && entry.name.toLowerCase() === String(name).trim().toLowerCase() && entry.product === product)
+  if (existing) return updateWarehouseItem(existing.id, { qty: existing.qty + Math.max(0, Number(qty) || 0), image: image || existing.image })
+  const item = { id: uid('w'), owner, name: String(name).trim(), qty: Math.max(0, Number(qty) || 0), sku, cost: Number(cost) || 0, location, product, image, updatedAt: Date.now() }
   state.warehouse = state.warehouse || []
   state.warehouse.unshift(item)
   save()
@@ -627,6 +631,14 @@ export function updateWarehouseItem(id, data) {
   }
   save()
   return item
+}
+
+export function deleteWarehouseItem(id) {
+  const index = (state.warehouse || []).findIndex((entry) => entry.id === id)
+  if (index < 0) return false
+  state.warehouse.splice(index, 1)
+  save()
+  return true
 }
 
 export const ownerWarehouse = (owner = state.session) => (state.warehouse || []).filter((item) => item.owner === owner)
@@ -657,12 +669,12 @@ export function toggleLike(pid) {
   state.likes.push({ id: uid('l'), user: u.id, product: pid }); save(); return true
 }
 
-export function addToCart({ product, qty = 1, options = {}, unitPrice }) {
+export function addToCart({ product, qty = 1, options = {}, unitPrice, image = '', customizedImage = '' }) {
   const p = productById(product); if (!p) return
   const key = product + '|' + JSON.stringify(options)
   const found = state.cart.find((i) => i.key === key)
   if (found) found.qty += qty
-  else state.cart.push({ key, product, store: p.store, title: p.title, image: p.media?.[0]?.url || '', qty, options, unitPrice: unitPrice ?? p.price })
+  else state.cart.push({ key, product, store: p.store, title: p.title, image: image || p.media?.[0]?.url || '', customizedImage, qty, options, unitPrice: unitPrice ?? p.price })
   save()
 }
 export const setCart = (items) => { state.cart = items; save() }
@@ -707,6 +719,16 @@ export function advanceOrder(id) {
   if (o.status === 4) o.etaDays = 0
   notify(o.user, 'Order ' + o.id + ' · ' + ORDER_STEPS[o.status], 'Aapka order aage barh gaya hai.', '#/track/' + o.id)
   save()
+}
+export function cancelOrder(id, reason) {
+  const order = orderById(id)
+  if (!order || order.status >= 2 || order.status === 5) return null
+  order.status = 5
+  order.cancelReason = String(reason || 'Store could not fulfil this customized order').trim()
+  order.timeline.push({ step: 5, at: Date.now(), note: 'Cancelled by store: ' + order.cancelReason })
+  notify(order.user, 'Order ' + order.id + ' cancelled', order.cancelReason, '#/track/' + order.id)
+  save()
+  return order
 }
 
 export function sendMessage({ productId, storeId, from, text }) {

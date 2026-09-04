@@ -40,6 +40,12 @@ create table if not exists threads (
   id text primary key, product_id text, store_id text, customer_id text,
   messages jsonb, updated_at timestamptz default now()
 );
+create table if not exists warehouse_items (
+ id text primary key, owner_id uuid, name text not null, sku text,
+ qty int default 0, cost numeric default 0, location text, image_url text,
+ updated_at timestamptz default now()
+);
+alter table warehouse_items add column if not exists image_url text;
 create table if not exists app_state (
   key text primary key,
   payload jsonb not null,
@@ -53,6 +59,7 @@ alter table reviews enable row level security;
 alter table orders enable row level security;
 alter table follows enable row level security;
 alter table threads enable row level security;
+alter table warehouse_items enable row level security;
 alter table app_state enable row level security;
 
 -- No public write policies: all writes go through the Vercel service role.

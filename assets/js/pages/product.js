@@ -74,18 +74,13 @@ export async function productPage(params) {
           <div data-wholesale-notice style="display:none;margin-top:10px;padding:8px 14px;font-size:13px;border-radius:10px;background:rgba(13,148,136,0.1);color:#0D9488;border:1px solid rgba(13,148,136,0.2)"></div>
         </div>
 
-        ${opts.length ? `<div class="opt-box">
-          <h4 class="h4">${icon('wand', '', 16)} Customize your product</h4>
-          <p class="tiny muted" style="margin:-4px 0 12px">Owner ne custom options enable ki hain — apni pasand chunein.</p>
-          <div class="stack" data-options>
-            ${opts.map((o, oi) => `<div>
-              <div class="label" style="margin-bottom:8px">${esc(o.name)}</div>
-              <div class="opt-choices" data-opt="${oi}">
-                ${o.choices.map((c, ci) => `<button class="chip ${ci === 0 ? 'active' : ''}" data-choice="${ci}" data-delta="${c.delta}">${esc(c.label)}${c.delta ? ` <b style="color:var(--magenta)">+${money(c.delta)}</b>` : ''}</button>`).join('')}
-              </div>
-            </div>`).join('')}
-          </div>
-        </div>` : ''}
+        <div class="opt-box">
+          <h4 class="h4">${icon('wand', '', 16)} Customize this product with AI</h4>
+          <p class="tiny muted" style="margin:-4px 0 12px">Original product image par apni design, colour ya print likhein. Generate hone wali image order ke sath owner ko jayegi.</p>
+          <div class="custom-preview" style="text-align:center;margin-bottom:12px"><img data-custom-preview src="${esc(p.media?.[0]?.url || './images/p-kurta.png')}" alt="${esc(p.title)}" style="max-height:220px;max-width:100%;border-radius:14px;object-fit:contain"></div>
+          <div class="row" style="gap:8px"><input class="input" data-custom-prompt placeholder="e.g. white shirt par blue floral print"><button class="btn btn-primary" data-custom-generate>${icon('sparkles', '', 15)} Generate</button></div>
+          <div class="tiny muted" data-custom-status style="margin-top:8px"></div>
+        </div>
 
         ${tiers.length ? `<div class="opt-box" style="border-color:rgba(15,167,155,.4);background:rgba(15,167,155,.05)">
           <h4 class="h4">${icon('scale', '', 16)} Wholesale rates</h4>
@@ -188,6 +183,7 @@ productPage.mount = (params, query, root) => {
   // state
   let qty = 1
   let chosen = (p.customizable?.options || []).map((o) => ({ name: o.name, choice: o.choices[0] }))
+  let customizedImage = p.media?.[0]?.url || ''
   const unit = () => {
     const base = p.price
     const delta = chosen.reduce((a, c) => a + (c.choice?.delta || 0), 0)
@@ -232,13 +228,31 @@ productPage.mount = (params, query, root) => {
   const doAdd = (buyNow) => {
     const options = {}
     chosen.forEach((c) => { if (c.choice) options[c.name] = c.choice.label })
-    addToCart({ product: p.id, qty, options, unitPrice: unit() })
+    addToCart({ product: p.id, qty, options: { ...options, ...(customizedImage !== p.media?.[0]?.url ? { 'AI design': 'Customized' } : {}) }, unitPrice: unit(), image: customizedImage, customizedImage })
     toast(`${p.title} × ${qty} cart mein add ho gaya`, 'ok')
     if (buyNow) navigate('#/cart')
     else updateCartBadge()
   }
   root.querySelector('[data-buy]')?.addEventListener('click', () => doAdd(false))
   root.querySelector('[data-buy-now]')?.addEventListener('click', () => doAdd(true))
+  root.querySelector('[data-custom-generate]')?.addEventListener('click', async (event) => {
+    const prompt = root.querySelector('[data-custom-prompt]').value.trim()
+    const status = root.querySelector('[data-custom-status]')
+    if (!prompt) return toast('Design instruction likhein', 'err')
+    event.currentTarget.disabled = true
+    status.textContent = 'AI image generate ho rahi hai…'
+    try {
+      const response = await fetch('/api/image', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ prompt, image: p.media?.[0]?.url || '' }) })
+      const data = await response.json()
+      if (!response.ok || !data.url) throw new Error(data.error || 'Image generate nahi hui')
+      customizedImage = data.url
+      root.querySelector('[data-custom-preview]').src = customizedImage
+      status.textContent = 'Design ready — ab order karein.'
+    } catch (error) {
+      status.textContent = error.message
+      toast(error.message, 'err')
+    } finally { event.currentTarget.disabled = false }
+  })
 
   // wishlist
   const likeBtn = root.querySelector('[data-like-big]')

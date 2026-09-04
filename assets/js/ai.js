@@ -111,9 +111,16 @@ export function parseStock(text) {
   T(text).split(/\n+/).forEach((line) => {
     const clean = line.trim().replace(/^[-•*]\s*/, '')
     if (!clean || /^(name|item|product)[,\t ]/i.test(clean)) return
-    const parts = clean.split(/[,;\t]|\s+[-|]\s+/).map((s) => s.trim()).filter(Boolean)
+    const image = clean.match(/https?:\/\/\S+/i)?.[0] || ''
+    const withoutImage = clean.replace(image, '').trim()
+    const quantityFirst = withoutImage.match(/^(?:add\s+)?(\d{1,6})\s*(?:x|pcs?|pieces?|units?)?\s+(.+)$/i)
+    const quantityLast = withoutImage.match(/^(.+?)[,\s]+(\d{1,6})\s*(?:pcs?|pieces?|units?)?$/i)
+    const parts = withoutImage.split(/[,;\t]|\s+[-|]\s+/).map((s) => s.trim()).filter(Boolean)
     let name = '', qty = 0, price = 0
+    if (quantityFirst) { qty = Number(quantityFirst[1]); name = quantityFirst[2].trim() }
+    else if (quantityLast) { qty = Number(quantityLast[2]); name = quantityLast[1].trim() }
     parts.forEach((part) => {
+      if ((quantityFirst || quantityLast) && part === withoutImage) return
       const numeric = part.replace(/[,\s]/g, '')
       if (/^rs?\d{2,7}$/i.test(numeric) || /^pkr\d{2,7}$/i.test(numeric)) price = Number(numeric.replace(/^(rs|pkr)/i, ''))
       else if (/^\d{1,6}$/.test(numeric)) {
@@ -124,9 +131,13 @@ export function parseStock(text) {
     })
     if (!name) name = 'Item ' + (rows.length + 1)
     if (!qty) qty = 1
-    rows.push({ name: name.trim().slice(0, 60), qty, price, sku: 'SKU-' + (hash(name) % 9000 + 1000) })
+    const normalized = name.trim().toLowerCase().replace(/\s+/g, ' ')
+    if (!normalized) return
+    const existing = rows.find((row) => row.name.toLowerCase().replace(/\s+/g, ' ') === normalized)
+    if (existing) existing.qty += qty || 1
+    else rows.push({ name: name.trim().slice(0, 60), qty: qty || 1, price, image, sku: 'SKU-' + (hash(name) % 9000 + 1000) })
   })
-  return rows
+  return rows.slice(0, 100)
 }
 
 export function chatReply({ question, productId, storeId }) {
@@ -190,7 +201,7 @@ export async function genDescriptionOnly({ title, category, storeName, tone, pri
 }
 
 export async function genStockPlan({ rough, storeName }) {
-  const r = await think('stock-plan', { prompt: 'You help shop owners plan inventory. From the rough note, output rows as: NAME, QTY, PRICE (PKR). 4-8 rows, plain text only.', user: `${rough} — for ${storeName}` }, async () => {
+  const r = await think('stock-plan', { prompt: 'You help shop owners plan inventory. Understand quantities exactly: "400 white shirts" means ONE row named "White shirts" with QTY 400, never 400 rows. Preserve supplied names and quantities. Output at most 20 rows as NAME, QTY, PRICE (PKR), IMAGE_URL. Never invent variants or products.', user: `${rough} — for ${storeName}` }, async () => {
     const items = parseStock(rough)
     if (items.length > 1) return items.map((i) => `${i.name}, ${i.qty}, ${i.price || 1200}`).join('\n')
     const base = T(rough).trim().replace(/\n/g, ' ').slice(0, 30) || 'New item'
@@ -211,14 +222,15 @@ export async function genCategorySuggestion({ rough, storeName }) {
 }
 
 export async function assistantReply({ question }) {
-  const catalog = state.products.filter((p) => p.status !== 'hidden').map((p) => {
+  const catalogProducts = state.products.filter((p) => p.status !== 'hidden' && !p.demo && !storeById(p.store)?.demo)
+  const catalog = catalogProducts.map((p) => {
     const store = storeById(p.store)
     return `${p.title} | ${store?.name || 'Store'} | Rs ${p.price} | ${p.stock > 0 ? 'in stock' : 'out of stock'} | ${[...(p.categories || []), ...(p.tags || [])].join(', ')}`
   }).join('\n')
-  const r = await think('assistant', { prompt: `You are the Street Bazar in-app assistant. Answer briefly (max 80 words), helpful and friendly, English mixed with Roman Urdu. Only recommend products from this live catalog; never invent a product/store. For price requests, find exact or nearest available prices and say the real price. Catalog:\n${catalog}`, user: question }, async () => {
+  const r = await think('assistant', { prompt: `You are the Street Bazar in-app assistant. Answer briefly (max 80 words), helpful and friendly, English mixed with Roman Urdu. Only recommend products from this live catalog; never invent a product/store. If no item matches, say no matching live product is listed. For price requests, find exact or nearest available prices and say the real price. Catalog:\n${catalog || '(empty live catalog)'}`, user: question }, async () => {
     const q = T(question).toLowerCase()
     if (q.includes('sale') || q.includes('offer')) {
-      const list = state.stores.filter((s) => s.sale && s.sale.until > Date.now())
+      const list = state.stores.filter((s) => !s.demo && s.sale && s.sale.until > Date.now())
       return list.length ? 'Active sales right now:\n' + list.map((s) => '• ' + s.name + ' — ' + s.sale.text).join('\n') : 'Filhaal koi live sale nahi hai, lekin For You feed check karte rahein.'
     }
     if (q.includes('follow')) {
@@ -227,7 +239,7 @@ export async function assistantReply({ question }) {
       return f.length ? 'Aap ' + f.length + ' stores follow kar rahe hain. Nayi listing For You feed mein show hoti hai.' : 'Abhi tak koi store follow nahi kiya. Explore se apne favourite store follow karein.'
     }
     if (q.includes('cheap') || q.includes('best price') || q.includes('budget')) {
-      const cheap = state.products.filter((p) => p.status !== 'hidden').sort((a, b) => a.price - b.price).slice(0, 3)
+      const cheap = catalogProducts.filter((p) => p.stock > 0).sort((a, b) => a.price - b.price).slice(0, 3)
       return 'Budget picks:\n' + cheap.map((p) => '• ' + p.title + ' — ' + money(p.price)).join('\n')
     }
     if (q.includes('track') || q.includes('order')) return 'Track page par Order ID (SB-XXXXXX) daliye — status, courier note aur expected delivery sab aa jayega.'
@@ -237,9 +249,9 @@ export async function assistantReply({ question }) {
       const text = `${p.title} ${(p.tags || []).join(' ')} ${(p.categories || []).join(' ')}`.toLowerCase()
       return { p, score: words.filter((word) => text.includes(word)).length + (maxPrice && p.price <= maxPrice ? 1 : 0) }
     }).filter((entry) => entry.score > 0).sort((a, b) => b.score - a.score || (maxPrice ? Math.abs(a.p.price - maxPrice) - Math.abs(b.p.price - maxPrice) : 0))
-    const hit = candidates[0]?.p || searchAll(question).products[0]
+    const hit = candidates[0]?.p || searchAll(question).products.find((p) => !p.demo && !storeById(p.store)?.demo)
     if (hit) return chatReply({ question, productId: hit.id, storeId: hit.store })
-    return 'Main poore catalog ko search kar sakta hoon — product ka naam, category ya store batayein. Jaise "custom cover", "namkeen" ya "wholesale kurta".'
+    return catalogProducts.length ? 'Main live catalog search kar sakta hoon — product ka naam, category ya budget batayein.' : 'Abhi live store catalog mein koi product listed nahi. Owner ke publish karne ke baad main real product suggest karunga.'
   }, question)
   return r
 }
