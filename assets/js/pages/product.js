@@ -78,7 +78,7 @@ export async function productPage(params) {
           <h4 class="h4">${icon('wand', '', 16)} Customize this product with AI</h4>
           <p class="tiny muted" style="margin:-4px 0 12px">Original product image par apni design, colour ya print likhein. Generate hone wali image order ke sath owner ko jayegi.</p>
           <div class="custom-preview" style="text-align:center;margin-bottom:12px"><img data-custom-preview src="${esc(p.media?.[0]?.url || './images/p-kurta.png')}" alt="${esc(p.title)}" style="max-height:220px;max-width:100%;border-radius:14px;object-fit:contain"></div>
-          <div class="row" style="gap:8px"><input class="input" data-custom-prompt placeholder="e.g. white shirt par blue floral print"><button class="btn btn-primary" data-custom-generate>${icon('sparkles', '', 15)} Generate</button></div>
+          <div class="row" style="gap:8px"><input class="input" data-custom-prompt placeholder="e.g. add a bold blue floral print, keep the same shirt"><button class="btn btn-primary" data-custom-generate>${icon('sparkles', '', 15)} Edit image</button></div>
           <div class="tiny muted" data-custom-status style="margin-top:8px"></div>
         </div>
 
@@ -242,7 +242,20 @@ productPage.mount = (params, query, root) => {
     event.currentTarget.disabled = true
     status.textContent = 'AI image generate ho rahi hai…'
     try {
-      const response = await fetch('/api/image', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ prompt, image: p.media?.[0]?.url || '' }) })
+    const source = customizedImage || p.media?.[0]?.url || ''
+    let reference = source
+    if (source && !source.startsWith('data:')) {
+      const sourceResponse = await fetch(source)
+      if (!sourceResponse.ok) throw new Error('The product reference image could not be loaded.')
+      const blob = await sourceResponse.blob()
+      reference = await new Promise((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onload = () => resolve(reader.result)
+        reader.onerror = () => reject(new Error('The product reference image could not be read.'))
+        reader.readAsDataURL(blob)
+      })
+    }
+    const response = await fetch('/api/image', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ prompt, image: reference }) })
       const raw = await response.text()
       let data = {}
       try { data = raw ? JSON.parse(raw) : {} } catch { data = { error: raw.slice(0, 240) || `Image service returned HTTP ${response.status}` } }

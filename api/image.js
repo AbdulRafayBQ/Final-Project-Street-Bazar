@@ -1,4 +1,11 @@
 const json = (res, status, body) => res.status(status).setHeader('Content-Type', 'application/json').send(JSON.stringify(body))
+const imageInput = async (source) => {
+  if (!source) return ''
+  if (source.startsWith('data:')) return source.split(',', 2)[1] || ''
+  const response = await fetch(source)
+  if (!response.ok) throw new Error(`Reference image could not be loaded (${response.status})`)
+  return Buffer.from(await response.arrayBuffer()).toString('base64')
+}
 
 export default async function handler(req, res) {
   try {
@@ -6,13 +13,15 @@ export default async function handler(req, res) {
     const { prompt = '', image = '' } = req.body || {}
     if (!prompt.trim()) return json(res, 400, { error: 'Design prompt is required' })
     const provider = (process.env.IMAGE_PROVIDER || 'openai').toLowerCase()
-    const fullPrompt = `${prompt.trim()}. Product reference: ${image || 'none'}`
+    const fullPrompt = `Edit the provided product image, do not create a new product image. Preserve the exact product shape, camera angle, background, material, seams, logos, and composition. Apply only this requested change: ${prompt.trim()}.`
 
     if (provider === 'huggingface') {
       const key = process.env.HF_TOKEN
       if (!key) return json(res, 503, { error: 'HF_TOKEN is not configured on Vercel' })
-      const configuredModel = process.env.HF_IMAGE_MODEL || 'stabilityai/stable-diffusion-3-medium-diffusers'
-      const models = [...new Set([configuredModel, 'stabilityai/stable-diffusion-3-medium-diffusers'])]
+      const configuredModel = process.env.HF_IMAGE_MODEL || 'black-forest-labs/FLUX.1-Kontext-dev'
+      const models = [...new Set([configuredModel, 'black-forest-labs/FLUX.1-Kontext-dev'])]
+      const reference = await imageInput(image)
+      if (!reference) return json(res, 400, { error: 'A reference product image is required for editing.' })
       let response
       let model = configuredModel
       let lastError = ''
@@ -21,7 +30,7 @@ export default async function handler(req, res) {
         response = await fetch(`https://router.huggingface.co/hf-inference/models/${candidate}`, {
           method: 'POST',
           headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ inputs: fullPrompt, parameters: { num_inference_steps: 4 } }),
+          body: JSON.stringify({ inputs: reference, parameters: { prompt: fullPrompt, num_inference_steps: 4, guidance_scale: 5 } }),
         })
         if (response.ok) break
         const body = await response.text().catch(() => '')
