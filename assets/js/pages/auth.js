@@ -92,7 +92,7 @@ authPage.mount = (params, query, root) => {
   let pendingSignup = null
   const paint = () => {
     body.innerHTML = pendingSignup
-      ? `<h2 class="h3">Verify your email</h2><p class="muted small" style="margin:8px 0 18px">6-digit verification code ${esc(pendingSignup.email)} par bheja gaya hai.</p><div class="stack"><input class="input" id="au-code" inputmode="numeric" maxlength="6" placeholder="123456"><button class="btn btn-grad btn-lg btn-block" id="au-verify">Verify & continue</button><button class="btn btn-ghost" id="au-back">Back</button></div>`
+      ? `<h2 class="h3">Verify your email</h2><p class="muted small" style="margin:8px 0 18px">Email par aaya verification code enter karein (${esc(pendingSignup.email)}).</p><div class="stack"><input class="input" id="au-code" inputmode="numeric" pattern="[0-9]*" maxlength="10" placeholder="Verification code"><button class="btn btn-grad btn-lg btn-block" id="au-verify">Verify & continue</button><button class="btn btn-ghost" id="au-back">Back</button></div>`
       : forms[mode]()
     root.querySelectorAll('[data-auth-tabs] button').forEach((b) => b.classList.toggle('active', b.dataset.mode === mode))
     root.querySelectorAll('[data-role] button').forEach((b) => b.classList.toggle('active', b.dataset.roleV === role))
