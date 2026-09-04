@@ -3,7 +3,7 @@
 import { $, $$, icon, esc, num, toast, modal, closeModal, avatar, timeAgo } from './ui.js'
 import { state, currentUser, cartCount, logout, myNotifications, unreadNotis, toggleLike, toggleFollow, productById, addToCart, save, unreadThreadCount, setRole } from './store.js'
 import { route, setNotFound, startRouter, onRender, navigate, renderRoute } from './router.js'
-import { authRequest, syncPush } from './db.js'
+import { authRequest, syncPull, syncPush } from './db.js'
 
 import { home } from './pages/home.js'
 import { explore, foryou } from './pages/explore.js'
@@ -461,10 +461,16 @@ async function restoreGoogleSession() {
   }
 }
 
-function boot() {
+async function boot() {
   const isReload = performance.navigation?.type === 1 || performance.getEntriesByType?.('navigation')?.[0]?.type === 'reload'
   if (isReload && window.location.hash !== '#/' && window.location.hash !== '') {
     window.location.hash = '#/'
+  }
+
+  try {
+    await syncPull()
+  } catch (error) {
+    console.error('Initial Supabase sync failed:', error)
   }
 
   renderHeader()
@@ -486,4 +492,4 @@ function boot() {
   setTimeout(hide, 800)
 }
 
-restoreGoogleSession().finally(boot)
+restoreGoogleSession().finally(() => boot())
