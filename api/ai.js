@@ -7,14 +7,14 @@ export default async function handler(req, res) {
   const key = process.env.AI_API_KEY
   if (!key) return json(res, 503, { error: 'AI_API_KEY is not configured on Vercel' })
   const configuredBase = (process.env.AI_BASE_URL || 'https://api.openai.com/v1').replace(/\/$/, '').replace(/\/v1beta$/, '')
-  const configuredModel = process.env.AI_MODEL || 'gpt-4o-mini'
+  const configuredModel = (process.env.AI_MODEL || 'gpt-4o-mini').trim().replace(/^models\//, '').replace(/^gemini-2\.0-flash(?:-.*)?$/i, 'gemini-3.6-flash')
   const { system = '', user = '', maxTokens = 800 } = req.body || {}
   const isGemini = key.startsWith('AIza') || configuredBase.includes('googleapis.com') || configuredModel.toLowerCase().includes('gemini')
   const isAnthropic = !isGemini && (configuredBase.includes('anthropic.com') || configuredModel.toLowerCase().includes('claude'))
   const base = isGemini
     ? (configuredBase.includes('googleapis.com') ? configuredBase : 'https://generativelanguage.googleapis.com')
     : configuredBase
-  const model = isGemini && !configuredModel.toLowerCase().includes('gemini') ? 'gemini-2.0-flash' : configuredModel
+  const model = isGemini && !configuredModel.toLowerCase().includes('gemini') ? 'gemini-3.6-flash' : configuredModel
   const url = isGemini
     ? `${base}/v1beta/models/${model}:generateContent?key=${key}`
     : isAnthropic ? `${base}/v1/messages` : `${base}/chat/completions`
