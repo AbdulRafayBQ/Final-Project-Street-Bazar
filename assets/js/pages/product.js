@@ -76,14 +76,8 @@ export async function productPage(params) {
 
         ${p.customizable?.on ? `<div class="opt-box">
           <h4 class="h4">${icon('wand', '', 16)} Customize this product</h4>
-          <p class="tiny muted" style="margin:-4px 0 12px">Live preview mein colour, print ya text change karein. Owner ko isi edited image ke sath order milega.</p>
-          <div style="text-align:center;margin-bottom:12px;background:#f8f5f1;border-radius:14px;padding:8px"><canvas data-custom-canvas width="640" height="640" style="max-width:100%;height:auto;border-radius:10px"></canvas></div>
-          <div class="grid grid-2" style="gap:8px">
-            <label class="field"><span class="label">Product colour</span><input class="input" type="color" data-custom-color value="#ffffff"></label>
-            <label class="field"><span class="label">Print / design text</span><input class="input" data-custom-text placeholder="e.g. Blue floral print"></label>
-          </div>
-          <label class="field" style="margin-top:8px"><span class="label">Upload design image (optional)</span><input class="input" type="file" accept="image/*" data-custom-file></label>
-          <button class="btn btn-ghost btn-block" style="margin-top:10px" data-custom-reset>Reset preview</button>
+          <p class="tiny muted" style="margin:-4px 0 12px">Prompt dein aur AI nayi product image generate karega. Owner ko isi image ke sath order milega.</p>
+          <div style="text-align:center;margin-bottom:12px;background:#f8f5f1;border-radius:14px;padding:8px"><canvas data-custom-canvas width="640" height="640" style="max-width:100%;height:auto;border-radius:10px"></canvas><img data-generated-preview alt="AI generated product preview" hidden style="max-width:100%;height:auto;border-radius:10px"></div>
           <div class="field" style="margin-top:10px"><span class="label">AI design prompt</span><input class="input" data-ai-design-prompt placeholder="e.g. Red floral print on this shirt"></div>
           <button class="btn btn-primary btn-block" style="margin-top:10px" data-ai-design-generate>${icon('sparkles', '', 15)} Generate with AI</button>
           <div class="tiny muted" data-custom-status style="margin-top:8px">Live editor changes stay on this product; AI may generate a separate design image.</div>
@@ -191,7 +185,7 @@ productPage.mount = (params, query, root) => {
   let qty = 1
   let chosen = (p.customizable?.options || []).map((o) => ({ name: o.name, choice: o.choices[0] }))
   let customizedImage = p.media?.[0]?.url || ''
-  let customState = { color: '#ffffff', text: '', design: '' }
+  let generatedImage = ''
   const unit = () => {
     const base = p.price
     const delta = chosen.reduce((a, c) => a + (c.choice?.delta || 0), 0)
@@ -255,32 +249,11 @@ productPage.mount = (params, query, root) => {
       const w = image.width * scale; const h = image.height * scale
       const x = (canvas.width - w) / 2; const y = (canvas.height - h) / 2
       ctx.drawImage(image, x, y, w, h)
-      const garmentX = x + w * 0.18; const garmentY = y + h * 0.12; const garmentW = w * 0.64; const garmentH = h * 0.76
-      ctx.save(); ctx.beginPath(); ctx.rect(garmentX, garmentY, garmentW, garmentH); ctx.clip()
-      if (customState.color !== '#ffffff') { ctx.globalAlpha = 0.28; ctx.fillStyle = customState.color; ctx.fillRect(garmentX, garmentY, garmentW, garmentH); ctx.globalAlpha = 1 }
-      if (customState.design) {
-        const design = new Image()
-        design.onload = () => { ctx.globalAlpha = 0.55; ctx.globalCompositeOperation = 'multiply'; ctx.drawImage(design, garmentX, garmentY, garmentW, garmentH); ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1; finish() }
-        design.src = customState.design
-      } else finish()
-      function finish() {
-        if (customState.text) { ctx.fillStyle = '#111'; ctx.font = 'bold 28px sans-serif'; ctx.textAlign = 'center'; ctx.fillText(customState.text.slice(0, 36), garmentX + garmentW / 2, garmentY + garmentH * 0.55) }
-        ctx.restore()
-        try { customizedImage = canvas.toDataURL('image/png'); } catch { customizedImage = p.media?.[0]?.url || '' }
-      }
+      customizedImage = generatedImage || p.media?.[0]?.url || ''
+      try { if (!generatedImage) customizedImage = canvas.toDataURL('image/png') } catch { customizedImage = p.media?.[0]?.url || '' }
     }
-    image.src = p.media?.[0]?.url || './images/p-kurta.png'
+    image.src = generatedImage || p.media?.[0]?.url || './images/p-kurta.png'
   }
-  root.querySelector('[data-custom-color]')?.addEventListener('input', (e) => { customState.color = e.target.value; redraw() })
-  root.querySelector('[data-custom-text]')?.addEventListener('input', (e) => { customState.text = e.target.value; redraw() })
-  root.querySelector('[data-custom-file]')?.addEventListener('change', (e) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-    const reader = new FileReader()
-    reader.onload = () => { customState.design = String(reader.result); redraw() }
-    reader.readAsDataURL(file)
-  })
-  root.querySelector('[data-custom-reset]')?.addEventListener('click', () => { customState = { color: '#ffffff', text: '', design: '' }; redraw() })
   root.querySelector('[data-ai-design-generate]')?.addEventListener('click', async (event) => {
     const prompt = root.querySelector('[data-ai-design-prompt]')?.value.trim()
     const status = root.querySelector('[data-custom-status]')
@@ -296,7 +269,13 @@ productPage.mount = (params, query, root) => {
       })
       const data = await response.json().catch(() => ({}))
       if (!response.ok || !data.url) throw new Error(data.error || 'AI image generate nahi ho saki')
-      customState.design = data.url
+      generatedImage = data.url
+      const generatedPreview = root.querySelector('[data-generated-preview]')
+      if (generatedPreview) {
+        generatedPreview.src = generatedImage
+        generatedPreview.hidden = false
+        canvas.style.display = 'none'
+      }
       redraw()
       status.textContent = 'AI image preview mein apply ho gayi. Aap dobara generate kar sakte hain.'
       toast('AI design ready', 'ok')
