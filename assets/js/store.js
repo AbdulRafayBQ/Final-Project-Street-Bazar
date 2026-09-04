@@ -581,6 +581,20 @@ export function updateStore(id, data) {
   save(); return s
 }
 
+export function deleteStore(id) {
+  const store = storeById(id)
+  if (!store) return false
+  const productIds = new Set(state.products.filter((p) => p.store === id).map((p) => p.id))
+  state.stores = state.stores.filter((s) => s.id !== id)
+  state.products = state.products.filter((p) => p.store !== id)
+  state.reviews = state.reviews.filter((r) => r.store !== id && !productIds.has(r.product))
+  state.follows = state.follows.filter((f) => f.store !== id)
+  state.threads = state.threads.filter((t) => t.store !== id)
+  state.warehouse = (state.warehouse || []).filter((item) => !item.product || !productIds.has(item.product))
+  save()
+  return true
+}
+
 export function createProduct(data) {
   const p = {
     id: uid('p'), store: data.store, title: data.title, description: data.description || '',

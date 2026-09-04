@@ -2,7 +2,7 @@
 
 import { icon, esc, money, num, timeAgo, toast, confirmBox, modal, closeModal } from '../ui.js'
 import { statCard } from '../components.js'
-import { state, currentUser, setRole, storeById, storeProducts, productById, userById, updateStore, updateProduct, notify, liveStores, pendingStores, lowStock } from '../store.js'
+import { state, currentUser, setRole, storeById, storeProducts, productById, userById, updateStore, deleteStore, updateProduct, notify, liveStores, pendingStores, lowStock } from '../store.js'
 import { isAIConnected, isConnected } from '../db.js'
 import { navigate } from '../router.js'
 
@@ -258,9 +258,7 @@ adminPage.mount = (params, query, root) => {
   root.querySelectorAll('[data-del-store]').forEach((b) => b.addEventListener('click', () => {
     const s = storeById(b.dataset.delStore)
     confirmBox('Delete ' + s.name + '?', 'Store aur uske products hata diye jayenge. Ye action wapas nahi hota.', () => {
-      state.stores = state.stores.filter((x) => x.id !== s.id)
-      state.products = state.products.filter((p) => p.store !== s.id)
-      import('../store.js').then(({ save }) => save())
+      deleteStore(s.id)
       toast('Store delete ho gaya')
       navigate('#/admin?tab=stores')
     }, 'Delete permanently')

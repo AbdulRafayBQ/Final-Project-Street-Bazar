@@ -2,7 +2,8 @@
 
 import { icon, esc, money, num, toast, modal, closeModal, timeAgo, spinner, confirmBox } from '../ui.js'
 import { statCard, emptyLogin } from '../components.js'
-import { myStores, storeById, storeProducts, storeOrders, storeRevenue, storeSales, currentUser, lowStock, productById, updateProduct, updateStore, advanceOrder, cancelOrder, addStock, storeThreads, threadById, markThreadRead, userById, save, ownerWarehouse, addWarehouseItem, updateWarehouseItem, deleteWarehouseItem } from '../store.js'
+import { myStores, storeById, storeProducts, storeOrders, storeRevenue, storeSales, currentUser, lowStock, productById, updateProduct, updateStore, deleteStore, advanceOrder, cancelOrder, addStock, storeThreads, threadById, markThreadRead, userById, save, ownerWarehouse, addWarehouseItem, updateWarehouseItem, deleteWarehouseItem } from '../store.js'
+import { authRequest } from '../db.js'
 import { genStockPlan, parseStock, chatReply, genProductCopy } from '../ai.js'
 import { navigate } from '../router.js'
 
@@ -67,6 +68,7 @@ export async function dashboardPage() {
                     <a class="btn btn-sm btn-ghost" href="#/add-product/${s.id}">${icon('plus', '', 13)} Add product</a>
                     <a class="btn btn-sm btn-ghost" href="#/edit-store/${s.id}">${icon('edit', '', 13)} Settings</a>
                     <button class="btn btn-sm btn-soft" data-sale="${s.id}">${icon('tag', '', 13)} Sale ad</button>
+                    <button class="btn btn-sm btn-danger" data-delete-store="${s.id}">Delete store</button>
                   </div>
                 </div>
               </div>`
@@ -205,6 +207,31 @@ dashboardPage.mount = (params, query, root) => {
   root.querySelectorAll('[data-reply]').forEach((b) => b.addEventListener('click', () => openReply(b.dataset.reply)))
 
   root.querySelectorAll('[data-sale]').forEach((b) => b.addEventListener('click', () => openSaleEditor(b.dataset.sale)))
+  root.querySelectorAll('[data-delete-store]').forEach((b) => b.addEventListener('click', () => {
+    const store = storeById(b.dataset.deleteStore)
+    const user = currentUser()
+    modal({
+      title: `Delete ${store?.name || 'store'}?`,
+      body: '<p class="small muted">Permanent delete hai. Confirm karne ke liye apna account password enter karein.</p><input class="input" id="delete-store-password" type="password" placeholder="Account password" style="margin-top:12px">',
+      foot: '<button class="btn btn-ghost" data-close>Cancel</button><button class="btn btn-danger" id="delete-store-confirm">Delete permanently</button>',
+      onOpen: (el) => el.querySelector('#delete-store-confirm').addEventListener('click', async () => {
+        const password = el.querySelector('#delete-store-password').value
+        if (!password) return toast('Password zaroori hai', 'err')
+        const button = spinner(el.querySelector('#delete-store-confirm'))
+        try {
+          if (user?.pass) {
+            if (user.pass !== password) throw new Error('Password match nahi karta')
+          } else {
+            await authRequest('login', { email: user.email, password })
+          }
+          deleteStore(store.id)
+          button(); closeModal(); toast('Store permanently delete ho gaya', 'ok'); navigate('#/dashboard')
+        } catch (error) {
+          button(); toast(error.message || 'Password verify nahi ho saka', 'err')
+        }
+      }),
+    })
+  }))
 
   bindWarehouse(root, root.querySelector('[data-panel="warehouse"]'), myStores()[0].id)
 
