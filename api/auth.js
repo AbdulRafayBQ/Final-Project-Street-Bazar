@@ -51,7 +51,7 @@ export default async function handler(req, res) {
         method: 'PUT',
         headers: { Authorization: 'Bearer ' + access_token },
         body: JSON.stringify({ password }),
-      }, access_token)
+      }, process.env.SUPABASE_ANON_KEY || process.env.SUPABASE_PUBLISHABLE_KEY)
       return json(res, 200, { reset: true })
     } else if (action === 'oauth_code') {
       auth = await supabaseRequest('/auth/v1/token?grant_type=pkce', {
@@ -61,7 +61,7 @@ export default async function handler(req, res) {
       auth.user = await supabaseRequest('/auth/v1/user', {
         method: 'GET',
         headers: { Authorization: 'Bearer ' + auth.access_token },
-      }, auth.access_token)
+      }, process.env.SUPABASE_ANON_KEY || process.env.SUPABASE_PUBLISHABLE_KEY)
     } else if (action === 'oauth') {
       auth = await supabaseRequest('/auth/v1/user', {
         method: 'GET',
