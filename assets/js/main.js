@@ -3,7 +3,7 @@
 import { $, $$, icon, esc, num, toast, modal, closeModal, avatar, timeAgo } from './ui.js'
 import { state, currentUser, cartCount, logout, myNotifications, unreadNotis, toggleLike, toggleFollow, productById, addToCart, save, unreadThreadCount, setRole } from './store.js'
 import { route, setNotFound, startRouter, onRender, navigate, renderRoute } from './router.js'
-import { authRequest } from './db.js'
+import { authRequest, syncPush } from './db.js'
 
 import { home } from './pages/home.js'
 import { explore, foryou } from './pages/explore.js'
@@ -434,6 +434,12 @@ function titleFor(path) {
 }
 
 /* ---------------- boot ---------------- */
+let syncTimer
+window.addEventListener('street-bazar-state-changed', () => {
+  clearTimeout(syncTimer)
+  syncTimer = setTimeout(() => syncPush().catch((error) => console.error('Automatic Supabase sync failed:', error)), 700)
+})
+
 async function restoreGoogleSession() {
   const params = new URLSearchParams(window.location.hash.replace(/^#\/?/, ''))
   const accessToken = params.get('access_token')

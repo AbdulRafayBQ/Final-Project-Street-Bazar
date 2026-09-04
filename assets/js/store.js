@@ -455,7 +455,8 @@ function load() {
 }
 
 export function save() {
-  try { localStorage.setItem(KEY, JSON.stringify(state)) } catch { /* ignore quota */ }
+  try {   localStorage.setItem(KEY, JSON.stringify(state))
+  window.dispatchEvent(new CustomEvent('street-bazar-state-changed')) } catch { /* ignore quota */ }
 }
 export function resetDemo() { state = seed(); save() }
 

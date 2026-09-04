@@ -64,6 +64,7 @@ drop policy if exists anon_state_read on app_state;
 export const isConnected = () => true
 export const isAIConnected = () => true
 export const getAIKey = () => 'server-managed'
+let syncing = false
 
 async function api(path, options = {}) {
 const res = await fetch(path, { ...options, headers: { 'Content-Type': 'application/json', ...(options.headers || {}) } })
@@ -77,17 +78,23 @@ return api('/api/auth', { method: 'POST', body: JSON.stringify({ action, ...payl
 }
 
 export async function syncPush() {
-const userId = state.session
-const payload = {
-  ...state,
-  users: state.users.map(({ pass, ...user }) => user),
-  settings: { ...state.settings, supabase: {}, ai: {} },
+if (syncing) return
+syncing = true
+try {
+  const userId = state.session
+  const payload = {
+    ...state,
+    users: state.users.map(({ pass, ...user }) => user),
+    settings: { ...state.settings, supabase: {}, ai: {} },
+  }
+  payload.user_id = userId
+  delete payload.session
+  await api('/api/data', { method: 'POST', body: JSON.stringify(payload) })
+  state.settings.lastSync = Date.now()
+  save()
+} finally {
+  syncing = false
 }
-payload.user_id = userId
-delete payload.session
-await api('/api/data', { method: 'POST', body: JSON.stringify(payload) })
-state.settings.lastSync = Date.now()
-save()
 }
 
 export async function syncPull() {
