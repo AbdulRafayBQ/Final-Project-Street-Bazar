@@ -59,8 +59,11 @@ create table if not exists follows (
 );
 
 create table if not exists threads (
-  id text primary key, product_id text, store_id text,
-  customer_id uuid references users(id), messages jsonb,
+  id text primary key,
+  product_id text,
+  store_id text,
+  customer_id uuid references users(id),
+  messages jsonb,
   updated_at timestamptz default now()
 );
 
