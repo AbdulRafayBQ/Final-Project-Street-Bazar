@@ -48,12 +48,18 @@ export default async function handler(req, res) {
       avatar: user.user_metadata?.avatar || '',
       created_at: user.created_at,
     }
-    await supabaseRequest('/rest/v1/users?on_conflict=id', {
-      method: 'POST',
-      headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
-      body: JSON.stringify(profile),
-    })
-    return json(res, 200, { user: profile, access_token: auth.access_token || null })
+    let profileSaved = false
+    try {
+      await supabaseRequest('/rest/v1/users?on_conflict=id', {
+        method: 'POST',
+        headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
+        body: JSON.stringify(profile),
+      })
+      profileSaved = true
+    } catch (profileError) {
+      console.error('Supabase profile write failed after successful auth:', profileError.message)
+    }
+    return json(res, 200, { user: profile, access_token: auth.access_token || null, profile_saved: profileSaved })
   } catch (error) {
     return json(res, 400, { error: error.message })
   }

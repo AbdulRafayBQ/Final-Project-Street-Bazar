@@ -828,8 +828,8 @@ tbody tr:hover{background:var(--paper-2)}
 @media(max-width:860px){
   .nav,.hd-search,.hd-actions .desktop-only{display:none}
   .menu-btn{display:grid}
-  .mobile-nav{display:block}
-  .view{padding-bottom:110px}
+  .mobile-nav{display:none}
+  .view{padding-bottom:40px}
   .store-tabs{top:0}
 }
 @media(max-width:640px){
