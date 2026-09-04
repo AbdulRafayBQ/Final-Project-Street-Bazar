@@ -4,7 +4,7 @@
 import { toast } from './ui.js'
 import { state, save } from './store.js'
 
-export const TABLES = ['users', 'stores', 'products', 'reviews', 'orders', 'follows', 'threads']
+export const TABLES = ['users', 'profiles', 'stores', 'products', 'reviews', 'orders', 'follows', 'threads', 'cart_items', 'saved_products']
 
 export const SQL_SCHEMA = `-- Street Bazar · Supabase schema (SQL Editor me paste karein)
 create extension if not exists "pgcrypto";
@@ -77,11 +77,13 @@ return api('/api/auth', { method: 'POST', body: JSON.stringify({ action, ...payl
 }
 
 export async function syncPush() {
+const userId = state.session
 const payload = {
   ...state,
   users: state.users.map(({ pass, ...user }) => user),
   settings: { ...state.settings, supabase: {}, ai: {} },
 }
+payload.user_id = userId
 delete payload.session
 await api('/api/data', { method: 'POST', body: JSON.stringify(payload) })
 state.settings.lastSync = Date.now()

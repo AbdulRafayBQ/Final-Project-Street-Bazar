@@ -1,5 +1,16 @@
 create extension if not exists "pgcrypto";
 
+create table if not exists profiles (
+  id uuid primary key references auth.users(id) on delete cascade,
+  full_name text,
+  email text unique,
+  phone text,
+  role text not null default 'customer',
+  seller_status text not null default 'none',
+  avatar_url text,
+  created_at timestamptz default now()
+);
+
 create table if not exists users (
   id uuid primary key,
   name text not null,
@@ -8,6 +19,11 @@ create table if not exists users (
   avatar text,
   created_at timestamptz default now()
 );
+
+insert into profiles (id, full_name, email)
+select id, coalesce(raw_user_meta_data->>'name', split_part(email, '@', 1)), email
+from auth.users
+on conflict (id) do update set email = excluded.email;
 
 create table if not exists stores (
   id text primary key,
@@ -48,6 +64,18 @@ create table if not exists threads (
   updated_at timestamptz default now()
 );
 
+create table if not exists cart_items (
+  id text primary key, user_id uuid references users(id),
+  product_id text, store_id text, title text, image text,
+  qty int default 1, options jsonb, unit_price numeric,
+  updated_at timestamptz default now()
+);
+
+create table if not exists saved_products (
+  id text primary key, user_id uuid references users(id),
+  product_id text, created_at timestamptz default now()
+);
+
 create table if not exists app_state (
   key text primary key,
   payload jsonb not null,
@@ -55,10 +83,13 @@ create table if not exists app_state (
 );
 
 alter table users enable row level security;
+alter table profiles enable row level security;
 alter table stores enable row level security;
 alter table products enable row level security;
 alter table reviews enable row level security;
 alter table orders enable row level security;
 alter table follows enable row level security;
 alter table threads enable row level security;
+alter table cart_items enable row level security;
+alter table saved_products enable row level security;
 alter table app_state enable row level security;

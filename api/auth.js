@@ -25,19 +25,19 @@ export default async function handler(req, res) {
   }
   if (req.method !== 'POST') return json(res, 405, { error: 'Method not allowed' })
   try {
-    const { action, name, email, password, token, access_token, role = 'customer' } = req.body || {}
+    const { action, name, email, password, token, access_token, type = 'signup', role = 'customer' } = req.body || {}
     if (action === 'oauth' && !access_token) return json(res, 400, { error: 'Google session is missing' })
-    if (action !== 'oauth' && (!email || (action === 'verify' ? !token : action === 'forgot' ? false : !password))) return json(res, 400, { error: action === 'verify' ? 'Email and verification code are required' : 'Email and password are required' })
+    if (action !== 'oauth' && action !== 'reset' && (!email || (action === 'verify' ? !token : action === 'forgot' ? false : !password))) return json(res, 400, { error: action === 'verify' ? 'Email and verification code are required' : 'Email and password are required' })
 
     let auth
     if (action === 'forgot') {
-      await supabaseRequest('/auth/v1/recover', {
+      await supabaseRequest('/auth/v1/otp', {
         method: 'POST',
-        body: JSON.stringify({ email, redirect_to: `${req.headers['x-forwarded-proto'] || 'https'}://${req.headers.host}/#/auth?reset=1` }),
+        body: JSON.stringify({ email, create_user: false }),
       }, process.env.SUPABASE_ANON_KEY || process.env.SUPABASE_PUBLISHABLE_KEY)
       return json(res, 200, { sent: true })
     } else if (action === 'reset') {
-      if (!access_token || !password || password.length < 6) return json(res, 400, { error: 'New password must be at least 6 characters' })
+      if (!access_token || !password || password.length < 6) return json(res, 400, { error: 'Verification code and new password are required' })
       await supabaseRequest('/auth/v1/user', {
         method: 'PUT',
         headers: { Authorization: `Bearer ${access_token}` },
@@ -53,7 +53,7 @@ export default async function handler(req, res) {
     } else if (action === 'verify') {
       auth = await supabaseRequest('/auth/v1/verify', {
         method: 'POST',
-        body: JSON.stringify({ type: 'signup', email, token }),
+        body: JSON.stringify({ type, email, token }),
       }, process.env.SUPABASE_ANON_KEY || process.env.SUPABASE_PUBLISHABLE_KEY)
     } else if (action === 'signup') {
       auth = await supabaseRequest('/auth/v1/signup', {

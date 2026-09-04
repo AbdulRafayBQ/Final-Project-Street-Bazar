@@ -73,16 +73,17 @@ authPage.mount = (params, query, root) => {
       </div>`,
     forgot: () => `
       <h2 class="h3">Reset password</h2>
-      <p class="muted small" style="margin:8px 0 18px">Email dein, hum reset link bhej denge.</p>
+      <p class="muted small" style="margin:8px 0 18px">Email dein, phir OTP aur naya password enter karein.</p>
       <div class="stack">
         <div class="field"><span class="label">Email</span><input class="input" id="au-email" type="email" placeholder="you@email.com"></div>
-        <button class="btn btn-grad btn-lg btn-block" id="au-go">Send reset link</button>
+        <button class="btn btn-grad btn-lg btn-block" id="au-go">Send OTP</button>
         <button class="btn btn-ghost" id="au-back">Back to sign in</button>
       </div>`,
     reset: () => `
-      <h2 class="h3">Set new password</h2>
-      <p class="muted small" style="margin:8px 0 18px">Apna naya password set karein.</p>
+      <h2 class="h3">Reset password</h2>
+      <p class="muted small" style="margin:8px 0 18px">Email par aaya OTP aur naya password enter karein.</p>
       <div class="stack">
+        <div class="field"><span class="label">OTP</span><input class="input" id="au-code" inputmode="numeric" maxlength="10" placeholder="Verification code"></div>
         <div class="field"><span class="label">New password</span><div class="password-wrap"><input class="input" id="au-pass" type="password" placeholder="6+ characters"><button type="button" class="password-toggle" data-password-toggle>Show</button></div></div>
         <button class="btn btn-grad btn-lg btn-block" id="au-go">Update password</button>
       </div>`,
@@ -146,13 +147,14 @@ authPage.mount = (params, query, root) => {
       try {
         if (mode === 'forgot') {
           await authRequest('forgot', { email })
-          btn(); toast('Password reset email bhej di gayi', 'ok'); return
+          sessionStorage.setItem('street-bazar-reset-email', email)
+          mode = 'reset'; btn(); paint(); toast('Password reset OTP email par bhej diya gaya', 'ok'); return
         }
         if (mode === 'reset') {
-          const token = sessionStorage.getItem('street-bazar-recovery-token')
-          if (!token) throw new Error('Reset link expired. Dobara reset email mangwayein.')
-          await authRequest('reset', { access_token: token, password: pass })
-          sessionStorage.removeItem('street-bazar-recovery-token')
+          const resetEmail = sessionStorage.getItem('street-bazar-reset-email') || email
+          const verify = await authRequest('verify', { email: resetEmail, token: body.querySelector('#au-code').value.trim(), type: 'recovery' })
+          await authRequest('reset', { access_token: verify.access_token, password: pass })
+          sessionStorage.removeItem('street-bazar-reset-email')
           mode = 'signin'; btn(); paint(); toast('Password update ho gaya', 'ok'); return
         }
         if (mode === 'signin') {
