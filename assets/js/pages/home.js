@@ -56,18 +56,7 @@ export async function home() {
       </div>
       
       ${sales.length ? `
-      <div class="grid grid-2 stagger" style="margin-top:16px;margin-bottom:20px">
-        ${sales.map((s) => `
-          <a class="ad-card reveal" href="#/store/${s.slug}">
-            <img src="${esc(s.banner || './images/banner-fashion.png')}" alt="${esc(s.name)}" onerror="this.src='./images/banner-fashion.png'">
-            <span class="ad-tag badge badge-sale">${icon('tag', '', 12)} SALE</span>
-            <div class="ad-in">
-              <div class="small" style="opacity:.85">${esc(s.name)}</div>
-              <div class="h4" style="color:#fff;margin:4px 0 8px">${esc(s.sale.text)}</div>
-              <div class="tiny" style="opacity:.8">Ends ${new Date(s.sale.until).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })} · ${num(storeProducts(s.id).length)} products</div>
-            </div>
-          </a>`).join('')}
-      </div>` : ''}
+      <div class="sale-carousel" data-sale-carousel style="margin-top:16px;margin-bottom:20px"></div>` : ''}
 
       <div class="grid grid-6 stagger">
         ${saleProducts.map(productCard).join('')}
@@ -143,6 +132,26 @@ export async function home() {
 
 home.mount = (p, q, root) => {
   root.querySelector('[data-ai-scan]')?.addEventListener('click', openAIScan)
+  const carousel = root.querySelector('[data-sale-carousel]')
+  if (!carousel) return
+  const sales = saleStores()
+  let index = 0
+  const paint = () => {
+    const s = sales[index % sales.length]
+    carousel.innerHTML = `
+      <a class="ad-card reveal sale-carousel-card" href="#/store/${s.slug}">
+        <img src="${esc(s.banner || './images/banner-fashion.png')}" alt="${esc(s.name)}" onerror="this.src='./images/banner-fashion.png'">
+        <span class="ad-tag badge badge-sale">${icon('tag', '', 12)} SALE</span>
+        <div class="ad-in">
+          <div class="small" style="opacity:.85">${esc(s.name)}</div>
+          <div class="h4" style="color:#fff;margin:4px 0 8px">${esc(s.sale.text)}</div>
+          <div class="tiny" style="opacity:.8">Ends ${new Date(s.sale.until).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })} · ${num(storeProducts(s.id).length)} products</div>
+        </div>
+      </a>`
+    index += 1
+  }
+  paint()
+  root._saleTimer = setInterval(paint, 4200)
 }
 
 export function openAIScan() {

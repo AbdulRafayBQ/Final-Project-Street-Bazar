@@ -1,9 +1,8 @@
 /* Street Bazar — AI engine.
-   Uses the configured provider (OpenAI-compatible) when an API key is set in Settings,
-   otherwise falls back to the built-in "Bazar Brain" so every AI feature still works. */
+   Uses the Vercel server proxy when configured, otherwise falls back to "Bazar Brain". */
 
 import { state, logAI, CATEGORIES, productById, storeById, ratingOf, productReviews, currentUser } from './store.js'
-import { isAIConnected, getAIKey } from './db.js'
+import { isAIConnected } from './db.js'
 import { money, num, toast } from './ui.js'
 
 const T = (s) => String(s || '')
@@ -13,49 +12,14 @@ const pick = (arr, seedStr) => arr[hash(seedStr) % arr.length]
 
 /* ---------------- real API ---------------- */
 async function api(system, user, maxTokens = 800) {
-  const apiKey = getAIKey()
-  if (!apiKey) throw new Error('API key nahi mili')
-
-  const { base, model } = state.settings.ai || {}
-
-  // Auto-detect Gemini key (starts with AIza or not sk-) vs OpenAI key
-  const isGemini = apiKey.startsWith('AIza') || !apiKey.startsWith('sk-') || (base && base.includes('googleapis')) || (model && model.includes('gemini'))
-
-  if (isGemini) {
-    const geminiModel = model && model.includes('gemini') ? model : 'gemini-1.5-flash'
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent?key=${apiKey}`
-    const promptText = `${system ? system + '\n\n' : ''}User instruction: ${user}`
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: promptText }] }]
-      }),
-    })
-    const data = await res.json().catch(() => ({}))
-    if (!res.ok) {
-      const msg = data.error?.message || ('Error ' + res.status)
-      throw new Error('Gemini: ' + msg)
-    }
-    return data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || ''
-  }
-
-  // Standard OpenAI-compatible API
-  const res = await fetch((base || 'https://api.openai.com/v1').replace(/\/$/, '') + '/chat/completions', {
+  const res = await fetch('/api/ai', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + apiKey },
-    body: JSON.stringify({
-      model: model || 'gpt-4o-mini',
-      messages: [{ role: 'system', content: system }, { role: 'user', content: user }],
-      temperature: 0.8, max_tokens: maxTokens,
-    }),
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ system, user, maxTokens }),
   })
   const data = await res.json().catch(() => ({}))
-  if (!res.ok) {
-    const msg = data.error?.message || ('Error ' + res.status)
-    throw new Error('OpenAI: ' + msg)
-  }
-  return data.choices?.[0]?.message?.content?.trim() || ''
+  if (!res.ok) throw new Error(data.error || `AI provider ${res.status}`)
+  return data.text || ''
 }
 
 async function think(kind, system, offline, label = '') {
@@ -271,5 +235,5 @@ export async function assistantReply({ question }) {
 }
 
 export function aiStatusText() {
-  return isAIConnected() ? 'Live AI connected · ' + state.settings.ai.model : 'Bazar Brain (offline mode)'
+  return isAIConnected() ? 'Live AI connected · server managed' : 'Bazar Brain (offline mode)'
 }

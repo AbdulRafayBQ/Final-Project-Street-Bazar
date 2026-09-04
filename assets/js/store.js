@@ -40,13 +40,13 @@ const IMG = (n) => './images/' + n
 /* ---------------- seed ---------------- */
 function seed() {
   const users = [
-    { id: 'u-admin', name: 'Bazar Admin', email: 'admin@streetbazar.pk', role: 'admin', pass: 'admin1234', avatar: '' },
-    { id: 'u-hassan', name: 'Hassan Raza', email: 'hassan@demo.pk', role: 'owner', pass: 'demo1234', avatar: '' },
-    { id: 'u-sana', name: 'Sana Iqbal', email: 'sana@demo.pk', role: 'owner', pass: 'demo1234', avatar: '' },
-    { id: 'u-bilal', name: 'Bilal Ahmed', email: 'bilal@demo.pk', role: 'owner', pass: 'demo1234', avatar: '' },
-    { id: 'u-mariam', name: 'Mariam Noor', email: 'mariam@demo.pk', role: 'owner', pass: 'demo1234', avatar: '' },
-    { id: 'u-ali', name: 'Ali Customer', email: 'ali@demo.pk', role: 'customer', pass: 'demo1234', avatar: '' },
-    { id: 'u-zoya', name: 'Zoya Malik', email: 'zoya@demo.pk', role: 'customer', pass: 'demo1234', avatar: '' },
+    { id: 'u-admin', name: 'Bazar Admin', email: 'admin@streetbazar.pk', role: 'admin', avatar: '' },
+    { id: 'u-hassan', name: 'Hassan Raza', email: 'hassan@demo.pk', role: 'owner', avatar: '' },
+    { id: 'u-sana', name: 'Sana Iqbal', email: 'sana@demo.pk', role: 'owner', avatar: '' },
+    { id: 'u-bilal', name: 'Bilal Ahmed', email: 'bilal@demo.pk', role: 'owner', avatar: '' },
+    { id: 'u-mariam', name: 'Mariam Noor', email: 'mariam@demo.pk', role: 'owner', avatar: '' },
+    { id: 'u-ali', name: 'Ali Customer', email: 'ali@demo.pk', role: 'customer', avatar: '' },
+    { id: 'u-zoya', name: 'Zoya Malik', email: 'zoya@demo.pk', role: 'customer', avatar: '' },
   ]
 
   const stores = [
@@ -539,7 +539,7 @@ export function notify(to, title, body, link = '#/') {
 export function login(email, pass) {
   const u = state.users.find((x) => x.email.toLowerCase() === String(email).toLowerCase().trim())
   if (!u) throw new Error('No account with this email. Sign up karein pehle.')
-  if (u.pass !== pass) throw new Error('Galat password. Demo passwords neeche box mein hain.')
+  if (!pass) throw new Error('Password required.')
   state.session = u.id; save(); return u
 }
 export function signup({ name, email, pass, role = 'customer' }) {

@@ -1,7 +1,8 @@
-/* Street Bazar — Login / Sign up / Google */
+/* Street Bazar — Supabase-backed Login / Sign up */
 
 import { icon, esc, toast, spinner } from '../ui.js'
-import { login, signup, googleAuth, currentUser, setRole, logout } from '../store.js'
+import { currentUser, setRole, logout, state, save } from '../store.js'
+import { authRequest } from '../db.js'
 import { navigate } from '../router.js'
 
 export async function authPage(params, query) {
@@ -49,17 +50,6 @@ export async function authPage(params, query) {
 
         <div style="margin-top:24px" data-auth-body></div>
 
-        <div class="or">or continue with</div>
-        <button class="gbtn" data-google>${icon('google', '', 19)} Continue with Google</button>
-
-        <div class="demo-box" style="margin-top:22px">
-          <b>Demo accounts</b> — ek click mein try karein:<br>
-          <div class="wrap-flex" style="margin-top:8px;gap:7px">
-            <button class="chip" data-demo="admin@streetbazar.pk|admin1234">${icon('shield', '', 13)} Admin</button>
-            <button class="chip" data-demo="hassan@demo.pk|demo1234">${icon('store', '', 13)} Store owner</button>
-            <button class="chip" data-demo="ali@demo.pk|demo1234">${icon('user', '', 13)} Customer</button>
-          </div>
-        </div>
       </div>
     </div>
   </div>`
@@ -109,13 +99,24 @@ authPage.mount = (params, query, root) => {
       await new Promise((r) => setTimeout(r, 500))
       try {
         if (mode === 'signin') {
-          const u = login(email, pass)
+          let u
+          const result = await authRequest('login', { email, password: pass })
+          u = result.user
+          const existing = state.users.find((x) => x.email.toLowerCase() === email.toLowerCase())
+          if (existing) Object.assign(existing, u)
+          else state.users.push(u)
+          state.session = u.id
+          save()
           btn(); toast('Welcome back, ' + u.name.split(' ')[0] + '!', 'ok')
         } else {
           const name = body.querySelector('#au-name').value.trim()
           if (!name) throw new Error('Apna naam likhein')
           if (pass.length < 6) throw new Error('Password kam se kam 6 characters ka ho')
-          const u = signup({ name, email, pass, role })
+          const result = await authRequest('signup', { name, email, password: pass, role })
+          const u = result.user
+          state.users.push(u)
+          state.session = u.id
+          save()
           btn(); toast('Account ban gaya 🎉', 'ok')
           if (role === 'owner') { navigate('#/create-store'); return }
         }
@@ -128,18 +129,5 @@ authPage.mount = (params, query, root) => {
   paint()
 
   root.querySelectorAll('[data-auth-tabs] button').forEach((b) => b.addEventListener('click', () => { mode = b.dataset.mode; paint() }))
-  root.querySelector('[data-google]').addEventListener('click', () => {
-    const u = googleAuth()
-    toast('Signed in with Google as ' + u.name, 'ok')
-    navigate(redirect)
-  })
-  root.querySelectorAll('[data-demo]').forEach((b) => b.addEventListener('click', () => {
-    const [email, pass] = b.dataset.demo.split('|')
-    try {
-      const u = login(email, pass)
-      toast('Demo login: ' + u.name, 'ok')
-      navigate(email.startsWith('admin') ? '#/admin' : redirect)
-    } catch (e) { toast(e.message, 'err') }
-  }))
   root.querySelector('[data-logout]')?.addEventListener('click', () => { logout(); toast('Logged out'); navigate('#/') })
 }

@@ -1,5 +1,5 @@
-/* Street Bazar — Supabase (Postgres) bridge.
-   Works fully offline on localStorage; connect Supabase in Settings to sync. */
+/* Street Bazar — server-backed integrations.
+   Secrets stay in Vercel environment variables; the browser only calls /api. */
 
 import { toast } from './ui.js'
 import { state, save } from './store.js'
@@ -10,7 +10,7 @@ export const SQL_SCHEMA = `-- Street Bazar · Supabase schema (SQL Editor me pas
 create extension if not exists "pgcrypto";
 
 create table if not exists users (
-  id text primary key, name text, email text unique, role text default 'customer',
+id uuid primary key, name text, email text unique, role text default 'customer',
   avatar text, created_at timestamptz default now()
 );
 create table if not exists stores (
@@ -40,6 +40,11 @@ create table if not exists threads (
   id text primary key, product_id text, store_id text, customer_id text,
   messages jsonb, updated_at timestamptz default now()
 );
+create table if not exists app_state (
+  key text primary key,
+  payload jsonb not null,
+  updated_at timestamptz default now()
+);
 
 alter table users enable row level security;
 alter table stores enable row level security;
@@ -48,89 +53,54 @@ alter table reviews enable row level security;
 alter table orders enable row level security;
 alter table follows enable row level security;
 alter table threads enable row level security;
+alter table app_state enable row level security;
 
--- Demo policy (app uses anon key). Tighten for production.
+-- No public write policies: all writes go through the Vercel service role.
 drop policy if exists anon_all on stores;
-create policy anon_all on stores for all using (true) with check (true);
 drop policy if exists anon_all_products on products;
-create policy anon_all_products on products for all using (true) with check (true);
+drop policy if exists anon_state_read on app_state;
 `
 
-export const isConnected = () => Boolean(state.settings.supabase?.url && state.settings.supabase?.key)
-export const getAIKey = () => {
-  if (state.settings.ai?.key) return state.settings.ai.key;
-  try {
-    if (typeof import.meta !== 'undefined' && import.meta.env) {
-      return import.meta.env.VITE_GEMINI_API_KEY || import.meta.env.VITE_AI_API_KEY || import.meta.env.GEMINI_API_KEY || '';
-    }
-  } catch (e) {}
-  return '';
-}
-export const isAIConnected = () => Boolean(getAIKey())
+export const isConnected = () => true
+export const isAIConnected = () => true
+export const getAIKey = () => 'server-managed'
 
-function headers() {
-  return {
-    apikey: state.settings.supabase.key,
-    Authorization: 'Bearer ' + state.settings.supabase.key,
-    'Content-Type': 'application/json',
-  }
+async function api(path, options = {}) {
+const res = await fetch(path, { ...options, headers: { 'Content-Type': 'application/json', ...(options.headers || {}) } })
+const data = await res.json().catch(() => ({}))
+if (!res.ok) throw new Error(data.error || `API ${res.status}`)
+return data
 }
 
-async function sb(path, opts = {}) {
-  const base = state.settings.supabase.url.replace(/\/$/, '') + '/rest/v1/' + path
-  const res = await fetch(base, { headers: headers(), ...opts })
-  if (!res.ok) throw new Error('Supabase ' + res.status + ': ' + (await res.text()).slice(0, 180))
-  const ct = res.headers.get('content-type') || ''
-  return ct.includes('json') ? res.json() : null
-}
-
-function collection(name) {
-  if (name === 'users') return state.users
-  if (name === 'stores') return state.stores
-  if (name === 'products') return state.products
-  if (name === 'reviews') return state.reviews
-  if (name === 'orders') return state.orders
-  if (name === 'follows') return state.follows.map((f) => ({ id: f.id, user_id: f.user, store_id: f.store, created_at: f.at }))
-  if (name === 'threads') return state.threads
-  return []
+export async function authRequest(action, payload) {
+return api('/api/auth', { method: 'POST', body: JSON.stringify({ action, ...payload }) })
 }
 
 export async function syncPush() {
-  if (!isConnected()) throw new Error('Connect Supabase first (Settings).')
-  for (const t of TABLES) {
-    const rows = collection(t)
-    if (!rows.length) continue
-    await sb(t + '?on_conflict=id', { method: 'POST', body: JSON.stringify(rows), headers: { ...headers(), Prefer: 'resolution=merge-duplicates,return=minimal' } })
-  }
-  state.settings.lastSync = Date.now()
-  save()
+const payload = {
+  ...state,
+  users: state.users.map(({ pass, ...user }) => user),
+  settings: { ...state.settings, supabase: {}, ai: {} },
+}
+delete payload.session
+await api('/api/data', { method: 'POST', body: JSON.stringify(payload) })
+state.settings.lastSync = Date.now()
+save()
 }
 
 export async function syncPull() {
-  if (!isConnected()) throw new Error('Connect Supabase first (Settings).')
-  for (const t of TABLES) {
-    const rows = await sb(t + '?select=*&limit=1000')
-    if (!rows) continue
-    if (t === 'follows') state.follows = rows.map((r) => ({ id: r.id, user: r.user_id, store: r.store_id, at: r.created_at }))
-    else state[t] = rows
-  }
-  save()
+const remote = await api('/api/data')
+if (!remote) return
+const session = state.session
+Object.assign(state, remote, { session })
+save()
 }
 
-export async function testConnection() {
-  if (!isConnected()) return false
-  try { await sb('stores?select=id&limit=1'); return true } catch { return false }
-}
+export const testConnection = async () => { try { await api('/api/data'); return true } catch { return false } }
 
 export async function syncBoth() {
   try {
-    if (state.isDemo) {
-      // Clear demo data before pulling
-      TABLES.forEach(t => { if(state[t]) state[t] = [] })
-      state.isDemo = false
-    } else {
-      await syncPush()
-    }
+    await syncPush()
     await syncPull()
     toast('Supabase sync complete — database live hai', 'ok')
     return true

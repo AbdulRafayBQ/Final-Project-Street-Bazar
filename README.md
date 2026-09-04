@@ -1,4 +1,27 @@
-# React + TypeScript + Vite
+# Street Bazar
+
+## Production setup
+
+This is a static frontend with Vercel serverless APIs. Keep provider and
+Supabase service keys out of the browser and add the variables in
+[.env.example](./.env.example) to Vercel Project Settings.
+
+Run the SQL shown in Settings once in Supabase SQL Editor. It creates the
+marketplace tables and `app_state` used by the server sync endpoint.
+Supabase Auth handles sign-up/login; the service role key is only used inside
+Vercel functions.
+
+`AI_BASE_URL` and `AI_MODEL` select the provider. OpenAI-compatible endpoints,
+Google Gemini (`generativelanguage.googleapis.com`), and Anthropic are handled
+by the server proxy.
+
+## Local development
+
+```sh
+npm run dev
+```
+
+Build with `npm run build`.
 
 This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
 

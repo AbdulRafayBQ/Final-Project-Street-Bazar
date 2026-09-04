@@ -27,7 +27,8 @@ function renderHeader() {
   head.innerHTML = `
     <div class="wrap hd">
       <a class="logo" href="#/" aria-label="Street Bazar home">
-        <img src="./images/logo.png" alt="Street Bazar" style="height:48px;width:auto;object-fit:contain">
+        <img src="./images/logo.png" alt="" style="height:48px;width:auto;object-fit:contain">
+        <span class="logo-wordmark">STREET BAZAR</span>
       </a>
 
       <nav class="nav" data-nav>

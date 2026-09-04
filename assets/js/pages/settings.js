@@ -1,8 +1,8 @@
-/* Street Bazar — Settings (account, AI keys, Supabase, data) */
+/* Street Bazar — Settings (account and server integrations) */
 
 import { icon, esc, toast, modal, closeModal, copyText, confirmBox, timeAgo } from '../ui.js'
-import { currentUser, updateSettings, state, setRole, logout, resetDemo, save } from '../store.js'
-import { SQL_SCHEMA, isConnected, isAIConnected, testConnection, syncBoth } from '../db.js'
+import { currentUser, state, setRole, logout, resetDemo, save } from '../store.js'
+import { SQL_SCHEMA, isConnected, isAIConnected, syncBoth } from '../db.js'
 import { navigate } from '../router.js'
 
 export async function settingsPage() {
@@ -34,30 +34,15 @@ export async function settingsPage() {
     </div>
 
     <div class="panel" style="margin-top:22px">
-      <div class="row-between"><h3 class="h4">AI engine</h3><span class="badge ${isAIConnected() ? 'badge-live' : 'badge-soft'}">${isAIConnected() ? 'Live' : 'Bazar Brain'}</span></div>
-      <p class="small muted" style="margin-top:8px">API key dalte hi har AI feature (description, title, stock, chat) live model par chalne lagta hai. Key na ho toh built-in Bazar Brain sab kaam karta rehta hai.</p>
-      <div class="stack" style="margin-top:14px">
-        <div class="field"><span class="label">Provider base URL</span><input class="input" id="ai-base" value="${esc(s.ai.base)}" placeholder="https://api.openai.com/v1"></div>
-        <div class="grid grid-2" style="gap:12px">
-          <div class="field"><span class="label">API key</span><input class="input" id="ai-key" type="password" value="${esc(s.ai.key)}" placeholder="sk-…"></div>
-          <div class="field"><span class="label">Model</span><input class="input" id="ai-model" value="${esc(s.ai.model)}" placeholder="gpt-4o-mini"></div>
-        </div>
-      </div>
-      <div class="wrap-flex" style="margin-top:14px">
-        <button class="btn btn-primary" id="save-ai"><span>Save AI settings</span></button>
-        <button class="btn btn-ghost" id="test-ai">${icon('sparkles', '', 15)} Test AI</button>
-      </div>
+      <div class="row-between"><h3 class="h4">AI engine</h3><span class="badge badge-live">Server managed</span></div>
+      <p class="small muted" style="margin-top:8px">AI provider key, base URL aur model Vercel environment variables mein secure hain. Keys browser ya users ko kabhi nahi dikhayi jatin.</p>
+      <button class="btn btn-primary" id="test-ai" style="margin-top:14px">${icon('sparkles', '', 15)} Test server AI</button>
     </div>
 
     <div class="panel" style="margin-top:22px">
       <div class="row-between"><h3 class="h4">Supabase database</h3><span class="badge ${isConnected() ? 'badge-live' : 'badge-soft'}">${isConnected() ? 'Connected' : 'Local storage'}</span></div>
-      <p class="small muted" style="margin-top:8px">Supabase project connect karein taake saara data (stores, products, orders, reviews, chats) Postgres mein sync ho. Abhi sab kuch browser ke local storage mein safe hai.</p>
-      <div class="grid grid-2" style="gap:12px;margin-top:14px">
-        <div class="field"><span class="label">Project URL</span><input class="input" id="sb-url" value="${esc(s.supabase.url)}" placeholder="https://xxxx.supabase.co"></div>
-        <div class="field"><span class="label">Anon key</span><input class="input" id="sb-key" type="password" value="${esc(s.supabase.key)}" placeholder="eyJhbGci…"></div>
-      </div>
+      <p class="small muted" style="margin-top:8px">Supabase connection Vercel backend par configured hai. Accounts, stores, products, orders aur reviews server API ke zariye database mein persist hote hain.</p>
       <div class="wrap-flex" style="margin-top:14px">
-        <button class="btn btn-primary" id="save-sb"><span>Save & connect</span></button>
         <button class="btn btn-ghost" id="sync-sb">${icon('refresh', '', 15)} Push + pull sync</button>
         <button class="btn btn-ghost" id="show-sql">${icon('copy', '', 15)} Copy SQL schema</button>
       </div>
@@ -84,13 +69,7 @@ settingsPage.mount = (params, query, root) => {
   }))
   root.querySelector('#do-logout').addEventListener('click', () => { logout(); toast('Logged out'); navigate('#/') })
 
-  root.querySelector('#save-ai').addEventListener('click', () => {
-    updateSettings({ ai: { base: root.querySelector('#ai-base').value.trim(), key: root.querySelector('#ai-key').value.trim(), model: root.querySelector('#ai-model').value.trim() } })
-    toast('AI settings saved', 'ok')
-  })
   root.querySelector('#test-ai').addEventListener('click', async () => {
-    const key = root.querySelector('#ai-key').value.trim()
-    if (!key) return toast('Pehle API key dalein — warna Bazar Brain chal raha hai', 'err')
     toast('Testing AI API…')
     try {
       const { assistantReply } = await import('../ai.js')
@@ -105,12 +84,6 @@ settingsPage.mount = (params, query, root) => {
     }
   })
 
-  root.querySelector('#save-sb').addEventListener('click', async () => {
-    updateSettings({ supabase: { url: root.querySelector('#sb-url').value.trim(), key: root.querySelector('#sb-key').value.trim() } })
-    if (!isConnected()) return toast('URL aur key dono chahiye', 'err')
-    const ok = await testConnection()
-    toast(ok ? 'Supabase connected ✓' : 'Connection fail — URL/key check karein', ok ? 'ok' : 'err')
-  })
   root.querySelector('#sync-sb').addEventListener('click', async () => { await syncBoth() })
   root.querySelector('#show-sql').addEventListener('click', () => {
     modal({

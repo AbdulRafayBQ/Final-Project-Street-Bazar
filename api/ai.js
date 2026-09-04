@@ -1,0 +1,38 @@
+const json = (res, status, body) => {
+  res.status(status).setHeader('Content-Type', 'application/json').send(JSON.stringify(body))
+}
+
+export default async function handler(req, res) {
+  if (req.method !== 'POST') return json(res, 405, { error: 'Method not allowed' })
+  const key = process.env.AI_API_KEY
+  if (!key) return json(res, 503, { error: 'AI_API_KEY is not configured on Vercel' })
+  const base = (process.env.AI_BASE_URL || 'https://api.openai.com/v1').replace(/\/$/, '')
+  const model = process.env.AI_MODEL || 'gpt-4o-mini'
+  const { system = '', user = '', maxTokens = 800 } = req.body || {}
+  const isGemini = base.includes('googleapis.com') || model.toLowerCase().includes('gemini')
+  const isAnthropic = base.includes('anthropic.com')
+  const url = isGemini
+    ? `${base}/v1beta/models/${model}:generateContent?key=${key}`
+    : isAnthropic ? `${base}/v1/messages` : `${base}/chat/completions`
+  const headers = isGemini
+    ? { 'Content-Type': 'application/json' }
+    : isAnthropic
+      ? { 'Content-Type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01' }
+      : { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` }
+  const body = isGemini
+    ? { contents: [{ parts: [{ text: `${system}\n\n${user}` }] }] }
+    : isAnthropic
+      ? { model, system, max_tokens: maxTokens, messages: [{ role: 'user', content: user }] }
+      : { model, messages: [{ role: 'system', content: system }, { role: 'user', content: user }], temperature: 0.8, max_tokens: maxTokens }
+  const response = await fetch(url, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(body),
+  })
+  const data = await response.json().catch(() => ({}))
+  if (!response.ok) return json(res, response.status, { error: data.error?.message || `AI provider ${response.status}` })
+  const text = isGemini
+    ? data.candidates?.[0]?.content?.parts?.[0]?.text
+    : isAnthropic ? data.content?.[0]?.text : data.choices?.[0]?.message?.content
+  return json(res, 200, { text: text?.trim() || '' })
+}
