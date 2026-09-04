@@ -442,6 +442,12 @@ window.addEventListener('street-bazar-state-changed', () => {
 
 async function restoreGoogleSession() {
   const params = new URLSearchParams(window.location.hash.replace(/^#\/?/, ''))
+  const oauthError = params.get('error_description') || params.get('error')
+  if (oauthError) {
+    sessionStorage.setItem('street-bazar-google-error', oauthError)
+    window.location.hash = '#/auth'
+    return
+  }
   const accessToken = params.get('access_token')
   if (!accessToken) return
   if (params.get('type') === 'recovery') {
@@ -479,6 +485,11 @@ async function boot() {
   bindGlobals()
   startRouter()
   renderFloatingAIWidget()
+  const googleError = sessionStorage.getItem('street-bazar-google-error')
+  if (googleError) {
+    sessionStorage.removeItem('street-bazar-google-error')
+    toast(`Google login failed: ${googleError.replace(/\+/g, ' ')}`, 'err')
+  }
 
   const loader = $('#loader')
   const app = $('#app')

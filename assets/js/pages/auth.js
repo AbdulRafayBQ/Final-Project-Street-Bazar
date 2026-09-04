@@ -108,6 +108,7 @@ authPage.mount = (params, query, root) => {
           </div>
         </div>
         <button class="btn btn-grad btn-lg btn-block" id="au-go"><span>Create account</span> ${icon('arrow', '', 16)}</button>
+        <button class="btn btn-ghost btn-lg btn-block" data-google-auth>${icon('google', '', 17)} Continue with Google</button>
       </div>`,
   }
 
@@ -125,11 +126,19 @@ authPage.mount = (params, query, root) => {
       input.type = input.type === 'password' ? 'text' : 'password'
       e.currentTarget.textContent = input.type === 'password' ? 'Show' : 'Hide'
     })
-    body.querySelector('#google-auth')?.addEventListener('click', async () => {
-      const response = await fetch(`/api/auth?action=google&redirect=${encodeURIComponent(location.origin + location.pathname)}`)
-      const data = await response.json()
-      if (!response.ok) return toast(data.error || 'Google sign in unavailable', 'err')
-      location.href = data.url
+    body.querySelector('[data-google-auth]')?.addEventListener('click', async (event) => {
+      const button = event.currentTarget
+      button.disabled = true
+      try {
+        const redirect = `${location.origin}${location.pathname}`
+        const response = await fetch(`/api/auth?action=google&redirect=${encodeURIComponent(redirect)}`)
+        const data = await response.json().catch(() => ({}))
+        if (!response.ok || !data.url) throw new Error(data.error || 'Google sign in unavailable')
+        window.location.assign(data.url)
+      } catch (error) {
+        button.disabled = false
+        toast(error.message, 'err')
+      }
     })
     body.querySelector('#au-verify')?.addEventListener('click', async (e) => {
       const btn = spinner(e.currentTarget)
