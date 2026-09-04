@@ -16,13 +16,32 @@ const supabaseRequest = async (path, options = {}, requestKey = process.env.SUPA
 }
 
 export default async function handler(req, res) {
+  if (req.method === 'GET' && req.query?.action === 'google') {
+    const base = (process.env.SUPABASE_URL || '').trim().replace(/\/$/, '')
+    const key = process.env.SUPABASE_ANON_KEY || process.env.SUPABASE_PUBLISHABLE_KEY
+    if (!base || !key) return json(res, 503, { error: 'Supabase environment variables are not configured' })
+    const redirect = req.query.redirect || `${req.headers['x-forwarded-proto'] || 'https'}://${req.headers.host}/`
+    return json(res, 200, { url: `${base}/auth/v1/authorize?provider=google&redirect_to=${encodeURIComponent(redirect)}` })
+  }
   if (req.method !== 'POST') return json(res, 405, { error: 'Method not allowed' })
   try {
-    const { action, name, email, password, role = 'customer' } = req.body || {}
-    if (!email || (action !== 'google' && !password)) return json(res, 400, { error: 'Email and password are required' })
+    const { action, name, email, password, token, access_token, role = 'customer' } = req.body || {}
+    if (action === 'oauth' && !access_token) return json(res, 400, { error: 'Google session is missing' })
+    if (action !== 'oauth' && (!email || (action === 'verify' ? !token : !password))) return json(res, 400, { error: action === 'verify' ? 'Email and verification code are required' : 'Email and password are required' })
 
     let auth
-    if (action === 'signup') {
+    if (action === 'oauth') {
+      auth = await supabaseRequest('/auth/v1/user', {
+        method: 'GET',
+        headers: { Authorization: `Bearer ${access_token}` },
+      }, process.env.SUPABASE_ANON_KEY || process.env.SUPABASE_PUBLISHABLE_KEY)
+      auth.access_token = access_token
+    } else if (action === 'verify') {
+      auth = await supabaseRequest('/auth/v1/verify', {
+        method: 'POST',
+        body: JSON.stringify({ type: 'signup', email, token }),
+      }, process.env.SUPABASE_ANON_KEY || process.env.SUPABASE_PUBLISHABLE_KEY)
+    } else if (action === 'signup') {
       auth = await supabaseRequest('/auth/v1/signup', {
         method: 'POST',
         body: JSON.stringify({ email, password, data: { name, role } }),
@@ -38,6 +57,7 @@ export default async function handler(req, res) {
 
     const user = auth.user || (auth.id ? auth : null)
     if (!user) {
+      if (action === 'signup') return json(res, 200, { pending_verification: true, email, name, role })
       const responseKeys = Object.keys(auth || {}).join(', ') || 'empty response'
       throw new Error(`Supabase returned no user (${responseKeys}). This email may already be registered, or the Auth anon key/project URL do not belong to the same Supabase project.`)
     }

@@ -1,8 +1,9 @@
 /* Street Bazar — app shell, routing & global interactions (vanilla JS) */
 
 import { $, $$, icon, esc, num, toast, modal, closeModal, avatar, timeAgo } from './ui.js'
-import { state, currentUser, cartCount, logout, myNotifications, unreadNotis, toggleLike, toggleFollow, productById, addToCart, save, unreadThreadCount } from './store.js'
+import { state, currentUser, cartCount, logout, myNotifications, unreadNotis, toggleLike, toggleFollow, productById, addToCart, save, unreadThreadCount, setRole } from './store.js'
 import { route, setNotFound, startRouter, onRender, navigate, renderRoute } from './router.js'
+import { authRequest } from './db.js'
 
 import { home } from './pages/home.js'
 import { explore, foryou } from './pages/explore.js'
@@ -17,6 +18,7 @@ import { ordersPage, trackPage } from './pages/orders.js'
 import { authPage } from './pages/auth.js'
 import { adminPage } from './pages/admin.js'
 import { settingsPage } from './pages/settings.js'
+import { termsPage } from './pages/terms.js'
 import { assistantReply, aiStatusText } from './ai.js'
 
 /* ---------------- header ---------------- */
@@ -392,6 +394,7 @@ route('/track/:id', trackPage)
 route('/auth', authPage)
 route('/admin', adminPage)
 route('/settings', settingsPage)
+route('/terms', termsPage)
 
 setNotFound(() => `<section class="sec"><div class="wrap"><div class="empty reveal">
   <div class="ic">${icon('search', '', 30)}</div>
@@ -431,6 +434,21 @@ function titleFor(path) {
 }
 
 /* ---------------- boot ---------------- */
+async function restoreGoogleSession() {
+  const accessToken = new URLSearchParams(window.location.hash.split('?')[1] || '').get('access_token')
+  if (!accessToken) return
+  try {
+    const result = await authRequest('oauth', { access_token: accessToken })
+    state.users.push(result.user)
+    state.session = result.user.id
+    setRole(result.user.role)
+    save()
+    window.history.replaceState({}, document.title, `${location.pathname}#/`)
+  } catch (error) {
+    console.error('Google session restore failed:', error)
+  }
+}
+
 function boot() {
   const isReload = performance.navigation?.type === 1 || performance.getEntriesByType?.('navigation')?.[0]?.type === 'reload'
   if (isReload && window.location.hash !== '#/' && window.location.hash !== '') {
@@ -456,4 +474,4 @@ function boot() {
   setTimeout(hide, 800)
 }
 
-boot()
+restoreGoogleSession().finally(boot)

@@ -66,8 +66,9 @@ authPage.mount = (params, query, root) => {
       <p class="muted small" style="margin:8px 0 18px">Login karke apne stores, orders aur follow kiye stores dekhein.</p>
       <div class="stack">
         <div class="field"><span class="label">Email</span><input class="input" id="au-email" type="email" placeholder="you@email.com"></div>
-        <div class="field"><span class="label">Password</span><input class="input" id="au-pass" type="password" placeholder="••••••••"></div>
+        <div class="field"><span class="label">Password</span><div class="password-wrap"><input class="input" id="au-pass" type="password" placeholder="••••••••"><button type="button" class="password-toggle" data-password-toggle>Show</button></div></div>
         <button class="btn btn-primary btn-lg btn-block" id="au-go"><span>Sign in</span> ${icon('arrow', '', 16)}</button>
+        <button class="btn btn-ghost btn-lg btn-block" id="google-auth">${icon('google', '', 17)} Continue with Google</button>
       </div>`,
     signup: () => `
       <h2 class="h3">Bazaar mein aapka swagat hai</h2>
@@ -75,7 +76,8 @@ authPage.mount = (params, query, root) => {
       <div class="stack">
         <div class="field"><span class="label">Your name</span><input class="input" id="au-name" placeholder="Full name"></div>
         <div class="field"><span class="label">Email</span><input class="input" id="au-email" type="email" placeholder="you@email.com"></div>
-        <div class="field"><span class="label">Password</span><input class="input" id="au-pass" type="password" placeholder="6+ characters"></div>
+        <div class="field"><span class="label">Password</span><div class="password-wrap"><input class="input" id="au-pass" type="password" placeholder="6+ characters"><button type="button" class="password-toggle" data-password-toggle>Show</button></div></div>
+        <label class="terms-check"><input type="checkbox" id="au-terms"> <span>I agree to the <a href="#/terms">Terms & Conditions</a> and Privacy Policy.</span></label>
         <div class="field"><span class="label">I am joining as</span>
           <div class="seg" style="width:100%" data-role>
             <button class="active" data-role-v="customer" style="flex:1">${icon('user', '', 14)} Customer</button>
@@ -87,12 +89,35 @@ authPage.mount = (params, query, root) => {
   }
 
   let role = 'customer'
+  let pendingSignup = null
   const paint = () => {
-    body.innerHTML = forms[mode]()
+    body.innerHTML = pendingSignup
+      ? `<h2 class="h3">Verify your email</h2><p class="muted small" style="margin:8px 0 18px">6-digit verification code ${esc(pendingSignup.email)} par bheja gaya hai.</p><div class="stack"><input class="input" id="au-code" inputmode="numeric" maxlength="6" placeholder="123456"><button class="btn btn-grad btn-lg btn-block" id="au-verify">Verify & continue</button><button class="btn btn-ghost" id="au-back">Back</button></div>`
+      : forms[mode]()
     root.querySelectorAll('[data-auth-tabs] button').forEach((b) => b.classList.toggle('active', b.dataset.mode === mode))
     root.querySelectorAll('[data-role] button').forEach((b) => b.classList.toggle('active', b.dataset.roleV === role))
     root.querySelectorAll('[data-role] button').forEach((b) => b.addEventListener('click', () => { role = b.dataset.roleV; paint() }))
-    body.querySelector('#au-go').addEventListener('click', async (e) => {
+    body.querySelector('[data-password-toggle]')?.addEventListener('click', (e) => {
+      const input = body.querySelector('#au-pass')
+      input.type = input.type === 'password' ? 'text' : 'password'
+      e.currentTarget.textContent = input.type === 'password' ? 'Show' : 'Hide'
+    })
+    body.querySelector('#google-auth')?.addEventListener('click', async () => {
+      const response = await fetch(`/api/auth?action=google&redirect=${encodeURIComponent(location.origin + location.pathname)}`)
+      const data = await response.json()
+      if (!response.ok) return toast(data.error || 'Google sign in unavailable', 'err')
+      location.href = data.url
+    })
+    body.querySelector('#au-verify')?.addEventListener('click', async (e) => {
+      const btn = spinner(e.currentTarget)
+      try {
+        const result = await authRequest('verify', { email: pendingSignup.email, token: body.querySelector('#au-code').value.trim() })
+        const u = result.user
+        state.users.push(u); state.session = u.id; save(); pendingSignup = null; btn(); toast('Account verified 🎉', 'ok'); navigate(redirect)
+      } catch (err) { btn(); toast(err.message, 'err') }
+    })
+    body.querySelector('#au-back')?.addEventListener('click', () => { pendingSignup = null; paint() })
+    body.querySelector('#au-go')?.addEventListener('click', async (e) => {
       const btn = spinner(e.currentTarget)
       const email = body.querySelector('#au-email').value.trim()
       const pass = body.querySelector('#au-pass').value
@@ -112,7 +137,12 @@ authPage.mount = (params, query, root) => {
           const name = body.querySelector('#au-name').value.trim()
           if (!name) throw new Error('Apna naam likhein')
           if (pass.length < 6) throw new Error('Password kam se kam 6 characters ka ho')
+          if (!body.querySelector('#au-terms').checked) throw new Error('Terms & Conditions accept karein')
           const result = await authRequest('signup', { name, email, password: pass, role })
+          if (result.pending_verification) {
+            pendingSignup = { email, name, role }
+            btn(); paint(); toast('Verification code email par bhej diya gaya', 'ok'); return
+          }
           const u = result.user
           state.users.push(u)
           state.session = u.id

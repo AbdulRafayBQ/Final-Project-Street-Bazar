@@ -114,8 +114,8 @@ function mediaMarkup(list) {
   return `
     <label class="drop" for="p-files">${icon('upload')}<div><b>Upload photos / videos</b></div><div class="hint">JPG, PNG, WEBP, MP4 — multiple select karein</div></label>
     <input type="file" id="p-files" accept="image/*,video/*" multiple hidden>
-    <input class="input" id="p-media-url" placeholder="…ya direct link paste karein + Enter" style="margin-top:8px">
-    <div class="media-grid" id="p-media-list" style="margin-top:10px"></div>`
+    <input class="input" id="p-media-url" data-media-url placeholder="…ya direct link paste karein + Enter" style="margin-top:8px">
+    <div class="media-grid" id="p-media-list" data-media-list style="margin-top:10px"></div>`
 }
 
 addProductPage.mount = (params, query, root) => {
