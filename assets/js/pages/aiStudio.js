@@ -31,7 +31,6 @@ export async function aiStudioPage() {
           <div><b class="small">${isAIConnected() ? 'Live AI connected' : 'Bazar Brain active'}</b>
           <div class="tiny muted">${aiStatusText()}</div></div>
         </div>
-        <a class="btn btn-sm btn-ghost" style="margin-top:10px" href="#/settings">${icon('settings', '', 14)} API settings</a>
       </div>
     </div>
 

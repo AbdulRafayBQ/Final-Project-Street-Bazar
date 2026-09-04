@@ -6,7 +6,7 @@ import { assistantReply } from '../ai.js'
 export async function home() {
   const stores = liveStores()
   const sales = saleStores()
-  const saleProducts = state.products.filter(p => p.compareAt && p.compareAt > p.price).slice(0, 6)
+  const saleProducts = state.products.filter((p) => p.status !== 'hidden' && p.compareAt && p.compareAt > p.price && storeById(p.store)?.status === 'live').slice(0, 6)
 
   const actionCards = [
     { title: 'Start Your Store', desc: 'Create your online store in just 5 minutes', icon: 'store', color: '#EF4444', bg: '#FEE2E2', href: '#/create-store' },
@@ -55,7 +55,7 @@ export async function home() {
         <a class="btn-link-sm" href="#/explore">Explore all deals ${icon('arrow', '', 14)}</a>
       </div>
       
-      ${sales.length ? `
+      ${sales.length || saleProducts.length ? `
       <div class="sale-carousel" data-sale-carousel style="margin-top:16px;margin-bottom:20px"></div>` : ''}
 
       <div class="grid grid-6 stagger">
@@ -134,24 +134,36 @@ home.mount = (p, q, root) => {
   root.querySelector('[data-ai-scan]')?.addEventListener('click', openAIScan)
   const carousel = root.querySelector('[data-sale-carousel]')
   if (!carousel) return
-  const sales = saleStores()
+  const storeSlides = saleStores().map((store) => ({ kind: 'store', store }))
+  const productSlides = state.products
+    .filter((product) => product.status !== 'hidden' && product.compareAt && product.compareAt > product.price && storeById(product.store)?.status === 'live')
+    .map((product) => ({ kind: 'product', product, store: storeById(product.store) }))
+  const slides = [...storeSlides, ...productSlides]
+  if (!slides.length) return
   let index = 0
   const paint = () => {
-    const s = sales[index % sales.length]
+    const slide = slides[index % slides.length]
+    const isProduct = slide.kind === 'product'
+    const s = isProduct ? slide.store : slide.store
+    const p = slide.product
+    const image = isProduct ? p.media?.[0]?.url : s.banner
+    const title = isProduct ? `${p.title} — ${Math.round((1 - p.price / p.compareAt) * 100)}% OFF` : s.sale.text
+    const href = isProduct ? `#/product/${p.id}` : `#/store/${s.slug}`
+    const detail = isProduct ? `${s.name} · Rs ${Number(p.price).toLocaleString('en-PK')} instead of Rs ${Number(p.compareAt).toLocaleString('en-PK')}` : `Ends ${new Date(s.sale.until).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })} · ${num(storeProducts(s.id).length)} products`
     carousel.innerHTML = `
-      <a class="ad-card reveal sale-carousel-card" href="#/store/${s.slug}">
-        <img src="${esc(s.banner || './images/banner-fashion.png')}" alt="${esc(s.name)}" onerror="this.src='./images/banner-fashion.png'">
+      <a class="ad-card reveal sale-carousel-card" href="${href}">
+        <img src="${esc(image || './images/banner-fashion.png')}" alt="${esc(isProduct ? p.title : s.name)}" onerror="this.src='./images/banner-fashion.png'">
         <span class="ad-tag badge badge-sale">${icon('tag', '', 12)} SALE</span>
         <div class="ad-in">
           <div class="small" style="opacity:.85">${esc(s.name)}</div>
-          <div class="h4" style="color:#fff;margin:4px 0 8px">${esc(s.sale.text)}</div>
-          <div class="tiny" style="opacity:.8">Ends ${new Date(s.sale.until).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })} · ${num(storeProducts(s.id).length)} products</div>
+          <div class="h4" style="color:#fff;margin:4px 0 8px">${esc(title)}</div>
+          <div class="tiny" style="opacity:.8">${esc(detail)}</div>
         </div>
       </a>`
     index += 1
   }
   paint()
-  root._saleTimer = setInterval(paint, 4200)
+  root._saleTimer = setInterval(paint, 4500)
 }
 
 export function openAIScan() {

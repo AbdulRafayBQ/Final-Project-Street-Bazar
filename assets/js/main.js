@@ -124,7 +124,7 @@ function openUserMenu() {
     <a class="dd-item" href="#/orders"><span class="ic">${icon('truck', '', 15)}</span><div><b>My orders</b><div class="tiny muted">Track with Order ID</div></div></a>
     ${u.role !== 'customer' ? `<a class="dd-item" href="#/dashboard"><span class="ic">${icon('store', '', 15)}</span><div><b>Owner dashboard</b><div class="tiny muted">Stores, products, inbox</div></div></a>` : `<a class="dd-item" href="#/create-store"><span class="ic">${icon('plus', '', 15)}</span><div><b>Start selling</b><div class="tiny muted">Create your store</div></div></a>`}
     <a class="dd-item" href="#/foryou"><span class="ic">${icon('heart', '', 15)}</span><div><b>For You feed</b><div class="tiny muted">Naye drops from followed stores</div></div></a>
-    <a class="dd-item" href="#/settings"><span class="ic">${icon('settings', '', 15)}</span><div><b>Settings</b><div class="tiny muted">AI keys, Supabase, profile</div></div></a>
+    ${u.role === 'admin' ? `<a class="dd-item" href="#/settings"><span class="ic">${icon('settings', '', 15)}</span><div><b>Settings</b><div class="tiny muted">AI, Supabase and server settings</div></div></a>` : ''}
     ${u.role === 'admin' ? `<a class="dd-item" href="#/admin"><span class="ic">${icon('shield', '', 15)}</span><div><b>Admin panel</b><div class="tiny muted">Requests, users, orders</div></div></a>` : ''}
     <div class="divider" style="margin:6px 0"></div>
     <button class="dd-item" id="do-logout" style="width:100%;color:var(--red)"><span class="ic">${icon('logout', '', 15)}</span><div><b>Log out</b></div></button>`
@@ -141,7 +141,8 @@ function openMobileMenu() {
       ${[
         ['#/', 'Home', 'home'], ['#/explore', 'Explore bazaar', 'search'], ['#/dukanien', 'Explore Dukanien', 'store'], ['#/foryou', 'For You', 'heart'],
         ['#/cart', 'Cart (' + cartCount() + ')', 'cart'], ['#/orders', 'My orders & tracking', 'truck'],
-        ...(u ? [['#/create-store', 'Create a store', 'store'], ['#/dashboard', 'Owner dashboard', 'layers'], ['#/settings', 'Settings', 'settings']] : []),
+        ...(u ? [['#/create-store', 'Create a store', 'store'], ['#/dashboard', 'Owner dashboard', 'layers']] : []),
+        ...(u?.role === 'admin' ? [['#/settings', 'Settings', 'settings']] : []),
         ...(u?.role === 'admin' ? [['#/admin', 'Admin panel', 'shield']] : []),
         ...(!u ? [['#/auth', 'Sign in / Sign up', 'user']] : []),
       ].map(([href, label, ic]) => `<a class="dd-item" href="${href}" data-close style="align-items:center"><span class="ic">${icon(ic, '', 16)}</span><b>${label}</b></a>`).join('')}
@@ -156,6 +157,7 @@ function openMobileMenu() {
 
 /* ---------------- footer ---------------- */
 function renderFooter() {
+  const u = currentUser()
   $('#site-footer').className = 'footer'
   $('#site-footer').innerHTML = `
     <div class="wrap">
@@ -186,14 +188,14 @@ function renderFooter() {
           <a href="#/create-store">Create a store</a>
           <a href="#/dashboard">Owner dashboard</a>
           <a href="#/warehouse">Warehouse</a>
-          <a href="#/settings">AI & database setup</a>
+          ${u?.role === 'admin' ? '<a href="#/settings">AI & database setup</a>' : ''}
         </div>
         <div>
           <h4>Company</h4>
           <a href="#/">Home</a>
           <a href="#/auth">Sign in / Sign up</a>
           <a href="#/admin">Admin panel</a>
-          <a href="#/settings">Settings</a>
+          ${u?.role === 'admin' ? '<a href="#/settings">Settings</a>' : ''}
         </div>
       </div>
       <div class="footer-bot">

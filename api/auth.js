@@ -38,11 +38,13 @@ export default async function handler(req, res) {
 
     const user = auth.user
     if (!user) throw new Error('Supabase signup completed without a user. Check SUPABASE_ANON_KEY and Auth email settings in Vercel.')
+    const adminEmails = (process.env.ADMIN_EMAILS || '').split(',').map((item) => item.trim().toLowerCase()).filter(Boolean)
+    const assignedRole = adminEmails.includes(String(user.email || email).toLowerCase()) ? 'admin' : (role === 'owner' ? 'owner' : 'customer')
     const profile = {
       id: user.id,
       name: name || user.user_metadata?.name || email.split('@')[0],
       email: user.email,
-      role: role || user.user_metadata?.role || 'customer',
+      role: assignedRole,
       avatar: user.user_metadata?.avatar || '',
       created_at: user.created_at,
     }

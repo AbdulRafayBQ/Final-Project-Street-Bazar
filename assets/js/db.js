@@ -14,7 +14,7 @@ id uuid primary key, name text, email text unique, role text default 'customer',
   avatar text, created_at timestamptz default now()
 );
 create table if not exists stores (
-  id text primary key, owner_id text references users(id), name text, slug text unique,
+  id text primary key, owner_id uuid references users(id), name text, slug text unique,
   tagline text, type text, description text, logo text, banner text, theme jsonb,
   categories text[], socials jsonb, address text, city text, sale jsonb,
   status text default 'pending', rating numeric default 0, created_at timestamptz default now()

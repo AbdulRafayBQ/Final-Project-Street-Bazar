@@ -205,10 +205,9 @@ h1,h2,h3,h4,.dsp{font-family:var(--font-d);font-weight:700;letter-spacing:-.02em
 .site-header{position:sticky;top:0;z-index:900;background:rgba(251,246,238,.86);backdrop-filter:blur(16px) saturate(1.3);
   border-bottom:1px solid rgba(228,215,194,.8)}
 .hd{height:var(--header-h);display:flex;align-items:center;gap:16px}
-.logo{display:flex;align-items:center;gap:10px;flex:none}
-.logo{position:relative}
-.logo img{opacity:.32}
-.logo-wordmark{position:absolute;left:22px;top:50%;transform:translateY(-50%);font-family:var(--font-d);font-weight:800;font-size:15px;letter-spacing:.08em;color:var(--ink);white-space:nowrap}
+.logo{display:flex;align-items:center;gap:10px;flex:none;position:relative;width:154px;min-width:154px;overflow:hidden}
+.hd .logo img{width:34px;height:34px !important;object-fit:contain;opacity:.22}
+.logo-wordmark{position:absolute;left:28px;top:50%;transform:translateY(-50%);font-family:var(--font-d);font-weight:800;font-size:13px;letter-spacing:.06em;color:var(--ink);white-space:nowrap}
 .logo-mark{width:38px;height:38px;border-radius:12px;background:var(--ink);display:grid;place-items:center;box-shadow:var(--shadow-s);transition:.3s var(--ease)}
 .logo:hover .logo-mark{transform:rotate(-6deg) scale(1.05)}
 .logo-mark svg{width:22px;height:22px}
@@ -223,6 +222,9 @@ h1,h2,h3,h4,.dsp{font-family:var(--font-d);font-weight:700;letter-spacing:-.02em
 .hd-search .input{padding-left:42px;border-radius:99px;background:#fff}
 .hd-search svg{position:absolute;left:15px;top:50%;transform:translateY(-50%);width:17px;height:17px;color:var(--muted)}
 .hd-actions{display:flex;align-items:center;gap:9px}
+.sale-carousel{min-height:260px;overflow:hidden}
+.sale-carousel-card{animation:saleSlideIn .55s var(--ease-out) both}
+@keyframes saleSlideIn{from{opacity:0;transform:translateX(24px)}to{opacity:1;transform:none}}
 .cart-count{position:absolute;top:-5px;right:-5px;min-width:20px;height:20px;padding:0 5px;border-radius:99px;background:var(--magenta);color:#fff;
   font-size:11px;font-weight:800;display:grid;place-items:center;box-shadow:0 0 0 2px var(--paper)}
 .avatar{width:38px;height:38px;border-radius:50%;display:grid;place-items:center;font-weight:800;font-size:14px;color:#fff;flex:none;

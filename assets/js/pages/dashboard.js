@@ -142,7 +142,6 @@ export async function dashboardPage() {
                 <h3 class="h3">Store AI Assistant</h3>
                 <p class="muted small" style="margin-top:4px">Generate high-converting titles, descriptions, pricing & warehouse stock entries.</p>
               </div>
-              <a class="btn btn-sm btn-ghost" href="#/settings">${icon('settings', '', 13)} Config AI API</a>
             </div>
 
             <div class="grid grid-2" style="gap:18px;margin-top:14px">

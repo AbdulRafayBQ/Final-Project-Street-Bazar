@@ -1,13 +1,13 @@
 /* Street Bazar — Settings (account and server integrations) */
 
 import { icon, esc, toast, modal, closeModal, copyText, confirmBox, timeAgo } from '../ui.js'
-import { currentUser, state, setRole, logout, resetDemo, save } from '../store.js'
+import { currentUser, state, setRole, logout, save } from '../store.js'
 import { SQL_SCHEMA, isConnected, isAIConnected, syncBoth } from '../db.js'
 import { navigate } from '../router.js'
 
 export async function settingsPage() {
   const u = currentUser()
-  if (!u) return `<section class="sec"><div class="wrap"><div class="empty"><div class="ic">${icon('settings', '', 30)}</div><h3 class="h3">Login required</h3><div style="margin-top:16px"><a class="btn btn-grad" href="#/auth"><span>Login</span></a></div></div></div></section>`
+  if (!u || u.role !== 'admin') return `<section class="sec"><div class="wrap"><div class="empty"><div class="ic">${icon('shield', '', 30)}</div><h3 class="h3">Admin access required</h3><p class="muted small" style="margin-top:8px">AI, Vercel aur Supabase settings sirf admin panel se available hain.</p><div style="margin-top:16px"><a class="btn btn-grad" href="#/admin"><span>Go to admin panel</span></a></div></div></div></section>`
   const s = state.settings
 
   return `
@@ -51,8 +51,8 @@ export async function settingsPage() {
 
     <div class="panel" style="margin-top:22px;border-color:rgba(229,72,77,.4)">
       <h3 class="h4" style="color:var(--red)">Danger zone</h3>
-      <p class="small muted" style="margin-top:8px">Demo data reset kar dein — saare stores, products aur orders wapas seed state par aa jayenge.</p>
-      <button class="btn btn-danger" id="reset-all" style="margin-top:14px">${icon('warning', '', 15)} Reset demo data</button>
+      <p class="small muted" style="margin-top:8px">Local browser cache clear karke latest catalog ko dobara load karein.</p>
+      <button class="btn btn-danger" id="reset-all" style="margin-top:14px">${icon('warning', '', 15)} Clear local cache</button>
     </div>
   </div>`
 }
@@ -97,8 +97,9 @@ settingsPage.mount = (params, query, root) => {
   })
 
   root.querySelector('#reset-all').addEventListener('click', () => {
-    confirmBox('Reset demo data?', 'Saare stores, products, orders aur chats wapas seed par chale jayenge.', () => {
-      resetDemo(); toast('Demo data reset ho gaya'); navigate('#/')
+    confirmBox('Clear local cache?', 'Browser ki local cache clear ho jayegi aur page fresh catalog ke sath load hoga.', () => {
+      localStorage.removeItem('street-bazar-v1'); toast('Local cache clear ho gayi'); location.hash = '#/'
+      location.reload()
     }, 'Reset everything')
   })
 }

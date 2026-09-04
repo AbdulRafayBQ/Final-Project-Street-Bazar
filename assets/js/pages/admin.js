@@ -3,7 +3,7 @@
 import { icon, esc, money, num, timeAgo, toast, confirmBox, modal, closeModal } from '../ui.js'
 import { statCard } from '../components.js'
 import { state, currentUser, setRole, storeById, storeProducts, productById, userById, updateStore, updateProduct, notify, liveStores, pendingStores, lowStock } from '../store.js'
-import { isAIConnected } from '../db.js'
+import { isAIConnected, isConnected } from '../db.js'
 import { navigate } from '../router.js'
 
 const TABS = [
@@ -22,10 +22,9 @@ export async function adminPage(params, query) {
     return `<section class="sec"><div class="wrap"><div class="panel" style="max-width:520px;margin:0 auto;text-align:center">
       <span style="width:70px;height:70px;border-radius:22px;background:rgba(229,72,77,.12);color:var(--red);display:grid;place-items:center;margin:0 auto 16px">${icon('shield', '', 30)}</span>
       <h2 class="h3">Admin area restricted</h2>
-      <p class="muted small" style="margin-top:10px">Sirf admin is jagah par ja sakta hai. Demo ke liye admin account se login karein.</p>
+      <p class="muted small" style="margin-top:10px">Sirf authorized admin account is jagah par ja sakta hai.</p>
       <div class="wrap-flex" style="justify-content:center;margin-top:20px">
-        <button class="btn btn-grad" data-as-admin>${icon('shield', '', 16)} <span>Login as demo admin</span></button>
-        <a class="btn btn-ghost" href="#/auth">Use another account</a>
+        <a class="btn btn-grad" href="#/auth">${icon('shield', '', 16)} <span>Admin sign in</span></a>
       </div>
     </div></div></section>`
   }
@@ -90,7 +89,7 @@ const views = {
           <div class="panel">
             <div class="row-between"><h3 class="h4">System status</h3><span class="badge badge-live">Operational</span></div>
             <div class="stack small" style="margin-top:12px">
-              <div class="row-between"><span class="muted">Database</span><b>${state.settings.supabase?.url ? 'Supabase connected' : 'Local demo store'}</b></div>
+              <div class="row-between"><span class="muted">Database</span><b>${isConnected() ? 'Supabase connected' : 'Unavailable'}</b></div>
               <div class="row-between"><span class="muted">AI engine</span><b>${isAIConnected() ? 'Live API' : 'Bazar Brain'}</b></div>
               <div class="row-between"><span class="muted">AI runs logged</span><b>${num(state.aiLog.length)}</b></div>
               <div class="row-between"><span class="muted">Last sync</span><b>${state.settings.lastSync ? timeAgo(state.settings.lastSync) : '—'}</b></div>
