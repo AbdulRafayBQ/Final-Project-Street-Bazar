@@ -81,9 +81,15 @@ authPage.mount = (params, query, root) => {
       </div>`,
     reset: () => `
       <h2 class="h3">Reset password</h2>
-      <p class="muted small" style="margin:8px 0 18px">Email par aaya OTP aur naya password enter karein.</p>
+      <p class="muted small" style="margin:8px 0 18px">Email par aaya OTP enter karein. OTP verify hone ke baad new password section khulega.</p>
       <div class="stack">
         <div class="field"><span class="label">OTP</span><input class="input" id="au-code" inputmode="numeric" maxlength="10" placeholder="Verification code"></div>
+        <button class="btn btn-grad btn-lg btn-block" id="au-go">Verify OTP</button>
+      </div>`,
+    resetPassword: () => `
+      <h2 class="h3">New password</h2>
+      <p class="muted small" style="margin:8px 0 18px">OTP verify ho gaya. Ab apna new password set karein.</p>
+      <div class="stack">
         <div class="field"><span class="label">New password</span><div class="password-wrap"><input class="input" id="au-pass" type="password" placeholder="6+ characters"><button type="button" class="password-toggle" data-password-toggle>Show</button></div></div>
         <button class="btn btn-grad btn-lg btn-block" id="au-go">Update password</button>
       </div>`,
@@ -153,8 +159,15 @@ authPage.mount = (params, query, root) => {
         if (mode === 'reset') {
           const resetEmail = sessionStorage.getItem('street-bazar-reset-email') || email
           const verify = await authRequest('verify', { email: resetEmail, token: body.querySelector('#au-code').value.trim(), type: 'email' })
-          await authRequest('reset', { access_token: verify.access_token, password: pass })
+          sessionStorage.setItem('street-bazar-reset-token', verify.access_token)
+          mode = 'resetPassword'; btn(); paint(); toast('OTP verify ho gaya. Ab new password set karein.', 'ok'); return
+        }
+        if (mode === 'resetPassword') {
+          const accessToken = sessionStorage.getItem('street-bazar-reset-token')
+          if (!accessToken) throw new Error('OTP session expire ho gaya. Dobara Forgot password karein.')
+          await authRequest('reset', { access_token: accessToken, password: pass })
           sessionStorage.removeItem('street-bazar-reset-email')
+          sessionStorage.removeItem('street-bazar-reset-token')
           mode = 'signin'; btn(); paint(); toast('Password update ho gaya', 'ok'); return
         }
         if (mode === 'signin') {
@@ -172,6 +185,9 @@ authPage.mount = (params, query, root) => {
           if (!name) throw new Error('Apna naam likhein')
           if (pass.length < 6) throw new Error('Password kam se kam 6 characters ka ho')
           if (!body.querySelector('#au-terms').checked) throw new Error('Terms & Conditions accept karein')
+          if (state.users.some((user) => user.email.toLowerCase() === email.toLowerCase())) {
+            throw new Error('Is email par account pehle se registered hai. Sign in ya Forgot password use karein.')
+          }
           const result = await authRequest('signup', { name, email, password: pass, role })
           if (result.pending_verification) {
             pendingSignup = { email, name, role, password: pass }

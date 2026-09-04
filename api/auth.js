@@ -61,6 +61,9 @@ export default async function handler(req, res) {
         method: 'POST',
         body: JSON.stringify({ email: normalizedEmail, password, data: { name, role } }),
       }, process.env.SUPABASE_ANON_KEY || process.env.SUPABASE_PUBLISHABLE_KEY)
+      if (auth.user && Array.isArray(auth.user.identities) && auth.user.identities.length === 0) {
+        return json(res, 409, { error: 'Is email par account pehle se registered hai. Sign in ya Forgot password use karein.' })
+      }
     } else if (action === 'login') {
       auth = await supabaseRequest('/auth/v1/token?grant_type=password', {
         method: 'POST',
@@ -102,7 +105,9 @@ export default async function handler(req, res) {
     }
     return json(res, 200, { user: profile, access_token: auth.access_token || null, profile_saved: profileSaved })
   } catch (error) {
-    const message = error.message === 'Invalid login credentials'
+    const message = /already registered|already been registered|user already registered|email.*registered/i.test(error.message)
+      ? 'Is email par account pehle se registered hai. Sign in ya Forgot password use karein.'
+      : error.message === 'Invalid login credentials'
       ? 'Email ya password match nahi kar raha. Password dobara type karein ya Forgot password se naya password set karein.'
       : error.message
     return json(res, 400, { error: message })
