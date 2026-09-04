@@ -152,7 +152,7 @@ authPage.mount = (params, query, root) => {
         }
         if (mode === 'reset') {
           const resetEmail = sessionStorage.getItem('street-bazar-reset-email') || email
-          const verify = await authRequest('verify', { email: resetEmail, token: body.querySelector('#au-code').value.trim(), type: 'recovery' })
+          const verify = await authRequest('verify', { email: resetEmail, token: body.querySelector('#au-code').value.trim(), type: 'email' })
           await authRequest('reset', { access_token: verify.access_token, password: pass })
           sessionStorage.removeItem('street-bazar-reset-email')
           mode = 'signin'; btn(); paint(); toast('Password update ho gaya', 'ok'); return

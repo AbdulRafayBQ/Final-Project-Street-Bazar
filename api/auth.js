@@ -25,15 +25,16 @@ export default async function handler(req, res) {
   }
   if (req.method !== 'POST') return json(res, 405, { error: 'Method not allowed' })
   try {
-    const { action, name, email, password, token, access_token, type = 'signup', role = 'customer' } = req.body || {}
+    const { action, name, password, token, access_token, type = 'signup', role = 'customer' } = req.body || {}
+    const normalizedEmail = String(req.body?.email || '').trim().toLowerCase()
     if (action === 'oauth' && !access_token) return json(res, 400, { error: 'Google session is missing' })
-    if (action !== 'oauth' && action !== 'reset' && (!email || (action === 'verify' ? !token : action === 'forgot' ? false : !password))) return json(res, 400, { error: action === 'verify' ? 'Email and verification code are required' : 'Email and password are required' })
+    if (action !== 'oauth' && action !== 'reset' && (!normalizedEmail || (action === 'verify' ? !token : action === 'forgot' ? false : !password))) return json(res, 400, { error: action === 'verify' ? 'Email and verification code are required' : 'Email and password are required' })
 
     let auth
     if (action === 'forgot') {
       await supabaseRequest('/auth/v1/otp', {
         method: 'POST',
-        body: JSON.stringify({ email, create_user: false }),
+        body: JSON.stringify({ email: normalizedEmail, create_user: false }),
       }, process.env.SUPABASE_ANON_KEY || process.env.SUPABASE_PUBLISHABLE_KEY)
       return json(res, 200, { sent: true })
     } else if (action === 'reset') {
@@ -53,17 +54,17 @@ export default async function handler(req, res) {
     } else if (action === 'verify') {
       auth = await supabaseRequest('/auth/v1/verify', {
         method: 'POST',
-        body: JSON.stringify({ type, email, token }),
+        body: JSON.stringify({ type, email: normalizedEmail, token }),
       }, process.env.SUPABASE_ANON_KEY || process.env.SUPABASE_PUBLISHABLE_KEY)
     } else if (action === 'signup') {
       auth = await supabaseRequest('/auth/v1/signup', {
         method: 'POST',
-        body: JSON.stringify({ email, password, data: { name, role } }),
+        body: JSON.stringify({ email: normalizedEmail, password, data: { name, role } }),
       }, process.env.SUPABASE_ANON_KEY || process.env.SUPABASE_PUBLISHABLE_KEY)
     } else if (action === 'login') {
       auth = await supabaseRequest('/auth/v1/token?grant_type=password', {
         method: 'POST',
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email: normalizedEmail, password }),
       }, process.env.SUPABASE_ANON_KEY || process.env.SUPABASE_PUBLISHABLE_KEY)
     } else {
       return json(res, 400, { error: 'Unsupported auth action' })
@@ -71,18 +72,18 @@ export default async function handler(req, res) {
 
     const user = auth.user || (auth.id ? auth : null)
     if (!user) {
-      if (action === 'signup') return json(res, 200, { pending_verification: true, email, name, role })
+      if (action === 'signup') return json(res, 200, { pending_verification: true, email: normalizedEmail, name, role })
       const responseKeys = Object.keys(auth || {}).join(', ') || 'empty response'
       throw new Error(`Supabase returned no user (${responseKeys}). This email may already be registered, or the Auth anon key/project URL do not belong to the same Supabase project.`)
     }
     if (action === 'signup' && (!auth.access_token || !user.email_confirmed_at)) {
-      return json(res, 200, { pending_verification: true, email, name, role })
+      return json(res, 200, { pending_verification: true, email: normalizedEmail, name, role })
     }
     const adminEmails = (process.env.ADMIN_EMAILS || '').split(',').map((item) => item.trim().toLowerCase()).filter(Boolean)
-    const assignedRole = adminEmails.includes(String(user.email || email).toLowerCase()) ? 'admin' : (role === 'owner' ? 'owner' : 'customer')
+    const assignedRole = adminEmails.includes(String(user.email || normalizedEmail).toLowerCase()) ? 'admin' : (role === 'owner' ? 'owner' : 'customer')
     const profile = {
       id: user.id,
-      name: name || user.user_metadata?.name || email.split('@')[0],
+      name: name || user.user_metadata?.name || normalizedEmail.split('@')[0],
       email: user.email,
       role: assignedRole,
       avatar: user.user_metadata?.avatar || '',
