@@ -16,10 +16,10 @@ export default async function handler(req, res) {
     : configuredBase
   const model = isGemini && !configuredModel.toLowerCase().includes('gemini') ? 'gemini-3.5-flash-lite' : configuredModel
   const url = isGemini
-    ? `${base}/v1beta/models/${model}:generateContent?key=${key}`
+    ? `${base}/v1beta/models/${model}:generateContent`
     : isAnthropic ? `${base}/v1/messages` : `${base}/chat/completions`
   const headers = isGemini
-    ? { 'Content-Type': 'application/json' }
+    ? { 'Content-Type': 'application/json', 'x-goog-api-key': key }
     : isAnthropic
       ? { 'Content-Type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01' }
       : { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` }
