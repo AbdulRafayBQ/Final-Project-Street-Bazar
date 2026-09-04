@@ -30,7 +30,7 @@ function renderHeader() {
     <div class="wrap hd">
       <a class="logo" href="#/" aria-label="Street Bazar home">
         <img src="./images/logo.png" alt="" style="height:48px;width:auto;object-fit:contain">
-        <span class="logo-wordmark">STREET BAZAR</span>
+        <span class="logo-wordmark"><span>Street</span> <b>Bazar</b></span>
       </a>
 
       <nav class="nav" data-nav>
