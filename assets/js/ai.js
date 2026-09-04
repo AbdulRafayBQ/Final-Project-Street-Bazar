@@ -227,7 +227,8 @@ export async function assistantReply({ question }) {
     const store = storeById(p.store)
     return `${p.title} | ${store?.name || 'Store'} | Rs ${p.price} | ${p.stock > 0 ? 'in stock' : 'out of stock'} | ${[...(p.categories || []), ...(p.tags || [])].join(', ')}`
   }).join('\n')
-  const r = await think('assistant', { prompt: `You are the Street Bazar in-app assistant. Answer briefly (max 80 words), helpful and friendly, English mixed with Roman Urdu. Only recommend products from this live catalog; never invent a product/store. If no item matches, say no matching live product is listed. For price requests, find exact or nearest available prices and say the real price. Catalog:\n${catalog || '(empty live catalog)'}`, user: question }, async () => {
+  const liveStores = state.stores.filter((store) => !store.demo && store.status !== 'hidden').map((store) => `${store.name} | ${store.type || 'Store'} | ${store.city || ''} | ${store.description || ''}`).join('\n')
+  const r = await think('assistant', { prompt: `You are the Street Bazar customer assistant. Answer in clear English mixed with Roman Urdu, maximum 120 words. You guide customers across this website: real stores, real products, prices, stock, categories, customization, wholesale, delivery, cart, checkout, order tracking, wishlist, follows, and seller chat. Only use the live store/product data below. Never invent or recommend demo/fake stores, products, prices, ratings, or features. If no live match exists, clearly say it is not listed and suggest the closest real match only. For product questions include the exact store and current price when available. Catalog:\n${catalog || '(empty live catalog)'}\nStores:\n${liveStores || '(empty live stores)'}`, user: question }, async () => {
     const q = T(question).toLowerCase()
     if (q.includes('sale') || q.includes('offer')) {
       const list = state.stores.filter((s) => !s.demo && s.sale && s.sale.until > Date.now())
@@ -245,7 +246,7 @@ export async function assistantReply({ question }) {
     if (q.includes('track') || q.includes('order')) return 'Track page par Order ID (SB-XXXXXX) daliye — status, courier note aur expected delivery sab aa jayega.'
     const words = q.split(/\s+/).filter((w) => w.length > 2 && !['under', 'price', 'chahiye', 'mujhe', 'please'].includes(w))
     const maxPrice = Number(q.match(/(?:under|below|less than)\s*(?:rs\.?\s*)?(\d+)/)?.[1] || 0)
-    const candidates = state.products.filter((p) => p.status !== 'hidden').map((p) => {
+    const candidates = catalogProducts.map((p) => {
       const text = `${p.title} ${(p.tags || []).join(' ')} ${(p.categories || []).join(' ')}`.toLowerCase()
       return { p, score: words.filter((word) => text.includes(word)).length + (maxPrice && p.price <= maxPrice ? 1 : 0) }
     }).filter((entry) => entry.score > 0).sort((a, b) => b.score - a.score || (maxPrice ? Math.abs(a.p.price - maxPrice) - Math.abs(b.p.price - maxPrice) : 0))

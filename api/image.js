@@ -22,7 +22,11 @@ export default async function handler(req, res) {
       const body = await response.text().catch(() => '')
       let data = {}
       try { data = body ? JSON.parse(body) : {} } catch { data = {} }
-      return json(res, response.status, { error: data.error || body.slice(0, 300) || 'Hugging Face image request failed' })
+      const message = data.error || body.slice(0, 300) || 'Hugging Face image request failed'
+      const hint = /permission|sufficient permissions|inference providers|unauthorized|forbidden/i.test(message)
+        ? ' Hugging Face token needs Inference Providers permission. Create a fine-grained token with Inference permissions, then update HF_TOKEN in Vercel and redeploy.'
+        : ''
+      return json(res, response.status, { error: message + hint })
     }
     if (!contentType.startsWith('image/')) return json(res, 502, { error: 'Hugging Face did not return an image. Try another model or wait for it to load.' })
     const bytes = Buffer.from(await response.arrayBuffer())
