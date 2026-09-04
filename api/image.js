@@ -13,16 +13,13 @@ export default async function handler(req, res) {
     const { prompt = '', image = '' } = req.body || {}
     if (!prompt.trim()) return json(res, 400, { error: 'Design prompt is required' })
     const provider = (process.env.IMAGE_PROVIDER || 'openai').toLowerCase()
-    const fullPrompt = `Edit the provided product image, do not create a new product image. Preserve the exact product shape, camera angle, background, material, seams, logos, and composition. Apply only this requested change: ${prompt.trim()}.`
+    const fullPrompt = `Create a polished product image based on this request: ${prompt.trim()}.`
 
     if (provider === 'huggingface') {
       const key = process.env.HF_TOKEN
       if (!key) return json(res, 503, { error: 'HF_TOKEN is not configured on Vercel' })
-      const configuredModel = process.env.HF_IMAGE_MODEL || 'black-forest-labs/FLUX.1-Kontext-dev'
-      return json(res, 503, { error: `${configuredModel} cannot edit an existing image through the configured Hugging Face hf-inference route. Stable Diffusion text-to-image models require a text-only request and would create a new image. Configure an image-editing provider/Inference Endpoint for this feature. No random replacement image was generated.` })
-      const models = [...new Set([configuredModel, 'black-forest-labs/FLUX.1-Kontext-dev'])]
-      const reference = await imageInput(image)
-      if (!reference) return json(res, 400, { error: 'A reference product image is required for editing.' })
+      const configuredModel = process.env.HF_IMAGE_MODEL || 'stabilityai/stable-diffusion-xl-base-1.0'
+      const models = [configuredModel]
       let response
       let model = configuredModel
       let lastError = ''
@@ -31,7 +28,7 @@ export default async function handler(req, res) {
         response = await fetch(`https://router.huggingface.co/hf-inference/models/${candidate}`, {
           method: 'POST',
           headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ inputs: reference, parameters: { prompt: fullPrompt, num_inference_steps: 4, guidance_scale: 5 } }),
+          body: JSON.stringify({ inputs: fullPrompt }),
         })
         if (response.ok) break
         const body = await response.text().catch(() => '')
