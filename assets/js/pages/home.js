@@ -76,10 +76,7 @@ export async function home() {
             <div class="cat-card-ic" style="background:${c.bg};color:${c.color}">
               ${icon(c.icon, '', 22)}
             </div>
-            <div class="cat-card-info">
-              <h3 class="cat-card-title">${c.name}</h3>
-              <p class="cat-card-desc">${c.desc}</p>
-            </div>
+            <div class="cat-card-info"><h3 class="cat-card-title">${c.name}</h3></div>
             <span class="cat-card-arrow">${icon('chev', '', 14)}</span>
           </a>
         `).join('')}

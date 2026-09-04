@@ -1,7 +1,7 @@
 /* Street Bazar — shared UI components */
 
 import { icon, esc, money, num, stars, avatar, timeAgo, dateStr } from './ui.js'
-import { storeOf, ratingOf, likedProducts, isFollowing, productReviews, storeProducts, ORDER_STEPS } from './store.js'
+import { storeOf, likedProducts, isFollowing, productReviews, storeProducts, ORDER_STEPS } from './store.js'
 
 export function sectionHead({ kicker = '', title = '', sub = '', href = '', cta = 'View all' }) {
   return `<div class="sec-head reveal">
@@ -19,7 +19,6 @@ export function productCard(p) {
   const off = p.compareAt && p.compareAt > p.price ? Math.round((1 - p.price / p.compareAt) * 100) : 0
   const isNew = Date.now() - new Date(p.createdAt).getTime() < 7 * 86400000
   const liked = likedProducts().includes(p.id)
-  const r = ratingOf(p)
   const low = p.stock <= 8
   const m = p.media?.[0] || { type: 'image', url: './images/p-kurta.png' }
 
@@ -39,15 +38,8 @@ export function productCard(p) {
     <div class="pcard-body">
       <a class="pcard-store" href="#/store/${s.slug}"><i class="live-dot"></i> ${esc(s.name)}</a>
       <a class="pcard-title" href="#/product/${p.id}">${esc(p.title)}</a>
-      <div class="rate-row">${stars(r)} <span>${r ? r.toFixed(1) : '—'}</span> · ${num(p.sales)} sold</div>
       <div class="pcard-price">
         <span class="price">${money(p.price)}</span>
-        ${p.compareAt ? `<span class="price-old">${money(p.compareAt)}</span>` : ''}
-        ${off ? `<span class="price-off">save ${money(p.compareAt - p.price)}</span>` : ''}
-      </div>
-      <div class="pcard-foot">
-        <span class="badge badge-soft">${p.customizable?.on ? icon('wand', '', 12) + ' Custom' : 'Ready to ship'}</span>
-        <a class="link-more" style="padding:5px 10px;font-size:12px" href="#/product/${p.id}">${icon('chat', '', 13)} Chat</a>
       </div>
       <button class="btn btn-primary btn-sm pcard-add" data-add="${p.id}">${icon('cart', '', 15)} Add to cart</button>
     </div>
