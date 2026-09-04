@@ -2,9 +2,9 @@ const json = (res, status, body) => {
   res.status(status).setHeader('Content-Type', 'application/json').send(JSON.stringify(body))
 }
 
-const supabaseRequest = async (path, options = {}, requestKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY) => {
-  const base = (process.env.SUPABASE_URL || '').replace(/\/$/, '')
-  const key = requestKey
+const supabaseRequest = async (path, options = {}, requestKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_ANON_KEY || process.env.SUPABASE_PUBLISHABLE_KEY) => {
+  const base = (process.env.SUPABASE_URL || '').trim().replace(/\/$/, '')
+  const key = String(requestKey || '').trim()
   if (!base || !key) throw new Error('Supabase environment variables are not configured')
   const response = await fetch(`${base}${path}`, {
     ...options,
@@ -26,18 +26,21 @@ export default async function handler(req, res) {
       auth = await supabaseRequest('/auth/v1/signup', {
         method: 'POST',
         body: JSON.stringify({ email, password, data: { name, role } }),
-      }, process.env.SUPABASE_ANON_KEY)
+      }, process.env.SUPABASE_ANON_KEY || process.env.SUPABASE_PUBLISHABLE_KEY)
     } else if (action === 'login') {
       auth = await supabaseRequest('/auth/v1/token?grant_type=password', {
         method: 'POST',
         body: JSON.stringify({ email, password }),
-      }, process.env.SUPABASE_ANON_KEY)
+      }, process.env.SUPABASE_ANON_KEY || process.env.SUPABASE_PUBLISHABLE_KEY)
     } else {
       return json(res, 400, { error: 'Unsupported auth action' })
     }
 
-    const user = auth.user
-    if (!user) throw new Error('Supabase signup completed without a user. Check SUPABASE_ANON_KEY and Auth email settings in Vercel.')
+    const user = auth.user || (auth.id ? auth : null)
+    if (!user) {
+      const responseKeys = Object.keys(auth || {}).join(', ') || 'empty response'
+      throw new Error(`Supabase returned no user (${responseKeys}). This email may already be registered, or the Auth anon key/project URL do not belong to the same Supabase project.`)
+    }
     const adminEmails = (process.env.ADMIN_EMAILS || '').split(',').map((item) => item.trim().toLowerCase()).filter(Boolean)
     const assignedRole = adminEmails.includes(String(user.email || email).toLowerCase()) ? 'admin' : (role === 'owner' ? 'owner' : 'customer')
     const profile = {
