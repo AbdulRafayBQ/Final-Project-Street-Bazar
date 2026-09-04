@@ -128,7 +128,11 @@ authPage.mount = (params, query, root) => {
       const btn = spinner(e.currentTarget)
       try {
         const result = await authRequest('verify', { email: pendingSignup.email, token: body.querySelector('#au-code').value.trim() })
-        const u = result.user
+        let u = result.user
+        if (pendingSignup.password) {
+          const loginResult = await authRequest('login', { email: pendingSignup.email, password: pendingSignup.password })
+          u = loginResult.user
+        }
         state.users.push(u); state.session = u.id; save(); pendingSignup = null; btn(); toast('Account verified 🎉', 'ok'); navigate(redirect)
       } catch (err) { btn(); toast(err.message, 'err') }
     })
@@ -168,7 +172,7 @@ authPage.mount = (params, query, root) => {
           if (!body.querySelector('#au-terms').checked) throw new Error('Terms & Conditions accept karein')
           const result = await authRequest('signup', { name, email, password: pass, role })
           if (result.pending_verification) {
-            pendingSignup = { email, name, role }
+            pendingSignup = { email, name, role, password: pass }
             btn(); paint(); toast('Verification code email par bhej diya gaya', 'ok'); return
           }
           const u = result.user

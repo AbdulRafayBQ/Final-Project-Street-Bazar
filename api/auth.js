@@ -101,6 +101,9 @@ export default async function handler(req, res) {
     }
     return json(res, 200, { user: profile, access_token: auth.access_token || null, profile_saved: profileSaved })
   } catch (error) {
-    return json(res, 400, { error: error.message })
+    const message = error.message === 'Invalid login credentials'
+      ? 'Email ya password match nahi kar raha. Password dobara type karein ya Forgot password se naya password set karein.'
+      : error.message
+    return json(res, 400, { error: message })
   }
 }
