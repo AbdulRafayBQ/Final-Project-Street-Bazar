@@ -8,7 +8,7 @@ const supabaseRequest = async (path, options = {}, requestKey = process.env.SUPA
   if (!base || !key) throw new Error('Supabase environment variables are not configured')
   const response = await fetch(`${base}${path}`, {
     ...options,
-    headers: { apikey: key, Authorization: `Bearer ${key}`, 'Content-Type': 'application/json', ...(options.headers || {}) },
+    headers: { apikey: key, Authorization: 'Bearer ' + key, 'Content-Type': 'application/json', ...(options.headers || {}) },
   })
   const data = await response.json().catch(() => ({}))
   if (!response.ok) throw new Error(data.msg || data.error_description || data.message || `Supabase ${response.status}`)
@@ -21,14 +21,22 @@ export default async function handler(req, res) {
     const key = process.env.SUPABASE_ANON_KEY || process.env.SUPABASE_PUBLISHABLE_KEY
     if (!base || !key) return json(res, 503, { error: 'Supabase environment variables are not configured' })
     const redirect = req.query.redirect || `${req.headers['x-forwarded-proto'] || 'https'}://${req.headers.host}/`
-    return json(res, 200, { url: `${base}/auth/v1/authorize?provider=google&redirect_to=${encodeURIComponent(redirect)}` })
+    const params = new URLSearchParams({ provider: 'google', redirect_to: redirect })
+    if (req.query.code_challenge) {
+      params.set('code_challenge', req.query.code_challenge)
+      params.set('code_challenge_method', 'S256')
+    }
+    return json(res, 200, { url: `${base}/auth/v1/authorize?${params.toString()}` })
   }
   if (req.method !== 'POST') return json(res, 405, { error: 'Method not allowed' })
   try {
-    const { action, name, password, token, access_token, type = 'signup', role = 'customer' } = req.body || {}
+    const { action, name, password, token, access_token, code, code_verifier, type = 'signup', role = 'customer' } = req.body || {}
     const normalizedEmail = String(req.body?.email || '').trim().toLowerCase()
     if (action === 'oauth' && !access_token) return json(res, 400, { error: 'Google session is missing' })
-    if (action !== 'oauth' && action !== 'reset' && (!normalizedEmail || (action === 'verify' ? !token : action === 'forgot' ? false : !password))) return json(res, 400, { error: action === 'verify' ? 'Email and verification code are required' : 'Email and password are required' })
+    if (action === 'oauth_code' && (!code || !code_verifier)) return json(res, 400, { error: 'Google verification is incomplete' })
+    if (!['oauth', 'oauth_code', 'reset'].includes(action) && (!normalizedEmail || (action === 'verify' ? !token : action === 'forgot' ? false : !password))) {
+      return json(res, 400, { error: action === 'verify' ? 'Email and verification code are required' : 'Email and password are required' })
+    }
 
     let auth
     if (action === 'forgot') {
@@ -41,14 +49,23 @@ export default async function handler(req, res) {
       if (!access_token || !password || password.length < 6) return json(res, 400, { error: 'Verification code and new password are required' })
       await supabaseRequest('/auth/v1/user', {
         method: 'PUT',
-        headers: { Authorization: `Bearer ${access_token}` },
+        headers: { Authorization: 'Bearer ' + access_token },
         body: JSON.stringify({ password }),
       }, access_token)
       return json(res, 200, { reset: true })
+    } else if (action === 'oauth_code') {
+      auth = await supabaseRequest('/auth/v1/token?grant_type=pkce', {
+        method: 'POST',
+        body: JSON.stringify({ auth_code: code, code_verifier }),
+      }, process.env.SUPABASE_ANON_KEY || process.env.SUPABASE_PUBLISHABLE_KEY)
+      auth.user = await supabaseRequest('/auth/v1/user', {
+        method: 'GET',
+        headers: { Authorization: 'Bearer ' + auth.access_token },
+      }, auth.access_token)
     } else if (action === 'oauth') {
       auth = await supabaseRequest('/auth/v1/user', {
         method: 'GET',
-        headers: { Authorization: `Bearer ${access_token}` },
+        headers: { Authorization: 'Bearer ' + access_token },
       }, process.env.SUPABASE_ANON_KEY || process.env.SUPABASE_PUBLISHABLE_KEY)
       auth.access_token = access_token
     } else if (action === 'verify') {
@@ -76,8 +93,7 @@ export default async function handler(req, res) {
     const user = auth.user || (auth.id ? auth : null)
     if (!user) {
       if (action === 'signup') return json(res, 200, { pending_verification: true, email: normalizedEmail, name, role })
-      const responseKeys = Object.keys(auth || {}).join(', ') || 'empty response'
-      throw new Error(`Supabase returned no user (${responseKeys}). This email may already be registered, or the Auth anon key/project URL do not belong to the same Supabase project.`)
+      throw new Error(`Supabase returned no user (${Object.keys(auth || {}).join(', ') || 'empty response'}). This email may already be registered, or the Auth anon key/project URL do not belong to the same Supabase project.`)
     }
     if (action === 'signup' && (!auth.access_token || !user.email_confirmed_at)) {
       return json(res, 200, { pending_verification: true, email: normalizedEmail, name, role })

@@ -5,6 +5,18 @@ import { currentUser, setRole, logout, state, save } from '../store.js'
 import { authRequest } from '../db.js'
 import { navigate } from '../router.js'
 
+const base64Url = (bytes) => {
+  let binary = ''
+  bytes.forEach((byte) => { binary += String.fromCharCode(byte) })
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+}
+
+const createCodeChallenge = async () => {
+  const verifier = base64Url(crypto.getRandomValues(new Uint8Array(32)))
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier))
+  return { verifier, challenge: base64Url(new Uint8Array(digest)) }
+}
+
 export async function authPage(params, query) {
   if (currentUser()) {
     return `<section class="sec"><div class="wrap"><div class="panel" style="max-width:520px;margin:0 auto;text-align:center">
@@ -131,7 +143,9 @@ authPage.mount = (params, query, root) => {
       button.disabled = true
       try {
         const redirect = `${location.origin}${location.pathname}`
-        const response = await fetch(`/api/auth?action=google&redirect=${encodeURIComponent(redirect)}`)
+        const { verifier, challenge } = await createCodeChallenge()
+        sessionStorage.setItem('street-bazar-google-verifier', verifier)
+        const response = await fetch(`/api/auth?action=google&redirect=${encodeURIComponent(redirect)}&code_challenge=${encodeURIComponent(challenge)}`)
         const data = await response.json().catch(() => ({}))
         if (!response.ok || !data.url) throw new Error(data.error || 'Google sign in unavailable')
         window.location.assign(data.url)

@@ -441,11 +441,39 @@ window.addEventListener('street-bazar-state-changed', () => {
 })
 
 async function restoreGoogleSession() {
-  const params = new URLSearchParams(window.location.hash.replace(/^#\/?/, ''))
+  const hashParams = new URLSearchParams(window.location.hash.replace(/^#\/?/, ''))
+  const queryParams = new URLSearchParams(window.location.search)
+  const params = new URLSearchParams([...queryParams.entries(), ...hashParams.entries()])
   const oauthError = params.get('error_description') || params.get('error')
   if (oauthError) {
     sessionStorage.setItem('street-bazar-google-error', oauthError)
     window.location.hash = '#/auth'
+    return
+  }
+  const code = params.get('code')
+  if (code) {
+    const verifier = sessionStorage.getItem('street-bazar-google-verifier')
+    if (!verifier) {
+      sessionStorage.setItem('street-bazar-google-error', 'Google verification session expire ho gayi. Dobara try karein.')
+      window.location.hash = '#/auth'
+      return
+    }
+    try {
+      const result = await authRequest('oauth_code', {
+        code,
+        code_verifier: verifier,
+      })
+      sessionStorage.removeItem('street-bazar-google-verifier')
+      state.users.push(result.user)
+      state.session = result.user.id
+      setRole(result.user.role)
+      save()
+      window.history.replaceState({}, document.title, `${location.pathname}#/`)
+    } catch (error) {
+      sessionStorage.removeItem('street-bazar-google-verifier')
+      sessionStorage.setItem('street-bazar-google-error', error.message)
+      window.location.hash = '#/auth'
+    }
     return
   }
   const accessToken = params.get('access_token')
