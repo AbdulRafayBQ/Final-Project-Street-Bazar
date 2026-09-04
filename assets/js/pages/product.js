@@ -84,7 +84,9 @@ export async function productPage(params) {
           </div>
           <label class="field" style="margin-top:8px"><span class="label">Upload design image (optional)</span><input class="input" type="file" accept="image/*" data-custom-file></label>
           <button class="btn btn-ghost btn-block" style="margin-top:10px" data-custom-reset>Reset preview</button>
-          <div class="tiny muted" data-custom-status style="margin-top:8px">Changes are applied to the product image in your browser.</div>
+          <div class="field" style="margin-top:10px"><span class="label">AI design prompt</span><input class="input" data-ai-design-prompt placeholder="e.g. Red floral print on this shirt"></div>
+          <button class="btn btn-primary btn-block" style="margin-top:10px" data-ai-design-generate>${icon('sparkles', '', 15)} Generate with AI</button>
+          <div class="tiny muted" data-custom-status style="margin-top:8px">Live editor changes stay on this product; AI may generate a separate design image.</div>
         </div>` : ''}
 
         ${tiers.length ? `<div class="opt-box" style="border-color:rgba(15,167,155,.4);background:rgba(15,167,155,.05)">
@@ -279,6 +281,32 @@ productPage.mount = (params, query, root) => {
     reader.readAsDataURL(file)
   })
   root.querySelector('[data-custom-reset]')?.addEventListener('click', () => { customState = { color: '#ffffff', text: '', design: '' }; redraw() })
+  root.querySelector('[data-ai-design-generate]')?.addEventListener('click', async (event) => {
+    const prompt = root.querySelector('[data-ai-design-prompt]')?.value.trim()
+    const status = root.querySelector('[data-custom-status]')
+    if (!prompt) return toast('AI design prompt likhein', 'err')
+    const button = event.currentTarget
+    button.disabled = true
+    status.textContent = 'AI design generate kar raha hai…'
+    try {
+      const response = await fetch('/api/image', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt: `${prompt}. Product concept: ${p.title}. Create a polished product design image.`, image: p.media?.[0]?.url || '' }),
+      })
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok || !data.url) throw new Error(data.error || 'AI image generate nahi ho saki')
+      customState.design = data.url
+      redraw()
+      status.textContent = 'AI image preview mein apply ho gayi. Aap dobara generate kar sakte hain.'
+      toast('AI design ready', 'ok')
+    } catch (error) {
+      status.textContent = error.message
+      toast(error.message, 'err')
+    } finally {
+      button.disabled = false
+    }
+  })
   redraw()
 
   // wishlist
