@@ -18,8 +18,8 @@ export default async function handler(req, res) {
     if (provider === 'huggingface') {
       const key = process.env.HF_TOKEN
       if (!key) return json(res, 503, { error: 'HF_TOKEN is not configured on Vercel' })
-      const configuredModel = process.env.HF_IMAGE_MODEL || 'stabilityai/stable-diffusion-xl-base-1.0'
-      const models = [configuredModel]
+      const configuredModel = process.env.HF_IMAGE_MODEL || 'black-forest-labs/FLUX.1-schnell'
+      const models = [...new Set([configuredModel, 'black-forest-labs/FLUX.1-schnell', 'black-forest-labs/FLUX.1-dev'])]
       let response
       let model = configuredModel
       let lastError = ''
@@ -35,7 +35,7 @@ export default async function handler(req, res) {
         let data = {}
         try { data = body ? JSON.parse(body) : {} } catch { data = {} }
         lastError = data.error || body.slice(0, 300) || 'Hugging Face image request failed'
-        if (!/deprecated|no longer supported|model.*not found|not available/i.test(lastError)) break
+        if (!/deprecated|no longer supported|model.*not found|not available|unsupported/i.test(lastError)) break
       }
       const contentType = response.headers.get('content-type') || ''
       if (!response.ok) {
