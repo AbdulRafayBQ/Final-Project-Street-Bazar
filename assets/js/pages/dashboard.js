@@ -364,7 +364,9 @@ warehousePage.mount = (params, query, root) => {
 function warehouseInner(sid) {
   const s = storeById(sid)
   const products = storeProducts(sid)
-  const privateItems = ownerWarehouse()
+  const warehouseItems = ownerWarehouse()
+  const storeItems = warehouseItems.filter((item) => item.product || item.inventory === 'store')
+  const privateItems = warehouseItems.filter((item) => !item.product && item.inventory !== 'store')
   const low = products.filter((p) => p.stock <= 8)
   const value = products.reduce((a, p) => a + p.stock * p.price, 0)
   const units = products.reduce((a, p) => a + p.stock, 0)
@@ -405,7 +407,7 @@ function warehouseInner(sid) {
       <div class="row"><span class="ai-orb">${icon('sparkles', '', 20)}</span><div><b class="h4">AI bulk stock</b><div class="tiny muted">Paste list, AI sab set kar dega</div></div></div>
       <p class="tiny muted" style="margin:12px 0">Har line: <b>name, qty, price</b>. AI quantity ko samajh kar inventory entries banayega. New private items ke liye product image required hai.</p>
       <label class="label" style="margin-top:10px">Add stock to</label>
-      <select class="select" id="bulk-destination"><option value="store">Store inventory (existing published product only)</option><option value="private">Private inventory (never published automatically)</option></select>
+      <select class="select" id="bulk-destination"><option value="store">Store inventory (publish later)</option><option value="private">Private inventory (never published automatically)</option></select>
       <textarea class="textarea" id="bulk-in" style="margin-top:10px" placeholder="Polo shirt, 300, 1499"></textarea>
       <div class="field" style="margin-top:10px">
         <span class="label">Product image <b style="color:var(--red)">(required for new warehouse items)</b></span>
@@ -422,9 +424,15 @@ function warehouseInner(sid) {
         </div>` : ''}
     </div>
     <div class="panel" style="grid-column:1/-1">
-      <div class="row-between"><div><h3 class="h4">Private warehouse stock</h3><div class="tiny muted">Ye inventory store par publish nahi hoti — physical stock ke liye.</div></div><button class="btn btn-sm btn-ghost" data-warehouse-add>${icon('plus', '', 14)} Add item</button></div>
+      <div class="row-between"><div><h3 class="h4">Store inventory</h3><div class="tiny muted">Private item ko pehle yahan move karein; phir yahin se product publish karein.</div></div></div>
+      <div class="table-wrap" style="margin-top:12px"><table><thead><tr><th>Item</th><th>SKU</th><th>Qty</th><th>Status</th><th></th></tr></thead><tbody>
+        ${storeItems.length ? storeItems.map((item) => `<tr><td><div class="row"><img src="${esc(item.image || './images/p-kurta.png')}" alt="" style="width:36px;height:36px;object-fit:cover;border-radius:9px"><b>${esc(item.name)}</b></div></td><td>${esc(item.sku || '—')}</td><td><b>${num(item.qty)}</b></td><td>${item.product ? '<span class="badge badge-soft">Published</span>' : '<span class="badge badge-soft">Ready to publish</span>'}</td><td>${item.product ? '' : `<a class="btn btn-sm btn-ghost" href="#/add-product?warehouseId=${encodeURIComponent(item.id)}">Publish product</a>`} <button class="btn btn-sm btn-ghost" data-warehouse-edit="${item.id}">Edit</button> <button class="btn btn-sm btn-danger" data-warehouse-delete="${item.id}">${icon('trash', '', 13)}</button></td></tr>`).join('') : '<tr><td colspan="5" class="muted">Store inventory empty hai.</td></tr>'}
+      </tbody></table></div>
+    </div>
+    <div class="panel" style="grid-column:1/-1">
+      <div class="row-between"><div><h3 class="h4">Private warehouse stock</h3><div class="tiny muted">Ye inventory store par publish nahi hoti — pehle Store inventory mein move karein.</div></div><button class="btn btn-sm btn-ghost" data-warehouse-add>${icon('plus', '', 14)} Add item</button></div>
       <div class="table-wrap" style="margin-top:12px"><table><thead><tr><th>Item</th><th>SKU</th><th>Qty</th><th>Location</th><th></th></tr></thead><tbody>
-        ${privateItems.length ? privateItems.map((item) => `<tr><td><div class="row"><img src="${esc(item.image || './images/p-kurta.png')}" alt="" style="width:36px;height:36px;object-fit:cover;border-radius:9px"><b>${esc(item.name)}</b></div></td><td>${esc(item.sku || '—')}</td><td><b>${num(item.qty)}</b></td><td>${esc(item.location || '—')}</td><td><a class="btn btn-sm btn-ghost" href="#/add-product?warehouseId=${encodeURIComponent(item.id)}">Publish product</a> <button class="btn btn-sm btn-ghost" data-warehouse-edit="${item.id}">Edit</button> <button class="btn btn-sm btn-danger" data-warehouse-delete="${item.id}">${icon('trash', '', 13)}</button></td></tr>`).join('') : '<tr><td colspan="5" class="muted">Private warehouse empty hai.</td></tr>'}
+        ${privateItems.length ? privateItems.map((item) => `<tr><td><div class="row"><img src="${esc(item.image || './images/p-kurta.png')}" alt="" style="width:36px;height:36px;object-fit:cover;border-radius:9px"><b>${esc(item.name)}</b></div></td><td>${esc(item.sku || '—')}</td><td><b>${num(item.qty)}</b></td><td>${esc(item.location || '—')}</td><td><button class="btn btn-sm btn-ghost" data-warehouse-store="${item.id}">Move to Store inventory</button> <button class="btn btn-sm btn-ghost" data-warehouse-edit="${item.id}">Edit</button> <button class="btn btn-sm btn-danger" data-warehouse-delete="${item.id}">${icon('trash', '', 13)}</button></td></tr>`).join('') : '<tr><td colspan="5" class="muted">Private warehouse empty hai.</td></tr>'}
       </tbody></table></div>
     </div>
   </div>`
@@ -470,6 +478,11 @@ function bindWarehouse(pageRoot, holder, sid) {
       foot: '<button class="btn btn-ghost" data-close>Cancel</button><button class="btn btn-primary" id="wh-save">Update</button>',
       onOpen: (el) => el.querySelector('#wh-save').addEventListener('click', () => { updateWarehouseItem(item.id, { qty: el.querySelector('#wh-qty').value }); closeModal(); refreshWarehouse(pageRoot, holder, sid) }),
     })
+  }))
+  holder.querySelectorAll('[data-warehouse-store]').forEach((button) => button.addEventListener('click', () => {
+    updateWarehouseItem(button.dataset.warehouseStore, { inventory: 'store' })
+    toast('Item Store inventory mein move ho gaya', 'ok')
+    refreshWarehouse(pageRoot, holder, sid)
   }))
   holder.querySelectorAll('[data-warehouse-delete]').forEach((button) => button.addEventListener('click', () => {
     deleteWarehouseItem(button.dataset.warehouseDelete)
@@ -526,12 +539,12 @@ function bindWarehouse(pageRoot, holder, sid) {
         })
         if (destination === 'store') {
           if (existing) addStock(existing.id, r.qty)
-          else missing.push(r.name + ' (not published)')
+          else addWarehouseItem({ owner: currentUser().id, name: r.name, qty: r.qty, cost: r.price, sku: r.sku, image: r.image || image, inventory: 'store' })
         } else {
           addWarehouseItem({ owner: currentUser().id, name: r.name, qty: r.qty, cost: r.price, sku: r.sku, image: r.image || image })
         }
       })
-      toast((rows.length - missing.length) + ' entries update ho gayi' + (missing.length ? `. Image missing: ${missing.join(', ')}` : ''), missing.length ? 'err' : 'ok')
+      toast((rows.length - missing.length) + ' entries Store inventory mein aa gayi' + (missing.length ? `. Missing: ${missing.join(', ')}` : ''), missing.length ? 'err' : 'ok')
       refreshWarehouse(pageRoot, holder, sid)
     })
   })

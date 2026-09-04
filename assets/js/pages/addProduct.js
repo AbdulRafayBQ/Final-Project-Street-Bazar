@@ -1,7 +1,7 @@
 /* Street Bazar — Add / Edit product with AI listing tools */
 
 import { icon, esc, money, toast, spinner, bindMediaPicker, closeModal } from '../ui.js'
-import { myStores, storeById, createProduct, updateProduct, productById, currentUser, allCategories, CATEGORIES, state } from '../store.js'
+import { myStores, storeById, createProduct, updateProduct, updateWarehouseItem, productById, currentUser, allCategories, CATEGORIES, state } from '../store.js'
 import { genProductCopy, genTitleOnly, suggestPrice, aiStatusText } from '../ai.js'
 import { navigate } from '../router.js'
 
@@ -294,6 +294,7 @@ addProductPage.mount = (params, query, root) => {
     if (editing) { updateProduct(editing.id, data); btn(); toast('Product update ho gaya', 'ok'); navigate('#/product/' + editing.id) }
     else {
       const p = createProduct(data)
+      if (warehouseDraft) updateWarehouseItem(warehouseDraft.id, { product: p.id, inventory: 'store', qty: stock })
       btn()
       toast('Product live ho gaya 🎉', 'ok')
       navigate('#/product/' + p.id)

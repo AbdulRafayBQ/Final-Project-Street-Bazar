@@ -595,7 +595,7 @@ export function createProduct(data) {
   const store = storeById(p.store)
   if (store?.owner) {
     state.warehouse = state.warehouse || []
-    state.warehouse.unshift({ id: uid('w'), owner: store.owner, name: p.title, qty: p.stock, sku: p.sku, cost: 0, location: '', product: p.id, updatedAt: Date.now() })
+    state.warehouse.unshift({ id: uid('w'), owner: store.owner, name: p.title, qty: p.stock, sku: p.sku, cost: 0, location: '', product: p.id, inventory: 'store', updatedAt: Date.now() })
   }
   save()
   return p
@@ -611,10 +611,10 @@ export function addStock(pid, qty) {
   if (linked) { linked.qty = p.stock; linked.updatedAt = Date.now(); save() }
 }
 
-export function addWarehouseItem({ owner, name, qty = 0, sku = '', cost = 0, location = '', product = null, image = '' }) {
+export function addWarehouseItem({ owner, name, qty = 0, sku = '', cost = 0, location = '', product = null, image = '', inventory = 'private' }) {
   const existing = (state.warehouse || []).find((entry) => entry.owner === owner && entry.name.toLowerCase() === String(name).trim().toLowerCase() && entry.product === product)
   if (existing) return updateWarehouseItem(existing.id, { qty: existing.qty + Math.max(0, Number(qty) || 0), image: image || existing.image })
-  const item = { id: uid('w'), owner, name: String(name).trim(), qty: Math.max(0, Number(qty) || 0), sku, cost: Number(cost) || 0, location, product, image, updatedAt: Date.now() }
+  const item = { id: uid('w'), owner, name: String(name).trim(), qty: Math.max(0, Number(qty) || 0), sku, cost: Number(cost) || 0, location, product, image, inventory, updatedAt: Date.now() }
   state.warehouse = state.warehouse || []
   state.warehouse.unshift(item)
   save()
