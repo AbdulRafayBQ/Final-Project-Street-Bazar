@@ -469,7 +469,8 @@ export const productById = (id) => state.products.find((p) => p.id === id) || nu
 export const storeById = (id) => state.stores.find((s) => s.id === id) || null
 export const storeBySlug = (s) => state.stores.find((x) => x.slug === s) || null
 export const storeOf = (p) => storeById(p?.store)
-export const liveStores = () => state.stores.filter((s) => s.status === 'live')
+// Stores remain discoverable while awaiting review; only explicitly hidden or rejected stores stay private.
+export const liveStores = () => state.stores.filter((s) => s.status !== 'hidden' && s.status !== 'rejected')
 export const storeProducts = (id) => state.products.filter((p) => p.store === id && p.status !== 'hidden')
 export const myStores = () => { const u = currentUser(); return u ? state.stores.filter((s) => s.owner === u.id) : [] }
 export const isFollowing = (id) => state.follows.some((f) => f.user === state.session && f.store === id)

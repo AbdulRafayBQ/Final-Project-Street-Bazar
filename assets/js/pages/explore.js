@@ -17,7 +17,7 @@ export async function explore(params = {}, query = {}) {
       <div class="row" style="margin-top:24px;gap:10px;flex-wrap:wrap">
         <div class="hd-search" style="max-width:520px;flex:1;position:relative">
           ${icon('search', '', 17)}
-          <input class="input" id="ex-q" value="${esc(q)}" placeholder="Product, store ya category search karein…" style="padding-left:42px;border-radius:99px">
+          <input class="input" id="ex-q" value="${esc(q)}" placeholder="Product ya category search karein…" style="padding-left:42px;border-radius:99px">
         </div>
         <button class="btn btn-grad" id="ex-ai">${icon('sparkles', '', 16)} <span>AI scan</span></button>
       </div>
@@ -39,7 +39,6 @@ export async function explore(params = {}, query = {}) {
 
   <section class="sec" style="padding-top:10px">
     <div class="wrap">
-      <div id="ex-stores"></div>
       <div id="ex-results"></div>
     </div>
   </section>`
@@ -51,7 +50,7 @@ explore.mount = (params, query, root) => {
   let term = query.q || ''
 
   const paint = () => {
-    const { products, stores } = searchAll(term)
+    const { products } = searchAll(term)
     let list = products.filter((p) => !cat || p.categories.includes(cat))
     if (!term && !cat) list = liveStores().flatMap((p0) => storeProducts(p0.id))
     list = [...list].sort((a, b) => {
@@ -60,14 +59,10 @@ explore.mount = (params, query, root) => {
       if (sort === 'low') return a.price - b.price
       return b.price - a.price
     })
-    const catStores = liveStores().filter((s) => !cat || s.categories.includes(cat))
-    root.querySelector('#ex-stores').innerHTML = (term || cat) && catStores.length
-      ? `<div style="margin-bottom:34px">${sectionHead({ kicker: 'Stores', title: 'Matching <span class="grad-text">stores</span>' })}<div class="grid grid-4 stagger">${catStores.slice(0, 4).map(storeCard).join('')}</div></div>`
-      : ''
     root.querySelector('#ex-results').innerHTML = list.length
       ? `${sectionHead({ kicker: 'Products', title: `${num(list.length)} <span class="grad-text">products</span> mile` })}<div class="grid grid-4 stagger">${list.map(productCard).join('')}</div>`
       : `<div class="empty reveal"><div class="ic">${icon('search', '', 30)}</div><h3 class="h3">Kuch nahi mila</h3><p class="muted">Try another keyword, ya AI scan se pooch lein kya dhoondna hai.</p><div style="margin-top:16px"><button class="btn btn-grad" onclick="document.getElementById('ex-ai').click()">${icon('sparkles', '', 15)} <span>AI scan</span></button></div></div>`
-    root.querySelector('#ex-count').textContent = `${num(list.length)} products · ${num(catStores.length)} stores`
+    root.querySelector('#ex-count').textContent = `${num(list.length)} products`
   }
   paint()
 
