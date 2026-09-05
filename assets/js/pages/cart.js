@@ -18,7 +18,12 @@ export async function cartPage() {
   }
 
   const subtotal = cartTotal()
-  const delivery = subtotal >= FREE_OVER ? 0 : DELIVERY
+  const storeCharges = [...new Set(items.map((item) => item.store))].reduce((total, sid) => {
+    const product = productById(items.find((item) => item.store === sid)?.product)
+    const charge = product?.deliveryCharge == null ? DELIVERY : Number(product.deliveryCharge)
+    return total + Math.max(0, charge)
+  }, 0)
+  const delivery = subtotal >= FREE_OVER ? 0 : storeCharges
   const total = subtotal + delivery
   const u = currentUser()
   const byStore = items.reduce((acc, i) => { (acc[i.store] = acc[i.store] || []).push(i); return acc }, {})

@@ -71,12 +71,13 @@ export async function productPage(params) {
             ${p.compareAt ? `<span class="price-old" style="font-size:16px">${money(p.compareAt)}</span>` : ''}
             ${off ? `<span class="price-off">You save ${money(p.compareAt - p.price)}</span>` : ''}
           </div>
+          <div class="tiny muted" style="margin-top:8px">${p.deliveryCharge ? `Delivery: ${money(p.deliveryCharge)}` : 'Delivery charges set by owner'}</div>
           <div data-wholesale-notice style="display:none;margin-top:10px;padding:8px 14px;font-size:13px;border-radius:10px;background:rgba(13,148,136,0.1);color:#0D9488;border:1px solid rgba(13,148,136,0.2)"></div>
         </div>
 
         ${p.customizable?.on ? `<div class="opt-box">
           <h4 class="h4">${icon('wand', '', 16)} Customize this product</h4>
-          <p class="tiny muted" style="margin:-4px 0 12px">Prompt dein aur AI nayi product image generate karega. Owner ko isi image ke sath order milega.</p>
+          <p class="tiny muted" style="margin:-4px 0 12px">Prompt dein aur AI nayi product image generate karega. Customized order par ${p.customizable?.price ? money(p.customizable.price) + ' extra' : 'owner ka extra charge apply nahi hota'} lagega.</p>
           <div style="text-align:center;margin-bottom:12px;background:#f8f5f1;border-radius:14px;padding:8px"><canvas data-custom-canvas width="640" height="640" style="max-width:100%;height:auto;border-radius:10px"></canvas><img data-generated-preview alt="AI generated product preview" hidden style="max-width:100%;height:auto;border-radius:10px"></div>
           <div class="field" style="margin-top:10px"><span class="label">AI design prompt</span><input class="input" data-ai-design-prompt placeholder="e.g. Red floral print on this shirt"></div>
           <button class="btn btn-primary btn-block" style="margin-top:10px" data-ai-design-generate>${icon('sparkles', '', 15)} Generate with AI</button>
@@ -187,11 +188,11 @@ productPage.mount = (params, query, root) => {
   let chosen = (p.customizable?.options || []).map((o) => ({ name: o.name, choice: o.choices[0] }))
   let customizedImage = p.media?.[0]?.url || ''
   let generatedImage = ''
-  const unit = () => {
+  const unit = (custom = false) => {
     const base = p.price
     const delta = chosen.reduce((a, c) => a + (c.choice?.delta || 0), 0)
     const tier = (p.wholesale?.tiers || []).filter((t) => qty >= t.qty).sort((a, b) => b.qty - a.qty)[0]
-    return tier ? tier.price : base + delta
+    return (tier ? tier.price : base) + delta + (custom ? Number(p.customizable?.price) || 0 : 0)
   }
   const paint = () => {
     root.querySelector('[data-qty-val]').textContent = qty
@@ -232,7 +233,7 @@ productPage.mount = (params, query, root) => {
     const options = {}
     chosen.forEach((c) => { if (c.choice) options[c.name] = c.choice.label })
     const image = useGeneratedImage ? generatedImage : (p.media?.[0]?.url || '')
-    addToCart({ product: p.id, qty, options: { ...options, ...(useGeneratedImage ? { 'AI design': 'Customized' } : {}) }, unitPrice: unit(), image, customizedImage: useGeneratedImage ? image : '' })
+    addToCart({ product: p.id, qty, options: { ...options, ...(useGeneratedImage ? { 'AI design': 'Customized' } : {}) }, unitPrice: unit(useGeneratedImage), image, customizedImage: useGeneratedImage ? image : '' })
     toast(`${p.title} × ${qty} cart mein add ho gaya`, 'ok')
     if (buyNow) navigate('#/cart')
     else updateCartBadge()

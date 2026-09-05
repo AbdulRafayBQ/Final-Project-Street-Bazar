@@ -602,6 +602,7 @@ export function createProduct(data) {
     price: Number(data.price) || 0, compareAt: Number(data.compareAt) || null,
     media: data.media?.length ? data.media : [{ type: 'image', url: './images/p-kurta.png' }],
     categories: data.categories || [], tags: data.tags || [], stock: Number(data.stock) || 0,
+    deliveryCharge: Number(data.deliveryCharge) || 0,
     sku: data.sku || '', customizable: data.customizable || { on: false, options: [] },
     wholesale: data.wholesale || { on: false, tiers: [] }, sales: 0, rating: 0,
     createdAt: Date.now(), status: 'active',

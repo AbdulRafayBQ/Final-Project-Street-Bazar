@@ -59,6 +59,10 @@ export async function addProductPage(params) {
               <div class="field"><span class="label">Stock *</span><input class="input" id="p-stock" type="number" min="0" value="${editing?.stock ?? ''}" placeholder="50"></div>
             </div>
             <div class="grid grid-2" style="gap:12px">
+              <div class="field"><span class="label">Delivery charges (Rs)</span><input class="input" id="p-delivery" type="number" min="0" value="${editing?.deliveryCharge || ''}" placeholder="250"></div>
+              <div class="field"><span class="label">Customization extra price (Rs)</span><input class="input" id="p-custom-price" type="number" min="0" value="${editing?.customizable?.price || ''}" placeholder="500"></div>
+            </div>
+            <div class="grid grid-2" style="gap:12px">
               <div class="field"><span class="label">SKU (optional)</span><input class="input" id="p-sku" value="${esc(editing?.sku || '')}" placeholder="NA-KUR-01"></div>
               <div class="field"><span class="label">Category *</span>
                 <select class="select" id="p-cat">${allCategories().map((c) => `<option ${editing?.categories?.includes(c) ? 'selected' : ''}>${c}</option>`).join('')}</select>
@@ -271,8 +275,9 @@ addProductPage.mount = (params, query, root) => {
       categories: [root.querySelector('#p-cat').value],
       tags: root.querySelector('#p-tags').value.split(',').map((t) => t.trim()).filter(Boolean),
       media: media.length ? media : [{ type: 'image', url: './images/p-kurta.png' }],
-      customizable: { on: custOn.checked, options: custOn.checked ? options.filter((o) => o.name && o.choices.length) : [] },
       wholesale: { on: wsOn.checked, tiers: wsOn.checked ? tiers : [] },
+      deliveryCharge: Number(root.querySelector('#p-delivery').value) || 0,
+      customizable: { on: custOn.checked, price: custOn.checked ? (Number(root.querySelector('#p-custom-price').value) || 0) : 0, options: custOn.checked ? options.filter((o) => o.name && o.choices.length) : [] },
     }
     if (editing) { updateProduct(editing.id, data); btn(); toast('Product update ho gaya', 'ok'); navigate('#/product/' + editing.id) }
     else {
