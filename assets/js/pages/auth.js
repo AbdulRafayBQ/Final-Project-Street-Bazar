@@ -2,7 +2,7 @@
 
 import { icon, esc, toast, spinner } from '../ui.js'
 import { currentUser, setRole, logout, state, save } from '../store.js'
-import { authRequest } from '../db.js'
+import { authRequest, syncPull } from '../db.js'
 import { navigate } from '../router.js'
 
 const base64Url = (bytes) => {
@@ -198,6 +198,7 @@ authPage.mount = (params, query, root) => {
           let u
           const result = await authRequest('login', { email, password: pass })
           u = result.user
+          await syncPull()
           const existing = state.users.find((x) => x.email.toLowerCase() === email.toLowerCase())
           if (existing) Object.assign(existing, u)
           else state.users.push(u)
@@ -215,6 +216,7 @@ authPage.mount = (params, query, root) => {
             btn(); paint(); toast('Verification code email par bhej diya gaya', 'ok'); return
           }
           const u = result.user
+          await syncPull()
           state.users = state.users.filter((user) => user.email.toLowerCase() !== email.toLowerCase())
           state.users.push(u)
           state.session = u.id

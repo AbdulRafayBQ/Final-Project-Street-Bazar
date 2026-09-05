@@ -464,6 +464,7 @@ async function restoreGoogleSession() {
         code_verifier: verifier,
       })
       sessionStorage.removeItem('street-bazar-google-verifier')
+      await syncPull()
       state.users.push(result.user)
       state.session = result.user.id
       setRole(result.user.role)
@@ -485,6 +486,7 @@ async function restoreGoogleSession() {
   }
   try {
     const result = await authRequest('oauth', { access_token: accessToken })
+    await syncPull()
     state.users.push(result.user)
     state.session = result.user.id
     setRole(result.user.role)
