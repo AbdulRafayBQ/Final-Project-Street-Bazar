@@ -1591,3 +1591,32 @@ tbody tr:hover{background:var(--paper-2)}
   }
 
 }
+/* ===== BLUR FIX ===== */
+
+.reveal {
+  filter: none !important;
+}
+
+.reveal.in {
+  filter: none !important;
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+/* Live Sales & Deals banner must stay crystal clear */
+.scard-banner,
+.scard-banner *,
+.scard-banner img {
+  filter: none !important;
+  opacity: 1;
+}
+
+.scard-banner img {
+  transform: none;
+  transition: transform .6s cubic-bezier(.16,1,.3,1);
+}
+
+/* Keep hover zoom without blur */
+.scard-banner:hover img {
+  transform: scale(1.04);
+}
