@@ -163,6 +163,7 @@ authPage.mount = (params, query, root) => {
           const loginResult = await authRequest('login', { email: pendingSignup.email, password: pendingSignup.password })
           u = loginResult.user
         }
+        state.users = state.users.filter((user) => user.email.toLowerCase() !== pendingSignup.email.toLowerCase())
         state.users.push(u); state.session = u.id; save(); pendingSignup = null; btn(); toast('Account verified 🎉', 'ok'); navigate(redirect)
       } catch (err) { btn(); toast(err.message, 'err') }
     })
@@ -208,15 +209,13 @@ authPage.mount = (params, query, root) => {
           if (!name) throw new Error('Apna naam likhein')
           if (pass.length < 6) throw new Error('Password kam se kam 6 characters ka ho')
           if (!body.querySelector('#au-terms').checked) throw new Error('Terms & Conditions accept karein')
-          if (state.users.some((user) => user.email.toLowerCase() === email.toLowerCase())) {
-            throw new Error('Is email par account pehle se registered hai. Sign in ya Forgot password use karein.')
-          }
           const result = await authRequest('signup', { name, email, password: pass, role })
           if (result.pending_verification) {
             pendingSignup = { email, name, role, password: pass }
             btn(); paint(); toast('Verification code email par bhej diya gaya', 'ok'); return
           }
           const u = result.user
+          state.users = state.users.filter((user) => user.email.toLowerCase() !== email.toLowerCase())
           state.users.push(u)
           state.session = u.id
           save()

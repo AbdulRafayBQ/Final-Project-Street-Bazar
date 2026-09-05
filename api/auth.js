@@ -112,6 +112,16 @@ export default async function handler(req, res) {
     }
     let profileSaved = false
     try {
+      if (action === 'signup') {
+        await supabaseRequest(`/rest/v1/users?email=eq.${encodeURIComponent(normalizedEmail)}`, {
+          method: 'DELETE',
+          headers: { Prefer: 'return=minimal' },
+        })
+        await supabaseRequest(`/rest/v1/profiles?email=eq.${encodeURIComponent(normalizedEmail)}`, {
+          method: 'DELETE',
+          headers: { Prefer: 'return=minimal' },
+        })
+      }
       await supabaseRequest('/rest/v1/users?on_conflict=id', {
         method: 'POST',
         headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
