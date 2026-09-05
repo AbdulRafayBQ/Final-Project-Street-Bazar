@@ -879,6 +879,8 @@ tbody tr:hover{background:var(--paper-2)}
     justify-content: center;
     bottom: 16px;
     right: 16px;
+    background:linear-gradient(135deg,var(--accent),var(--magenta));
+    color:#fff;
   }
   .floating-ai-btn span {
     display: none;

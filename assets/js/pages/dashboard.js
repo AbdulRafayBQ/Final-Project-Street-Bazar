@@ -3,6 +3,7 @@
 import { icon, esc, money, num, toast, modal, closeModal, timeAgo, spinner, confirmBox } from '../ui.js'
 import { statCard, emptyLogin } from '../components.js'
 import { myStores, storeById, storeProducts, storeOrders, storeRevenue, storeSales, currentUser, lowStock, productById, updateProduct, updateStore, deleteStore, advanceOrder, cancelOrder, addStock, storeThreads, threadById, markThreadRead, userById, save, ownerWarehouse, addWarehouseItem, updateWarehouseItem, deleteWarehouseItem } from '../store.js'
+import { genStockPlan } from '../ai.js'
 import { authRequest } from '../db.js'
 import { navigate } from '../router.js'
 
@@ -203,6 +204,7 @@ function openReply(threadId) {
   const th = threadById(threadId)
   if (!th) return
   markThreadRead(threadId)
+  document.querySelector('[data-tab="inbox"] .badge')?.remove()
   const who = userById(th.customer)?.name || 'Customer'
   modal({
       title: 'Reply to ' + esc(who),
@@ -335,6 +337,11 @@ function warehouseInner(sid) {
     </div>
 
     <div class="panel">
+      <div class="row"><span class="ai-orb">${icon('sparkles', '', 20)}</span><div><b class="h4">AI bulk stock</b><div class="tiny muted">Paste list, AI sab set kar dega</div></div></div>
+      <p class="tiny muted" style="margin:12px 0">Har line mein item name, quantity aur optional price likhein. AI existing products ka stock update karega aur naye items private warehouse mein rakhega.</p>
+      <textarea class="textarea" id="bulk-in" placeholder="Leather Wallet Brown, 25, 1450&#10;Leather Wallet Black, 30, 1450"></textarea>
+      <button class="btn btn-grad btn-block" id="bulk-run" style="margin-top:10px">${icon('sparkles', '', 15)} <span>Generate with AI</span></button>
+      <div id="bulk-out" style="margin-top:14px"></div>
       ${low.length ? `<div class="divider"></div>
         <b class="small" style="color:var(--red)">${icon('warning', '', 14)} Low stock alerts</b>
         <div class="stack" style="margin-top:10px">
@@ -418,6 +425,40 @@ function bindWarehouse(pageRoot, holder, sid) {
       }),
     })
   }))
+
+  holder.querySelector('#bulk-run')?.addEventListener('click', async (e) => {
+    const raw = holder.querySelector('#bulk-in')?.value.trim()
+    if (!raw) return toast('Pehle stock list paste karein', 'err')
+    const button = spinner(e.currentTarget)
+    const output = holder.querySelector('#bulk-out')
+    try {
+      output.innerHTML = '<div class="ai-out"><span class="lbl">AI list read kar raha hai...</span>Stock rows prepare ho rahi hain.</div>'
+      const result = await genStockPlan({ rough: raw, storeName: storeById(sid)?.name || 'Store' })
+      output.innerHTML = `<div class="ai-out"><span class="lbl">AI · ${result.source === 'live' ? 'live model' : 'Bazar Brain'} · ${result.rows.length} rows</span>Existing listings ka stock update hoga; naye items private warehouse mein add honge.</div>
+        <div class="table-wrap"><table style="min-width:auto"><thead><tr><th>Item</th><th>Qty</th><th>Price</th></tr></thead><tbody>${result.rows.map((row) => `<tr><td>${esc(row.name)}</td><td>${num(row.qty)}</td><td>${row.price ? money(row.price) : '—'}</td></tr>`).join('')}</tbody></table></div>
+        <button class="btn btn-primary btn-block" id="bulk-apply" style="margin-top:12px">${icon('box', '', 15)} <span>Add ${result.rows.length} entries</span></button>`
+      output.querySelector('#bulk-apply').addEventListener('click', () => {
+        const missing = []
+        result.rows.forEach((row) => {
+          const requested = row.name.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
+          const existing = storeProducts(sid).find((product) => {
+            const title = product.title.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
+            return title === requested || title.includes(requested) || requested.includes(title)
+          })
+          if (existing) addStock(existing.id, row.qty)
+          else if (row.image) addWarehouseItem({ owner: currentUser().id, name: row.name, qty: row.qty, cost: row.price, sku: row.sku, image: row.image })
+          else missing.push(row.name)
+        })
+        toast(`${result.rows.length - missing.length} entries update ho gayi${missing.length ? `. Image missing: ${missing.join(', ')}` : ''}`, missing.length ? 'err' : 'ok')
+        refreshWarehouse(pageRoot, holder, sid)
+      })
+    } catch (error) {
+      output.innerHTML = ''
+      toast('AI parsing failed: ' + error.message, 'err')
+    } finally {
+      button()
+    }
+  })
 
 }
 

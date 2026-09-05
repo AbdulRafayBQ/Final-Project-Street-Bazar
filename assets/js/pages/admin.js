@@ -271,6 +271,7 @@ adminPage.mount = (params, query, root) => {
   root.querySelectorAll('[data-toggle-prod]').forEach((b) => b.addEventListener('click', () => {
     const p = productById(b.dataset.toggleProd)
     updateProduct(p.id, { status: p.status === 'hidden' ? 'active' : 'hidden' })
+    b.textContent = p.status === 'hidden' ? 'Show' : 'Hide'
     toast('Product ' + (p.status === 'hidden' ? 'visible' : 'hidden'))
     navigate('#/admin?tab=products')
   }))
