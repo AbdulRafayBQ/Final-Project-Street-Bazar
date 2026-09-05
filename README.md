@@ -295,6 +295,30 @@ Can manage and monitor the complete platform, approve stores, manage users and p
 
 ---
 
+## Team & Contributions
+
+This project was developed as a two-member team.
+
+### Abdul Rafay — Lead Developer
+- Designed and developed the core application
+- Implemented the frontend and responsive UI
+- Developed authentication and role-based access
+- Implemented store management and seller dashboard
+- Developed product, inventory, warehouse and order management
+- Implemented AI-powered features
+- Developed product customization and wholesale pricing
+- Implemented customer features including cart, reviews, following stores and order tracking
+- Integrated Supabase backend and database functionality
+- Worked on admin panel, security and overall system integration
+- Testing, debugging and deployment
+
+### Ahtisham — Project Support & Development
+- Assisted with project planning and feature discussions
+- Assisted with UI/content ideas and project structure
+- Helped with testing and identifying bugs
+- Assisted with documentation and presentation preparation
+- Provided support during project development and final testing
+
 # 📁 Project Architecture
 
 The project uses a vanilla JavaScript frontend with serverless backend functions.
