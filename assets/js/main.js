@@ -1,7 +1,7 @@
 /* Street Bazar — app shell, routing & global interactions (vanilla JS) */
 
 import { $, $$, icon, esc, num, toast, modal, closeModal, avatar, timeAgo } from './ui.js'
-import { state, currentUser, cartCount, logout, myNotifications, unreadNotis, toggleLike, toggleFollow, productById, addToCart, save, unreadThreadCount, setRole } from './store.js'
+import { state, currentUser, myStores, cartCount, logout, myNotifications, unreadNotis, toggleLike, toggleFollow, productById, addToCart, save, unreadThreadCount, setRole } from './store.js'
 import { route, setNotFound, startRouter, onRender, navigate, renderRoute } from './router.js'
 import { authRequest, syncPull, syncPush } from './db.js'
 
@@ -24,6 +24,7 @@ import { assistantReply, aiStatusText } from './ai.js'
 /* ---------------- header ---------------- */
 function renderHeader() {
   const u = currentUser()
+  const hasStore = Boolean(u && myStores().length)
   const head = $('#site-header')
   head.className = 'site-header'
   head.innerHTML = `
@@ -38,7 +39,7 @@ function renderHeader() {
         <a href="#/explore" data-path="/explore">Explore</a>
         <a href="#/dukanien" data-path="/dukanien">Explore Dukanien</a>
         <a href="#/foryou" data-path="/foryou">For You</a>
-        ${u && (u.role === 'owner' || u.role === 'admin') ? `<a href="#/dashboard" data-path="/dashboard">Dashboard</a>` : ''}
+        ${u && (hasStore || u.role === 'admin') ? `<a href="#/dashboard" data-path="/dashboard">Dashboard</a>` : ''}
         ${u && u.role === 'admin' ? `<a href="#/admin" data-path="/admin">Admin</a>` : ''}
       </nav>
 
@@ -112,6 +113,7 @@ function openUserMenu() {
   const existing = $('[data-user-panel]')
   existing?.remove()
   const u = currentUser()
+  const hasStore = Boolean(u && myStores().length)
   if (!u) return navigate('#/auth')
   const wrap = document.createElement('div')
   wrap.className = 'dropdown'
@@ -124,7 +126,7 @@ function openUserMenu() {
     </div>
     <div class="divider" style="margin:6px 0"></div>
     <a class="dd-item" href="#/orders"><span class="ic">${icon('truck', '', 15)}</span><div><b>My orders</b><div class="tiny muted">Track with Order ID</div></div></a>
-    ${u.role !== 'customer' ? `<a class="dd-item" href="#/dashboard"><span class="ic">${icon('store', '', 15)}</span><div><b>Owner dashboard</b><div class="tiny muted">Stores, products, inbox</div></div></a>` : `<a class="dd-item" href="#/create-store"><span class="ic">${icon('plus', '', 15)}</span><div><b>Start selling</b><div class="tiny muted">Create your store</div></div></a>`}
+    ${hasStore || u.role === 'admin' ? `<a class="dd-item" href="#/dashboard"><span class="ic">${icon('store', '', 15)}</span><div><b>Owner dashboard</b><div class="tiny muted">Stores, products, inbox</div></div></a>` : `<a class="dd-item" href="#/create-store"><span class="ic">${icon('plus', '', 15)}</span><div><b>Start selling</b><div class="tiny muted">Create your store</div></div></a>`}
     <a class="dd-item" href="#/foryou"><span class="ic">${icon('heart', '', 15)}</span><div><b>For You feed</b><div class="tiny muted">Naye drops from followed stores</div></div></a>
     ${u.role === 'admin' ? `<a class="dd-item" href="#/settings"><span class="ic">${icon('settings', '', 15)}</span><div><b>Settings</b><div class="tiny muted">AI, Supabase and server settings</div></div></a>` : ''}
     ${u.role === 'admin' ? `<a class="dd-item" href="#/admin"><span class="ic">${icon('shield', '', 15)}</span><div><b>Admin panel</b><div class="tiny muted">Requests, users, orders</div></div></a>` : ''}
@@ -137,13 +139,15 @@ function openUserMenu() {
 
 function openMobileMenu() {
   const u = currentUser()
+  const hasStore = Boolean(u && myStores().length)
   modal({
     title: 'Menu',
     body: `<div class="stack">
       ${[
         ['#/', 'Home', 'home'], ['#/explore', 'Explore bazaar', 'search'], ['#/dukanien', 'Explore Dukanien', 'store'], ['#/foryou', 'For You', 'heart'],
         ['#/cart', 'Cart (' + cartCount() + ')', 'cart'], ['#/orders', 'My orders & tracking', 'truck'],
-        ...(u ? [['#/create-store', 'Create a store', 'store'], ['#/dashboard', 'Owner dashboard', 'layers']] : []),
+        ...(u && !hasStore ? [['#/create-store', 'Start selling', 'store']] : []),
+        ...(hasStore || u?.role === 'admin' ? [['#/dashboard', 'Owner dashboard', 'layers']] : []),
         ...(u?.role === 'admin' ? [['#/settings', 'Settings', 'settings']] : []),
         ...(u?.role === 'admin' ? [['#/admin', 'Admin panel', 'shield']] : []),
         ...(!u ? [['#/auth', 'Sign in / Sign up', 'user']] : []),
@@ -209,6 +213,7 @@ function renderFooter() {
 
 function renderMobileNav() {
   const u = currentUser()
+  const hasStore = Boolean(u && myStores().length)
   $('#mobile-nav').className = 'mobile-nav'
   $('#mobile-nav').innerHTML = `
     <ul>
@@ -217,7 +222,7 @@ function renderMobileNav() {
       <li><a href="#/dukanien" data-path="/dukanien">${icon('store', '', 20)}<span>Dukanien</span></a></li>
       <li><a href="#/foryou" data-path="/foryou">${icon('heart', '', 20)}<span>For You</span></a></li>
       <li><a href="#/cart" data-path="/cart">${icon('cart', '', 20)}<span>Cart</span><span class="cart-count" data-cart-count style="display:${cartCount() ? 'grid' : 'none'}">${cartCount()}</span></a></li>
-      <li><a href="${u ? '#/dashboard' : '#/auth'}" data-path="${u ? '/dashboard' : '/auth'}">${icon(u ? 'layers' : 'user', '', 20)}<span>${u ? 'Seller' : 'Account'}</span></a></li>
+      <li><a href="${hasStore || u?.role === 'admin' ? '#/dashboard' : u ? '#/create-store' : '#/auth'}" data-path="${hasStore || u?.role === 'admin' ? '/dashboard' : u ? '/create-store' : '/auth'}">${icon(hasStore || u?.role === 'admin' ? 'layers' : u ? 'store' : 'user', '', 20)}<span>${hasStore || u?.role === 'admin' ? 'Seller' : u ? 'Start selling' : 'Account'}</span></a></li>
     </ul>`
 }
 
