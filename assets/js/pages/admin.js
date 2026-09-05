@@ -2,8 +2,8 @@
 
 import { icon, esc, money, num, timeAgo, toast, confirmBox, modal, closeModal } from '../ui.js'
 import { statCard } from '../components.js'
-import { state, currentUser, setRole, storeById, storeProducts, productById, userById, updateStore, deleteStore, updateProduct, notify, liveStores, pendingStores, lowStock } from '../store.js'
-import { isAIConnected, isConnected } from '../db.js'
+import { state, currentUser, setRole, storeById, storeProducts, productById, userById, updateStore, deleteStore, updateProduct, deleteProduct, deleteOrder, notify, liveStores, pendingStores, lowStock } from '../store.js'
+import { isAIConnected, isConnected, deleteRemote } from '../db.js'
 import { navigate } from '../router.js'
 
 const TABS = [
@@ -161,7 +161,10 @@ const views = {
           <td class="${p.stock <= 8 ? 'low' : ''}">${p.stock}</td>
           <td>${p.sales}</td>
           <td>${p.rating ? '★ ' + Number(p.rating).toFixed(1) : '—'}</td>
-          <td><button class="btn btn-sm btn-ghost" data-toggle-prod="${p.id}">${p.status === 'hidden' ? 'Show' : 'Hide'}</button></td>
+          <td><div class="row" style="gap:6px">
+            <button class="btn btn-sm btn-ghost" data-toggle-prod="${p.id}">${p.status === 'hidden' ? 'Show' : 'Hide'}</button>
+            <button class="btn btn-sm btn-danger" data-del-prod="${p.id}">Delete</button>
+          </div></td>
         </tr>`).join('')}</tbody>
     </table></div>`,
 
@@ -186,7 +189,7 @@ const views = {
     <h3 class="h3">Platform orders</h3>
     <p class="muted small" style="margin:8px 0 18px">Har store ke orders, status ke sath.</p>
     ${state.orders.length ? `<div class="table-wrap"><table>
-      <thead><tr><th>Order</th><th>Customer</th><th>Stores</th><th>Items</th><th>Total</th><th>Status</th><th>Placed</th></tr></thead>
+      <thead><tr><th>Order</th><th>Customer</th><th>Stores</th><th>Items</th><th>Total</th><th>Status</th><th>Placed</th><th></th></tr></thead>
       <tbody>${state.orders.map((o) => `
         <tr>
           <td><a href="#/track/${o.id}"><b>${o.id}</b></a></td>
@@ -196,6 +199,7 @@ const views = {
           <td><b>${money(o.total)}</b></td>
           <td><span class="badge ${o.status === 4 ? 'badge-live' : 'badge-pending'}">${['Placed', 'Packed', 'Shipped', 'Out', 'Delivered'][o.status]}</span></td>
           <td class="muted tiny">${timeAgo(o.createdAt)}</td>
+          <td><button class="btn btn-sm btn-danger" data-del-order="${o.id}">Delete</button></td>
         </tr>`).join('')}</tbody>
     </table></div>` : '<div class="empty"><p class="muted">Abhi koi order nahi.</p></div>'}
   `,
@@ -269,6 +273,26 @@ adminPage.mount = (params, query, root) => {
     updateProduct(p.id, { status: p.status === 'hidden' ? 'active' : 'hidden' })
     toast('Product ' + (p.status === 'hidden' ? 'visible' : 'hidden'))
     navigate('#/admin?tab=products')
+  }))
+
+  root.querySelectorAll('[data-del-prod]').forEach((b) => b.addEventListener('click', () => {
+    const p = productById(b.dataset.delProd)
+    confirmBox('Delete ' + p.title + '?', 'Product aur uska warehouse record permanently delete hoga.', async () => {
+      deleteProduct(p.id)
+      try { await deleteRemote('products', p.id) } catch (error) { toast('Remote delete failed: ' + error.message, 'err'); return }
+      toast('Product delete ho gaya', 'ok')
+      navigate('#/admin?tab=products')
+    }, 'Delete permanently')
+  }))
+
+  root.querySelectorAll('[data-del-order]').forEach((b) => b.addEventListener('click', () => {
+    const order = state.orders.find((o) => o.id === b.dataset.delOrder)
+    confirmBox('Delete order ' + order.id + '?', 'Ye order aur iska suspicious total permanently remove hoga.', async () => {
+      deleteOrder(order.id)
+      try { await deleteRemote('orders', order.id) } catch (error) { toast('Remote delete failed: ' + error.message, 'err'); return }
+      toast('Order delete ho gaya', 'ok')
+      navigate('#/admin?tab=orders')
+    }, 'Delete permanently')
   }))
 
   root.querySelectorAll('[data-role-of]').forEach((sel) => sel.addEventListener('change', () => {

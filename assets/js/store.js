@@ -619,6 +619,25 @@ export function updateProduct(id, data) {
   const p = productById(id); if (!p) return null
   Object.assign(p, data); save(); return p
 }
+export function deleteProduct(id) {
+  const product = productById(id)
+  if (!product) return false
+  state.products = state.products.filter((p) => p.id !== id)
+  state.reviews = state.reviews.filter((r) => r.product !== id)
+  state.threads = state.threads.filter((t) => t.product !== id)
+  state.warehouse = (state.warehouse || []).filter((item) => item.product !== id)
+  state.cart = (state.cart || []).filter((item) => item.product !== id)
+  state.likes = (state.likes || []).filter((item) => item.product !== id)
+  save()
+  return true
+}
+export function deleteOrder(id) {
+  const order = state.orders.find((o) => o.id === id)
+  if (!order) return false
+  state.orders = state.orders.filter((o) => o.id !== id)
+  save()
+  return true
+}
 export function addStock(pid, qty) {
   const p = productById(pid); if (!p) return
   p.stock = Math.max(0, (p.stock || 0) + Number(qty)); save()

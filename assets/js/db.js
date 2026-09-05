@@ -94,6 +94,7 @@ try {
     users: state.users.map(({ pass, ...user }) => user),
     settings: { ...state.settings, supabase: {}, ai: {} },
   }
+
   payload.user_id = userId
   delete payload.session
   await api('/api/data', { method: 'POST', body: JSON.stringify(payload) })
@@ -102,6 +103,10 @@ try {
 } finally {
   syncing = false
 }
+}
+
+export async function deleteRemote(table, id) {
+  await api('/api/data', { method: 'DELETE', body: JSON.stringify({ table, id }) })
 }
 
 export async function syncPull() {

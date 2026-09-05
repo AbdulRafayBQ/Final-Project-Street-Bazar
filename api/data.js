@@ -38,6 +38,21 @@ export default async function handler(req, res) {
       const rows = await request('/rest/v1/app_state?select=payload&key=eq.global&limit=1')
       return json(res, 200, rows[0]?.payload || null)
     }
+    if (req.method === 'DELETE') {
+      const { table, id } = req.body || {}
+      const allowed = ['products', 'orders', 'reviews', 'threads', 'follows', 'cart_items', 'saved_products', 'warehouse_items']
+      if (!allowed.includes(table) || !id) return json(res, 400, { error: 'Invalid delete request' })
+      await request(`/rest/v1/${table}?id=eq.${encodeURIComponent(id)}`, { method: 'DELETE' })
+      if (table === 'products') {
+        await Promise.all([
+          request(`/rest/v1/reviews?product_id=eq.${encodeURIComponent(id)}`, { method: 'DELETE' }),
+          request(`/rest/v1/threads?product_id=eq.${encodeURIComponent(id)}`, { method: 'DELETE' }),
+          request(`/rest/v1/cart_items?product_id=eq.${encodeURIComponent(id)}`, { method: 'DELETE' }),
+          request(`/rest/v1/saved_products?product_id=eq.${encodeURIComponent(id)}`, { method: 'DELETE' }),
+        ])
+      }
+      return json(res, 200, { ok: true })
+    }
     if (req.method !== 'POST') return json(res, 405, { error: 'Method not allowed' })
     const payload = req.body || {}
     await request('/rest/v1/app_state?on_conflict=key', {
