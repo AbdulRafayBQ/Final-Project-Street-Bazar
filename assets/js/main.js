@@ -532,3 +532,160 @@ async function boot() {
 }
 
 restoreGoogleSession().finally(() => boot())
+/* =========================================================
+   STREET BAZAR — GLOBAL SCROLL & MOTION EFFECTS
+   ========================================================= */
+
+(() => {
+
+  let ticking = false
+
+  function updateScrollEffects() {
+
+    const scrollTop = window.scrollY
+    const docHeight =
+      document.documentElement.scrollHeight - window.innerHeight
+
+    const progress =
+      docHeight > 0
+        ? (scrollTop / docHeight) * 100
+        : 0
+
+    const progressBar = document.querySelector('#scroll-progress')
+
+    if (progressBar) {
+      progressBar.style.width = `${progress}%`
+    }
+
+    const header = document.querySelector('#site-header')
+
+    if (header) {
+      header.classList.toggle('scrolled', scrollTop > 30)
+    }
+
+    ticking = false
+  }
+
+  window.addEventListener('scroll', () => {
+
+    if (!ticking) {
+      requestAnimationFrame(updateScrollEffects)
+      ticking = true
+    }
+
+  }, { passive: true })
+
+  updateScrollEffects()
+
+
+  /* ---------- MOUSE PARALLAX ---------- */
+
+  document.addEventListener('mousemove', (e) => {
+
+    const cards = document.querySelectorAll(
+      '.action-card, .cat-card'
+    )
+
+    if (window.innerWidth < 800) return
+
+    const x = (e.clientX / window.innerWidth - .5)
+    const y = (e.clientY / window.innerHeight - .5)
+
+    cards.forEach((card, index) => {
+
+      if (card.matches(':hover')) {
+
+        const amount = index % 2 === 0 ? 5 : -5
+
+        card.style.transform =
+          `translateY(-9px)
+           rotateX(${y * amount}deg)
+           rotateY(${x * amount}deg)
+           scale(1.02)`
+      }
+
+    })
+
+  }, { passive: true })
+
+
+  /* ---------- IMAGE PARALLAX ---------- */
+
+  const parallaxObserver =
+    new IntersectionObserver((entries) => {
+
+      entries.forEach(entry => {
+
+        if (!entry.isIntersecting) return
+
+        const element = entry.target
+
+        const image =
+          element.querySelector(
+            '.pcard-media img, .scard-banner img'
+          )
+
+        if (!image) return
+
+        element.addEventListener(
+          'mousemove',
+          (event) => {
+
+            const rect =
+              element.getBoundingClientRect()
+
+            const x =
+              ((event.clientX - rect.left) / rect.width - .5) * 8
+
+            const y =
+              ((event.clientY - rect.top) / rect.height - .5) * 8
+
+            image.style.transform =
+              `scale(1.08) translate(${x}px, ${y}px)`
+          }
+        )
+
+        element.addEventListener(
+          'mouseleave',
+          () => {
+            image.style.transform = ''
+          }
+        )
+
+        parallaxObserver.unobserve(element)
+
+      })
+
+    }, { threshold: .1 })
+
+
+  function observeMotion() {
+
+    document
+      .querySelectorAll(
+        '.pcard, .scard, .featured-store-card'
+      )
+      .forEach(el => parallaxObserver.observe(el))
+
+  }
+
+  observeMotion()
+
+  /* Router changes ke baad naye cards ko observe karo */
+
+  const observer =
+    new MutationObserver(() => {
+      observeMotion()
+    })
+
+  const view =
+    document.querySelector('#view')
+
+  if (view) {
+    observer.observe(view, {
+      childList: true,
+      subtree: true
+    })
+  }
+
+})()
