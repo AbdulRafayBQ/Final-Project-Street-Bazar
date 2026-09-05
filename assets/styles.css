@@ -882,6 +882,8 @@ tbody tr:hover{background:var(--paper-2)}
     background:linear-gradient(135deg,var(--accent),var(--magenta));
     color:#fff;
   }
+  .floating-ai-logo{width:24px;height:24px;border-radius:50%;object-fit:contain;background:#fff;padding:2px}
+  .ai-header-logo{width:28px;height:28px;border-radius:50%;object-fit:contain;background:#fff;padding:2px}
   .floating-ai-btn span {
     display: none;
   }

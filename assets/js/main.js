@@ -233,13 +233,13 @@ function renderFloatingAIWidget() {
   wrap.id = 'floating-ai-root'
   wrap.innerHTML = `
     <button class="floating-ai-btn" id="floating-ai-toggle" aria-label="Open AI Assistant">
-      ${icon('sparkles', '', 18)} <span>Bazar AI Assistant</span>
+      <img src="./images/logo.png" alt="AI" class="floating-ai-logo"> <span>Bazar AI Assistant</span>
     </button>
 
     <div class="floating-ai-panel" id="floating-ai-panel" style="display:none">
       <div class="floating-ai-head">
         <div class="row" style="gap:9px">
-          ${icon('sparkles', '', 18)}
+          <img src="./images/logo.png" alt="AI" class="ai-header-logo">
           <div>
             <b class="small" style="color:#fff">Street Bazar AI</b>
             <div class="tiny" style="color:rgba(255,255,255,0.7);font-size:11px">${aiStatusText()}</div>

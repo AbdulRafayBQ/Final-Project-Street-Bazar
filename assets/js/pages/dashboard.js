@@ -297,7 +297,7 @@ warehousePage.mount = (params, query, root) => {
 function warehouseInner(sid) {
   const s = storeById(sid)
   const products = storeProducts(sid)
-  const warehouseItems = ownerWarehouse()
+  const warehouseItems = ownerWarehouse().filter((item) => item.store === sid || item.product && productById(item.product)?.store === sid || !item.store && !item.product && sid === myStores()[0]?.id)
   const storeItems = warehouseItems.filter((item) => item.product || item.inventory === 'store')
   const privateItems = warehouseItems.filter((item) => !item.product && item.inventory !== 'store')
   const low = products.filter((p) => p.stock <= 8)
@@ -381,7 +381,7 @@ function bindWarehouse(pageRoot, holder, sid) {
         if (!file) return toast('Product image is required.', 'err')
         const reader = new FileReader()
         reader.onload = () => {
-          addWarehouseItem({ owner: currentUser().id, name, qty: el.querySelector('#wh-qty').value, image: String(reader.result || ''), sku: el.querySelector('#wh-sku').value.trim(), location: el.querySelector('#wh-location').value.trim() })
+          addWarehouseItem({ owner: currentUser().id, store: sid, name, qty: el.querySelector('#wh-qty').value, image: String(reader.result || ''), sku: el.querySelector('#wh-sku').value.trim(), location: el.querySelector('#wh-location').value.trim() })
           closeModal(); refreshWarehouse(pageRoot, holder, sid)
         }
         reader.readAsDataURL(file)
@@ -454,7 +454,7 @@ function bindWarehouse(pageRoot, holder, sid) {
             return title === requested || title.includes(requested) || requested.includes(title)
           })
           if (existing && inventory === 'store') addStock(existing.id, row.qty)
-          else addWarehouseItem({ owner: currentUser().id, name: row.name, qty: row.qty, cost: row.price, sku: row.sku, image: row.image, inventory })
+          else addWarehouseItem({ owner: currentUser().id, store: sid, name: row.name, qty: row.qty, cost: row.price, sku: row.sku, image: row.image, inventory })
         })
         chat.insertAdjacentHTML('beforeend', `<div class="msg them"><div class="who">Bazar AI</div>${result.rows.length} item ${inventory === 'store' ? 'Store' : 'Private'} inventory mein add ho gaye.</div>`)
         output.innerHTML = ''
