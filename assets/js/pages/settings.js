@@ -25,7 +25,7 @@ export async function settingsPage() {
         <div class="seg" data-role-seg>
           ${['customer', 'owner', 'admin'].map((r) => `<button data-role-v="${r}" class="${u.role === r ? 'active' : ''}">${r}</button>`).join('')}
         </div>
-        <span class="hint">Owner banne par store creation, warehouse aur AI Studio khul jate hain.</span>
+        <span class="hint">Owner banne par store creation, warehouse aur product listing tools khul jate hain.</span>
       </div>
       <div class="wrap-flex" style="margin-top:16px">
         <button class="btn btn-primary" id="save-profile"><span>Save profile</span></button>

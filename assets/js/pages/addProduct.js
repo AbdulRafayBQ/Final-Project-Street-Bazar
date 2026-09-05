@@ -2,7 +2,7 @@
 
 import { icon, esc, money, toast, spinner, bindMediaPicker, closeModal } from '../ui.js'
 import { myStores, storeById, createProduct, updateProduct, updateWarehouseItem, productById, currentUser, allCategories, CATEGORIES, state } from '../store.js'
-import { genProductCopy, genTitleOnly, suggestPrice, aiStatusText } from '../ai.js'
+import { genProductCopy, aiStatusText } from '../ai.js'
 import { navigate } from '../router.js'
 
 export async function addProductPage(params) {
@@ -19,31 +19,28 @@ export async function addProductPage(params) {
   <div class="wrap" style="padding-top:28px">
     <span class="kicker">${editing ? 'Edit product' : 'New listing'}</span>
     <h1 class="h1" style="margin-top:12px">${editing ? 'Product update karein' : 'Product <span class="grad-text">list karein</span>'}</h1>
-    <p class="lead" style="margin-top:10px">Details likhein ya sirf idea dein — AI title, description, tags aur price tak likh dega. ${aiStatusText()}</p>
+    <p class="lead" style="margin-top:10px">Product image upload karein, details aur language batayein — AI image samajh kar title, description aur tags likhega. Price aap khud set karein. ${aiStatusText()}</p>
 
     <div style="display:grid;grid-template-columns:1.15fr .85fr;gap:26px;align-items:start;margin-top:26px" class="cs-grid">
       <div class="stack" style="gap:20px">
         <div class="panel">
-          <div class="row-between"><h3 class="h4">1 · AI se likhwao</h3><span class="badge badge-violet">${icon('sparkles', '', 12)} AI</span></div>
-          <p class="tiny muted" style="margin:6px 0 14px">Simple Urdu/English mein likhein aap kya bech rahe hain — baqi AI sambhal lega.</p>
-          <div class="field"><span class="label">Aapka idea (rough note)</span>
-            <textarea class="textarea" id="ai-rough" placeholder="e.g. handmade leather wallet, brown colour, 6 card slots, ghar par bana rahe hain">${editing ? esc(editing.title) : ''}</textarea>
+          <div class="row-between"><h3 class="h4">1 · AI listing assistant</h3><span class="badge badge-violet">${icon('sparkles', '', 12)} Image AI</span></div>
+          <p class="tiny muted" style="margin:6px 0 14px">Pehle product photo upload karein. AI photo ko dekh kar title, description aur tags banayega — price hamesha aap manually enter karein.</p>
+          <div class="field"><span class="label">Product details / instructions</span>
+            <textarea class="textarea" id="ai-rough" placeholder="e.g. Good quality Puma shirt, all sizes available. Write it in English.">${editing ? esc(editing.title) : ''}</textarea>
           </div>
           <div class="grid grid-2" style="gap:12px;margin-top:12px">
             <div class="field"><span class="label">Category</span>
               <select class="select" id="ai-cat">${allCategories().map((c) => `<option ${editing?.categories?.includes(c) ? 'selected' : ''}>${c}</option>`).join('')}</select>
             </div>
-            <div class="field"><span class="label">Tone</span>
+            <div class="field"><span class="label">Output language</span>
               <select class="select" id="ai-tone">
-                <option>Friendly</option><option>Premium</option><option>Desi Masala</option><option>Minimal</option><option>Sales Push</option>
+               <option>English</option><option>Urdu</option><option>Roman Urdu</option>
               </select>
             </div>
           </div>
           <div class="wrap-flex" style="margin-top:14px">
-            <button class="ai-chip" id="ai-all">${icon('sparkles', '', 14)} Generate everything</button>
-            <button class="ai-chip" id="ai-title">${icon('wand', '', 14)} Title only</button>
-            <button class="ai-chip" id="ai-price">${icon('coins', '', 14)} Suggest price</button>
-            <a class="ai-chip" href="#/warehouse/${stores[0].id}">${icon('box', '', 14)} Bulk stock with AI</a>
+            <button class="ai-chip" id="ai-all">${icon('sparkles', '', 14)} Analyze image & write listing</button>
           </div>
           <div id="ai-out" style="margin-top:14px"></div>
         </div>
@@ -137,40 +134,26 @@ addProductPage.mount = (params, query, root) => {
 
   root.querySelector('#ai-all').addEventListener('click', async (e) => {
     const idea = rough()
-    if (!idea) return toast('Pehle apna idea likhein', 'err')
+    const image = media.find((item) => item.type === 'image')?.url || ''
+    if (!image) return toast('AI ke liye pehle product image upload karein', 'err')
     const btn = spinner(e.currentTarget)
-    aiOut.innerHTML = '<div class="ai-out"><span class="lbl">AI is writing…</span>Title, description, tags aur price ban rahe hain…</div>'
+    aiOut.innerHTML = '<div class="ai-out"><span class="lbl">AI is analyzing the image…</span>Title, description aur tags ban rahe hain…</div>'
     const cat = root.querySelector('#ai-cat').value
-    const tone = root.querySelector('#ai-tone').value
-    const price = suggestPrice({ title: idea, category: cat })
-    const res = await genProductCopy({ rough: idea, category: cat, storeName: 'your store', tone, price })
-    btn()
-    root.querySelector('#p-title').value = res.title
-    root.querySelector('#p-desc').value = res.description
-    root.querySelector('#p-price').value = price
-    root.querySelector('#p-compare').value = Math.round(price * 1.28 / 50) * 50
-    if (!root.querySelector('#p-stock').value) root.querySelector('#p-stock').value = 25
-    root.querySelector('#p-tags').value = res.tags.join(', ')
-    aiOut.innerHTML = `<div class="ai-out"><span class="lbl">AI ready · ${res.source === 'live' ? 'live model' : 'Bazar Brain'}</span>Listing tayyar hai — neeche details check kar lein aur publish karein.</div>`
-    toast('AI ne listing likh di ✨', 'ai')
-    paintPreview()
-  })
-
-  root.querySelector('#ai-title').addEventListener('click', async () => {
-    const idea = rough()
-    if (!idea) return toast('Pehle idea likhein', 'err')
-    const t = await genTitleOnly({ rough: idea, category: root.querySelector('#ai-cat').value })
-    root.querySelector('#p-title').value = t
-    toast('Title update ho gaya', 'ai')
-    paintPreview()
-  })
-
-  root.querySelector('#ai-price').addEventListener('click', () => {
-    const idea = rough() || root.querySelector('#p-title').value
-    const p = suggestPrice({ title: idea, category: root.querySelector('#ai-cat').value })
-    root.querySelector('#p-price').value = p
-    toast('Suggested price: Rs ' + p.toLocaleString('en-PK'), 'ai')
-    paintPreview()
+    const language = root.querySelector('#ai-tone').value
+    try {
+      const res = await genProductCopy({ rough: idea, category: cat, storeName: 'your store', tone: 'Friendly', price: 0, image, language })
+      root.querySelector('#p-title').value = res.title
+      root.querySelector('#p-desc').value = res.description
+      root.querySelector('#p-tags').value = res.tags.join(', ')
+      aiOut.innerHTML = `<div class="ai-out"><span class="lbl">AI ready · ${res.source === 'live' ? 'image model' : 'Bazar Brain'}</span>Listing tayyar hai — price aur stock neeche manually check karein.</div>`
+      toast('AI ne image dekh kar listing likh di ✨', 'ai')
+      paintPreview()
+    } catch (error) {
+      aiOut.innerHTML = `<div class="ai-out"><span class="lbl">AI failed</span>${esc(error.message)}</div>`
+      toast(error.message, 'err')
+    } finally {
+      btn()
+    }
   })
 
   /* ---- customize options ---- */

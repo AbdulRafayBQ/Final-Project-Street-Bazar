@@ -8,7 +8,7 @@ export default async function handler(req, res) {
   if (!key) return json(res, 503, { error: 'AI_API_KEY is not configured on Vercel' })
   const configuredBase = (process.env.AI_BASE_URL || 'https://api.openai.com/v1').replace(/\/$/, '').replace(/\/v1beta$/, '')
   const configuredModel = (process.env.AI_MODEL || 'gpt-4o-mini').trim().replace(/^models\//, '').replace(/^gemini-(?:2\.0|2\.5|3\.6)-flash(?:-.*)?$/i, 'gemini-3.5-flash-lite')
-  const { system = '', user = '', maxTokens = 800 } = req.body || {}
+  const { system = '', user = '', image = '', maxTokens = 800 } = req.body || {}
   const isGemini = key.startsWith('AIza') || configuredBase.includes('googleapis.com') || configuredModel.toLowerCase().includes('gemini')
   const isAnthropic = !isGemini && (configuredBase.includes('anthropic.com') || configuredModel.toLowerCase().includes('claude'))
   const base = isGemini
@@ -23,11 +23,19 @@ export default async function handler(req, res) {
     : isAnthropic
       ? { 'Content-Type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01' }
       : { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` }
+  const imagePart = image.startsWith('data:') ? (() => {
+    const match = image.match(/^data:([^;]+);base64,(.+)$/)
+    return match ? { inline_data: { mime_type: match[1], data: match[2] } } : null
+  })() : null
+  const geminiParts = [{ text: `${system}\n\n${user}` }, ...(imagePart ? [imagePart] : [])]
+  const openAiContent = image
+    ? [{ type: 'text', text: user }, { type: 'image_url', image_url: { url: image } }]
+    : user
   const body = isGemini
-    ? { contents: [{ parts: [{ text: `${system}\n\n${user}` }] }] }
+    ? { contents: [{ parts: geminiParts }] }
     : isAnthropic
-      ? { model, system, max_tokens: maxTokens, messages: [{ role: 'user', content: user }] }
-      : { model, messages: [{ role: 'system', content: system }, { role: 'user', content: user }], temperature: 0.8, max_tokens: maxTokens }
+      ? { model, system, max_tokens: maxTokens, messages: [{ role: 'user', content: image ? [{ type: 'text', text: user }, { type: 'image', source: { type: 'url', url: image } }] : user }] }
+      : { model, messages: [{ role: 'system', content: system }, { role: 'user', content: openAiContent }], temperature: 0.8, max_tokens: maxTokens }
   const response = await fetch(url, {
     method: 'POST',
     headers,

@@ -11,11 +11,11 @@ const hash = (s) => { let h = 0; for (const c of T(s)) h = (h * 31 + c.charCodeA
 const pick = (arr, seedStr) => arr[hash(seedStr) % arr.length]
 
 /* ---------------- real API ---------------- */
-async function api(system, user, maxTokens = 800) {
+async function api(system, user, maxTokens = 800, image = '') {
   const res = await fetch('/api/ai', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ system, user, maxTokens }),
+    body: JSON.stringify({ system, user, maxTokens, image }),
   })
   const data = await res.json().catch(() => ({}))
   if (!res.ok) throw new Error(data.error || `AI provider ${res.status}`)
@@ -26,7 +26,7 @@ async function think(kind, system, offline, label = '') {
   logAI(kind, label || kind)
   if (isAIConnected()) {
     try {
-      const out = await api(system.prompt, system.user)
+      const out = await api(system.prompt, system.user, 800, system.image || '')
       if (out) return { text: out, source: 'live' }
     } catch (e) {
       console.warn('AI API failed, using Bazar Brain fallback:', e.message)
@@ -169,20 +169,21 @@ export function chatReply({ question, productId, storeId }) {
 const options2 = (s) => s
 
 /* ---------------- feature entry points ---------------- */
-export async function genProductCopy({ rough, category, storeName, tone, price }) {
+export async function genProductCopy({ rough, category, storeName, tone, price, image = '', language = 'English' }) {
   const result = await think(
     'product-copy',
     {
-      prompt: 'You are the listing copywriter for Street Bazar, a Pakistani marketplace. Write crisp e-commerce copy in English with light Roman-Urdu warmth. Return EXACTLY this format:\nTITLE: ...\nDESCRIPTION: ...\nTAGS: tag, tag, tag',
-      user: `Product idea: ${rough}\nCategory: ${category}\nStore: ${storeName}\nTone: ${tone}\nPrice: ${price}`,
+      prompt: `You are the listing copywriter for Street Bazar, a Pakistani marketplace. Analyze the attached product image carefully before writing. Use the seller details as context, but do not invent information that is not visible or supplied. Write the title, description, and tags in ${language}; follow the requested language exactly. Never mention or generate a price. Return EXACTLY this format:\nTITLE: ...\nDESCRIPTION: ...\nTAGS: tag, tag, tag`,
+      user: `Seller details: ${rough || 'Use the product image to identify the item.'}\nCategory: ${category}\nStore: ${storeName}\nTone: ${tone}\nLanguage: ${language}\nPrice must be entered manually by the seller and must not appear in your response.`,
+      image,
     },
     async () => {
       const title = genTitle({ seed: rough, category })
-      const desc = genDescription({ title, category, storeName, tone, price })
+      const desc = genDescription({ title, category, storeName, tone, price: 0 })
       const tags = genTags({ title, category })
       return `TITLE: ${title}\nDESCRIPTION: ${desc}\nTAGS: ${tags.join(', ')}`
     },
-    rough
+    rough || image
   )
   const title = /TITLE:\s*(.+)/i.exec(result.text)?.[1]?.trim() || genTitle({ seed: rough, category })
   const description = /DESCRIPTION:\s*([\s\S]*?)(?=\nTAGS:|$)/i.exec(result.text)?.[1]?.trim() || genDescription({ title, category, storeName, tone, price })

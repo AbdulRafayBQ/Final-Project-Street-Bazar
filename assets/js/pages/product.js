@@ -100,6 +100,7 @@ export async function productPage(params) {
           </div>
           <button class="btn btn-grad btn-lg" style="flex:1;min-width:150px" data-buy>${icon('cart', '', 17)} <span>Add to cart</span></button>
           <button class="btn btn-primary btn-lg" data-buy-now>Buy now ${icon('arrow', '', 16)}</button>
+          ${p.customizable?.on ? `<button class="btn btn-grad btn-lg" data-order-custom hidden>${icon('wand', '', 17)} Order this design</button>` : ''}
           <button class="icon-btn" data-like-big="${p.id}" style="width:50px;height:50px;border-radius:16px">${icon('heart', '', 19)}</button>
         </div>
 
@@ -227,16 +228,18 @@ productPage.mount = (params, query, root) => {
     qty = Number(b.dataset.qty); paint()
   }))
 
-  const doAdd = (buyNow) => {
+  const doAdd = (buyNow, useGeneratedImage = false) => {
     const options = {}
     chosen.forEach((c) => { if (c.choice) options[c.name] = c.choice.label })
-    addToCart({ product: p.id, qty, options: { ...options, ...(customizedImage !== p.media?.[0]?.url ? { 'AI design': 'Customized' } : {}) }, unitPrice: unit(), image: customizedImage, customizedImage })
+    const image = useGeneratedImage ? generatedImage : (p.media?.[0]?.url || '')
+    addToCart({ product: p.id, qty, options: { ...options, ...(useGeneratedImage ? { 'AI design': 'Customized' } : {}) }, unitPrice: unit(), image, customizedImage: useGeneratedImage ? image : '' })
     toast(`${p.title} × ${qty} cart mein add ho gaya`, 'ok')
     if (buyNow) navigate('#/cart')
     else updateCartBadge()
   }
   root.querySelector('[data-buy]')?.addEventListener('click', () => doAdd(false))
   root.querySelector('[data-buy-now]')?.addEventListener('click', () => doAdd(true))
+  root.querySelector('[data-order-custom]')?.addEventListener('click', () => doAdd(true, true))
   const canvas = root.querySelector('[data-custom-canvas]')
   const redraw = () => {
     if (!canvas) return
@@ -276,6 +279,8 @@ productPage.mount = (params, query, root) => {
         generatedPreview.hidden = false
         canvas.style.display = 'none'
       }
+      const customOrder = root.querySelector('[data-order-custom]')
+      if (customOrder) customOrder.hidden = false
       redraw()
       status.textContent = 'AI image preview mein apply ho gayi. Aap dobara generate kar sakte hain.'
       toast('AI design ready', 'ok')

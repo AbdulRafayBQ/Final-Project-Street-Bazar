@@ -846,7 +846,22 @@ tbody tr:hover{background:var(--paper-2)}
   .trust-bar{grid-template-columns:1fr}
   .grid-auto{grid-template-columns:repeat(auto-fill,minmax(160px,1fr))}
   .grid-auto-sm{grid-template-columns:repeat(auto-fill,minmax(140px,1fr))}
-  .wh-row{grid-template-columns:1fr 1fr;gap:9px}
+  .wh-grid{grid-template-columns:1fr !important}
+  .wh-row{grid-template-columns:1fr;gap:10px;padding:14px}
+  .wh-row > .wrap-flex{justify-content:flex-start}
+  .wh-row > .btn{justify-self:start}
+  .warehouse-table{overflow-x:visible}
+  .warehouse-table table,.warehouse-table thead,.warehouse-table tbody,.warehouse-table tr,.warehouse-table td{display:block}
+  .warehouse-table table{min-width:0}
+  .warehouse-table thead{display:none}
+  .warehouse-table tr{padding:8px 0;border-top:1px solid var(--line)}
+  .warehouse-table tr:first-child{border-top:0}
+  .warehouse-table td{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:6px 8px;border:0;text-align:right}
+  .warehouse-table td:first-child{justify-content:flex-start;text-align:left}
+  .warehouse-table td:nth-child(2)::before{content:'SKU';font-size:11px;color:var(--muted);font-weight:700}
+  .warehouse-table td:nth-child(3)::before{content:'Qty';font-size:11px;color:var(--muted);font-weight:700}
+  .warehouse-table td:nth-child(4)::before{content:'Status / Location';font-size:11px;color:var(--muted);font-weight:700}
+  .warehouse-table td:last-child{justify-content:flex-start;flex-wrap:wrap;text-align:left}
   .footer-grid{grid-template-columns:1fr}
   .hero-stats{gap:18px}
   .store-hero-in{flex-direction:column;align-items:flex-start}

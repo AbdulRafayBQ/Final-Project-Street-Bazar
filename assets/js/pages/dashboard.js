@@ -4,7 +4,6 @@ import { icon, esc, money, num, toast, modal, closeModal, timeAgo, spinner, conf
 import { statCard, emptyLogin } from '../components.js'
 import { myStores, storeById, storeProducts, storeOrders, storeRevenue, storeSales, currentUser, lowStock, productById, updateProduct, updateStore, deleteStore, advanceOrder, cancelOrder, addStock, storeThreads, threadById, markThreadRead, userById, save, ownerWarehouse, addWarehouseItem, updateWarehouseItem, deleteWarehouseItem } from '../store.js'
 import { authRequest } from '../db.js'
-import { genStockPlan, parseStock, chatReply, genProductCopy } from '../ai.js'
 import { navigate } from '../router.js'
 
 export async function dashboardPage() {
@@ -49,7 +48,6 @@ export async function dashboardPage() {
         <button data-tab="orders">${icon('truck', '', 15)} Orders (${num(orders.length)})</button>
         <button data-tab="inbox">${icon('chat', '', 15)} Inbox ${threads.filter((t) => !t.read).length ? `<span class="badge badge-sale" style="margin-left:6px">${threads.filter((t) => !t.read).length}</span>` : ''}</button>
         <button data-tab="warehouse">${icon('layers', '', 15)} Warehouse</button>
-        <button data-tab="ai">${icon('sparkles', '', 15)} AI Assistant</button>
       </div>
 
       <div style="padding:clamp(16px,3vw,24px)">
@@ -137,42 +135,6 @@ export async function dashboardPage() {
 
         <div data-panel="warehouse" hidden>${warehouseInner(stores[0].id)}</div>
 
-        <div data-panel="ai" hidden>
-          <div class="stack">
-            <div class="row-between" style="flex-wrap:wrap;gap:12px">
-              <div>
-                <h3 class="h3">Store AI Assistant</h3>
-                <p class="muted small" style="margin-top:4px">Generate high-converting titles, descriptions, pricing & warehouse stock entries.</p>
-              </div>
-            </div>
-
-            <div class="grid grid-2" style="gap:18px;margin-top:14px">
-              <div class="card" style="padding:18px">
-                <h4 class="h4" style="display:flex;align-items:center;gap:8px">${icon('wand', '', 16)} Product Copy Generator</h4>
-                <p class="tiny muted" style="margin:6px 0 12px">Type a rough product idea and let AI draft title, description, price & tags.</p>
-                <div class="stack">
-                  <div class="field"><span class="label">Product Idea / Details</span><textarea class="textarea" id="dash-ai-idea" placeholder="e.g. Handmade embroidered lawn suit 3 piece" style="min-height:80px"></textarea></div>
-                  <div class="grid grid-2" style="gap:10px">
-                    <div class="field"><span class="label">Category</span><select class="select" id="dash-ai-cat"><option>Fashion</option><option>Electronics</option><option>Mobile Accessories</option><option>Home & Kitchen</option><option>Food & Groceries</option><option>Handicraft</option></select></div>
-                    <div class="field"><span class="label">Tone</span><select class="select" id="dash-ai-tone"><option>Friendly</option><option>Premium</option><option>Desi Masala</option><option>Minimal</option></select></div>
-                  </div>
-                  <button class="btn btn-grad" id="dash-ai-gen">${icon('sparkles', '', 15)} Generate Copy</button>
-                  <div id="dash-ai-out" style="margin-top:10px"></div>
-                </div>
-              </div>
-
-              <div class="card" style="padding:18px">
-                <h4 class="h4" style="display:flex;align-items:center;gap:8px">${icon('box', '', 16)} Bulk Stock AI Importer</h4>
-                <p class="tiny muted" style="margin:6px 0 12px">Paste your inventory list (Name, Qty, Price) to generate warehouse entries.</p>
-                <div class="stack">
-                  <div class="field"><span class="label">Stock List</span><textarea class="textarea" id="dash-ai-stock-list" placeholder="Cotton Cap Black, 50, 450&#10;Canvas Tote Bag, 25, 1200" style="min-height:80px"></textarea></div>
-                  <button class="btn btn-teal" id="dash-ai-parse-stock">${icon('layers', '', 15)} Parse Stock List</button>
-                  <div id="dash-ai-stock-out" style="margin-top:10px"></div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
       </div>
     </div>
   </div>`
@@ -235,64 +197,6 @@ dashboardPage.mount = (params, query, root) => {
 
   bindWarehouse(root, root.querySelector('[data-panel="warehouse"]'), myStores()[0].id)
 
-  // AI Tab actions
-  const genBtn = root.querySelector('#dash-ai-gen')
-  if (genBtn) {
-    genBtn.addEventListener('click', async () => {
-      const rough = root.querySelector('#dash-ai-idea')?.value.trim()
-      if (!rough) return toast('Please enter a product idea', 'err')
-      const cat = root.querySelector('#dash-ai-cat')?.value || 'Fashion'
-      const tone = root.querySelector('#dash-ai-tone')?.value || 'Friendly'
-      genBtn.disabled = true
-      genBtn.innerHTML = spinner() + ' Thinking...'
-      try {
-        const copy = await genProductCopy({ rough, category: cat, storeName: myStores()[0]?.name || 'Store', tone, price: 0 })
-        const outEl = root.querySelector('#dash-ai-out')
-        if (outEl) {
-          outEl.innerHTML = `
-            <div class="ai-out">
-              <div class="lbl">AI GENERATED COPY (${copy.source})</div>
-              <b>Title:</b> ${esc(copy.title)}
-              <br><br><b>Description:</b>\n${esc(copy.description)}
-              <br><br><b>Tags:</b> ${esc(copy.tags.join(', '))}
-            </div>`
-        }
-        toast('Product copy generated!', 'ok')
-      } catch (e) {
-        toast('AI Generation failed', 'err')
-      } finally {
-        genBtn.disabled = false
-        genBtn.innerHTML = `${icon('sparkles', '', 15)} Generate Copy`
-      }
-    })
-  }
-
-  const parseStockBtn = root.querySelector('#dash-ai-parse-stock')
-  if (parseStockBtn) {
-    parseStockBtn.addEventListener('click', async () => {
-      const text = root.querySelector('#dash-ai-stock-list')?.value.trim()
-      if (!text) return toast('Please enter stock list items', 'err')
-      parseStockBtn.disabled = true
-      parseStockBtn.innerHTML = spinner() + ' Parsing...'
-      try {
-        const res = await genStockPlan({ rough: text, storeName: myStores()[0]?.name || 'Store' })
-        const outEl = root.querySelector('#dash-ai-stock-out')
-        if (outEl) {
-          outEl.innerHTML = `
-            <div class="ai-out">
-              <div class="lbl">PARSED STOCK ITEMS (${res.source})</div>
-              ${res.rows.map((r) => `<div>• <b>${esc(r.name)}</b>: Qty ${r.qty} @ ${money(r.price)} (SKU: ${r.sku})</div>`).join('')}
-            </div>`
-        }
-        toast('Stock items parsed!', 'ok')
-      } catch (e) {
-        toast('Parsing failed', 'err')
-      } finally {
-        parseStockBtn.disabled = false
-        parseStockBtn.innerHTML = `${icon('layers', '', 15)} Parse Stock List`
-      }
-    })
-  }
 }
 
 function openReply(threadId) {
@@ -431,19 +335,6 @@ function warehouseInner(sid) {
     </div>
 
     <div class="panel">
-      <div class="row"><span class="ai-orb">${icon('sparkles', '', 20)}</span><div><b class="h4">AI bulk stock</b><div class="tiny muted">Paste list, AI sab set kar dega</div></div></div>
-      <p class="tiny muted" style="margin:12px 0">Har line: <b>name, qty, price</b>. AI quantity ko samajh kar inventory entries banayega. New private items ke liye product image required hai.</p>
-      <label class="label" style="margin-top:10px">Add stock to</label>
-      <select class="select" id="bulk-destination"><option value="store">Store inventory (publish later)</option><option value="private">Private inventory (never published automatically)</option></select>
-      <textarea class="textarea" id="bulk-in" style="margin-top:10px" placeholder="Polo shirt, 300, 1499"></textarea>
-      <div class="field" style="margin-top:10px">
-        <span class="label">Product image <b style="color:var(--red)">(required for new warehouse items)</b></span>
-        <input class="input" id="bulk-image-file" type="file" accept="image/*" style="margin-top:8px">
-        <div class="tiny muted" id="bulk-image-help" style="margin-top:6px">Upload an image. This image will be attached to new inventory items.</div>
-      </div>
-      <button class="btn btn-grad btn-block" id="bulk-run" style="margin-top:10px">${icon('sparkles', '', 15)} <span>Parse with AI</span></button>
-      <div id="bulk-out" style="margin-top:14px"></div>
-
       ${low.length ? `<div class="divider"></div>
         <b class="small" style="color:var(--red)">${icon('warning', '', 14)} Low stock alerts</b>
         <div class="stack" style="margin-top:10px">
@@ -452,13 +343,13 @@ function warehouseInner(sid) {
     </div>
     <div class="panel" style="grid-column:1/-1">
       <div class="row-between"><div><h3 class="h4">Store inventory</h3><div class="tiny muted">Private item ko pehle yahan move karein; phir yahin se product publish karein.</div></div></div>
-      <div class="table-wrap" style="margin-top:12px"><table><thead><tr><th>Item</th><th>SKU</th><th>Qty</th><th>Status</th><th></th></tr></thead><tbody>
+      <div class="table-wrap warehouse-table" style="margin-top:12px"><table><thead><tr><th>Item</th><th>SKU</th><th>Qty</th><th>Status</th><th></th></tr></thead><tbody>
         ${storeItems.length ? storeItems.map((item) => `<tr><td><div class="row"><img src="${esc(item.image || './images/p-kurta.png')}" alt="" style="width:36px;height:36px;object-fit:cover;border-radius:9px"><b>${esc(item.name)}</b></div></td><td>${esc(item.sku || '—')}</td><td><b>${num(item.qty)}</b></td><td>${item.product ? '<span class="badge badge-soft">Published</span>' : '<span class="badge badge-soft">Ready to publish</span>'}</td><td>${item.product ? '' : `<a class="btn btn-sm btn-ghost" href="#/add-product?warehouseId=${encodeURIComponent(item.id)}">Publish product</a>`} <button class="btn btn-sm btn-ghost" data-warehouse-edit="${item.id}">Edit</button> <button class="btn btn-sm btn-danger" data-warehouse-delete="${item.id}">${icon('trash', '', 13)}</button></td></tr>`).join('') : '<tr><td colspan="5" class="muted">Store inventory empty hai.</td></tr>'}
       </tbody></table></div>
     </div>
     <div class="panel" style="grid-column:1/-1">
       <div class="row-between"><div><h3 class="h4">Private warehouse stock</h3><div class="tiny muted">Ye inventory store par publish nahi hoti — pehle Store inventory mein move karein.</div></div><button class="btn btn-sm btn-ghost" data-warehouse-add>${icon('plus', '', 14)} Add item</button></div>
-      <div class="table-wrap" style="margin-top:12px"><table><thead><tr><th>Item</th><th>SKU</th><th>Qty</th><th>Location</th><th></th></tr></thead><tbody>
+      <div class="table-wrap warehouse-table" style="margin-top:12px"><table><thead><tr><th>Item</th><th>SKU</th><th>Qty</th><th>Location</th><th></th></tr></thead><tbody>
         ${privateItems.length ? privateItems.map((item) => `<tr><td><div class="row"><img src="${esc(item.image || './images/p-kurta.png')}" alt="" style="width:36px;height:36px;object-fit:cover;border-radius:9px"><b>${esc(item.name)}</b></div></td><td>${esc(item.sku || '—')}</td><td><b>${num(item.qty)}</b></td><td>${esc(item.location || '—')}</td><td><button class="btn btn-sm btn-ghost" data-warehouse-store="${item.id}">Move to Store inventory</button> <button class="btn btn-sm btn-ghost" data-warehouse-edit="${item.id}">Edit</button> <button class="btn btn-sm btn-danger" data-warehouse-delete="${item.id}">${icon('trash', '', 13)}</button></td></tr>`).join('') : '<tr><td colspan="5" class="muted">Private warehouse empty hai.</td></tr>'}
       </tbody></table></div>
     </div>
@@ -467,16 +358,6 @@ function warehouseInner(sid) {
 
 function bindWarehouse(pageRoot, holder, sid) {
   if (!holder) return
-  holder.querySelector('#bulk-image-file')?.addEventListener('change', (event) => {
-    const file = event.currentTarget.files?.[0]
-    if (!file) return
-    const reader = new FileReader()
-    reader.onload = () => {
-      holder.dataset.bulkImage = String(reader.result || '')
-      holder.querySelector('#bulk-image-help').textContent = `Image selected: ${file.name}`
-    }
-    reader.readAsDataURL(file)
-  })
   holder.querySelector('[data-warehouse-add]')?.addEventListener('click', () => {
     modal({
       title: 'Add private warehouse item',
@@ -538,43 +419,6 @@ function bindWarehouse(pageRoot, holder, sid) {
     })
   }))
 
-  holder.querySelector('#bulk-run')?.addEventListener('click', async (e) => {
-    const raw = holder.querySelector('#bulk-in').value.trim()
-    if (!raw) return toast('Pehle list paste karein', 'err')
-    const image = holder.dataset.bulkImage || ''
-    if (!image) return toast('Product image is required. Upload an image or paste an image URL.', 'err')
-    const destination = holder.querySelector('#bulk-destination').value
-    const btn = spinner(e.currentTarget)
-    const out = holder.querySelector('#bulk-out')
-    out.innerHTML = '<div class="ai-out"><span class="lbl">AI is reading your list…</span>Rows parse ho rahe hain…</div>'
-    const { rows, source } = await genStockPlan({ rough: raw, storeName: storeById(sid)?.name || 'Store' })
-    btn()
-    out.innerHTML = `
-      <div class="ai-out"><span class="lbl">AI · ${source === 'live' ? 'live model' : 'Bazar Brain'} · ${rows.length} rows</span>${destination === 'store' ? 'Selected published products ka stock update hoga. New products publish nahi honge.' : 'Private inventory mein existing item ki quantity merge hogi. Koi product automatically publish nahi hoga.'}</div>
-      <div class="table-wrap" style="margin-top:10px"><table style="min-width:auto">
-        <thead><tr><th>Item</th><th>Qty</th><th>Price</th></tr></thead>
-        <tbody>${rows.map((r) => `<tr><td>${esc(r.name)}</td><td>${r.qty}</td><td>${r.price ? money(r.price) : '—'}</td></tr>`).join('')}</tbody>
-      </table></div>
-      <button class="btn btn-primary btn-block" id="bulk-apply" style="margin-top:12px">${icon('box', '', 15)} <span>Add ${rows.length} entries to warehouse</span></button>`
-    out.querySelector('#bulk-apply').addEventListener('click', () => {
-      const missing = []
-      rows.forEach((r) => {
-        const requested = r.name.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
-        const existing = storeProducts(sid).find((p) => {
-          const title = p.title.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
-          return title === requested || title.includes(requested) || requested.includes(title)
-        })
-        if (destination === 'store') {
-          if (existing) addStock(existing.id, r.qty)
-          else addWarehouseItem({ owner: currentUser().id, name: r.name, qty: r.qty, cost: r.price, sku: r.sku, image: r.image || image, inventory: 'store' })
-        } else {
-          addWarehouseItem({ owner: currentUser().id, name: r.name, qty: r.qty, cost: r.price, sku: r.sku, image: r.image || image })
-        }
-      })
-      toast((rows.length - missing.length) + ' entries Store inventory mein aa gayi' + (missing.length ? `. Missing: ${missing.join(', ')}` : ''), missing.length ? 'err' : 'ok')
-      refreshWarehouse(pageRoot, holder, sid)
-    })
-  })
 }
 
 function refreshWarehouse(pageRoot, holder, sid) {
