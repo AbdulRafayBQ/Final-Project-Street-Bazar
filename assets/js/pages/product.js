@@ -80,6 +80,7 @@ export async function productPage(params) {
           <div style="text-align:center;margin-bottom:12px;background:#f8f5f1;border-radius:14px;padding:8px"><canvas data-custom-canvas width="640" height="640" style="max-width:100%;height:auto;border-radius:10px"></canvas><img data-generated-preview alt="AI generated product preview" hidden style="max-width:100%;height:auto;border-radius:10px"></div>
           <div class="field" style="margin-top:10px"><span class="label">AI design prompt</span><input class="input" data-ai-design-prompt placeholder="e.g. Red floral print on this shirt"></div>
           <button class="btn btn-primary btn-block" style="margin-top:10px" data-ai-design-generate>${icon('sparkles', '', 15)} Generate with AI</button>
+          <button class="btn btn-grad btn-block" style="margin-top:10px" data-order-custom hidden>${icon('wand', '', 15)} Order this design</button>
           <div class="tiny muted" data-custom-status style="margin-top:8px">Live editor changes stay on this product; AI may generate a separate design image.</div>
         </div>` : ''}
 
@@ -100,7 +101,6 @@ export async function productPage(params) {
           </div>
           <button class="btn btn-grad btn-lg" style="flex:1;min-width:150px" data-buy>${icon('cart', '', 17)} <span>Add to cart</span></button>
           <button class="btn btn-primary btn-lg" data-buy-now>Buy now ${icon('arrow', '', 16)}</button>
-          ${p.customizable?.on ? `<button class="btn btn-grad btn-lg" data-order-custom hidden>${icon('wand', '', 17)} Order this design</button>` : ''}
           <button class="icon-btn" data-like-big="${p.id}" style="width:50px;height:50px;border-radius:16px">${icon('heart', '', 19)}</button>
         </div>
 
