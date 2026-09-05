@@ -882,11 +882,9 @@ tbody tr:hover{background:var(--paper-2)}
     background:linear-gradient(135deg,var(--accent),var(--magenta));
     color:#fff;
   }
-  .floating-ai-logo{width:24px;height:24px;border-radius:50%;object-fit:contain;background:#fff;padding:2px}
-  .ai-header-logo{width:28px;height:28px;border-radius:50%;object-fit:contain;background:#fff;padding:2px}
-  .floating-ai-btn span {
-    display: none;
-  }
+  .floating-ai-btn .floating-ai-label{display:none}
+  .floating-ai-btn .floating-ai-emoji{display:block;font-size:22px;line-height:1}
+  .floating-ai-btn svg{display:none}
   .floating-ai-panel {
     bottom: 74px;
     right: 12px;
@@ -945,6 +943,7 @@ tbody tr:hover{background:var(--paper-2)}
   cursor: pointer;
   transition: transform .25s var(--ease), box-shadow .25s;
 }
+.floating-ai-emoji{display:none}
 .floating-ai-btn:hover {
   transform: translateY(-3px) scale(1.03);
   box-shadow: 0 14px 34px rgba(37,99,235,0.35);
