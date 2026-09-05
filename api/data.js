@@ -42,6 +42,18 @@ export default async function handler(req, res) {
       const { table, id } = req.body || {}
       const allowed = ['products', 'orders', 'reviews', 'threads', 'follows', 'cart_items', 'saved_products', 'warehouse_items']
       if (!allowed.includes(table) || !id) return json(res, 400, { error: 'Invalid delete request' })
+      if (table === 'orders' && !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)) {
+        const rows = await request('/rest/v1/app_state?select=payload&key=eq.global&limit=1')
+        const payload = rows[0]?.payload
+        if (!payload) return json(res, 404, { error: 'Shared state not found' })
+        payload.orders = (payload.orders || []).filter((order) => order.id !== id)
+        await request('/rest/v1/app_state?on_conflict=key', {
+          method: 'POST',
+          headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
+          body: JSON.stringify({ key: 'global', payload }),
+        })
+        return json(res, 200, { ok: true })
+      }
       await request(`/rest/v1/${table}?id=eq.${encodeURIComponent(id)}`, { method: 'DELETE' })
       if (table === 'products') {
         await Promise.all([
