@@ -51,8 +51,9 @@ explore.mount = (params, query, root) => {
 
   const paint = () => {
     const { products } = searchAll(term)
-    let list = products.filter((p) => !cat || p.categories.includes(cat))
-    if (!term && !cat) list = liveStores().flatMap((p0) => storeProducts(p0.id))
+    const catalog = term ? products : liveStores().flatMap((store) => storeProducts(store.id))
+    const normalizedCat = cat.trim().toLowerCase()
+    let list = catalog.filter((p) => !normalizedCat || (p.categories || []).some((value) => String(value).trim().toLowerCase() === normalizedCat))
     list = [...list].sort((a, b) => {
       if (sort === 'popular') return b.sales - a.sales
       if (sort === 'new') return new Date(b.createdAt) - new Date(a.createdAt)
