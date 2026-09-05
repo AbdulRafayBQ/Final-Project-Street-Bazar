@@ -68,8 +68,9 @@ createStorePage.mount = (params, query, root) => {
 
   const renderPreview = () => {
     const t = draft.theme
+    const pair = FONT_PAIRS.find((f) => f.id === t.fontPair) || FONT_PAIRS[0]
     preview.innerHTML = `
-      <div class="store-page ${t.dark ? 'dark' : ''}" style="margin:0;border-radius:0;border:0;box-shadow:none;${themeStyle(t)};--st-d:${FONT_PAIRS.find((f) => f.id === t.fontPair)?.d};--st-b:${FONT_PAIRS.find((f) => f.id === t.fontPair)?.b}">
+      <div class="store-page ${t.dark ? 'dark' : ''}" style="margin:0;border-radius:0;border:0;box-shadow:none;${themeStyle(t)};--st-d:${pair.d};--st-b:${pair.b}">
         <div class="store-hero" style="min-height:150px">
           <img class="bg" src="${esc(draft.banner || './images/banner-fashion.png')}" alt="" onerror="this.src='./images/banner-fashion.png'">
           <div class="store-hero-in" style="padding:16px">
@@ -129,7 +130,7 @@ createStorePage.mount = (params, query, root) => {
       <p class="muted small" style="margin:8px 0 20px">Theme chunein ya khud colors mix karein. Sab kuch live preview mein dikhta hai.</p>
       <div class="grid grid-3" style="gap:12px" data-presets>
         ${THEME_PRESETS.map((t) => `
-          <div class="theme-preview ${draft.themeId === t.id ? 'on' : ''}" data-preset="${t.id}">
+          <div class="theme-preview ${draft.themeId === t.id ? 'on' : ''}" data-preset="${t.id}" style="font-family:${FONT_PAIRS.find((f) => f.id === t.fontPair)?.b || 'inherit'}">
             <div class="tp-top" style="background:linear-gradient(120deg,${t.primary},${t.accent})"></div>
             <div class="tp-in" style="background:${t.bg}">
               <div class="tp-line w60"></div><div class="tp-line w40"></div>
@@ -144,12 +145,19 @@ createStorePage.mount = (params, query, root) => {
         <div class="field"><span class="label">Accent colour</span><input type="color" data-color="accent" value="${draft.theme.accent}" style="width:100%;height:46px;border-radius:12px;border:1px solid var(--line);background:#fff"></div>
         <div class="field"><span class="label">Background</span><input type="color" data-color="bg" value="${draft.theme.bg}" style="width:100%;height:46px;border-radius:12px;border:1px solid var(--line);background:#fff"></div>
       </div>
-      <div class="grid grid-2" style="gap:14px;margin-top:16px">
-        <div class="field"><span class="label">Font pair</span>
-          <select class="select" data-f="fontPair">
-            ${FONT_PAIRS.map((f) => `<option value="${f.id}" ${draft.theme.fontPair === f.id ? 'selected' : ''}>${f.name}</option>`).join('')}
-          </select>
+       <div class="field" style="margin-top:16px"><span class="label">Font pair</span>
+        <div class="grid grid-2" style="gap:10px;margin-top:8px">
+          ${FONT_PAIRS.map((f) => `<button type="button" class="theme-preview ${draft.theme.fontPair === f.id ? 'on' : ''}" data-font="${f.id}" style="text-align:left;padding:12px;font-family:${f.b}">
+            <b style="display:block;font-family:${f.d};font-size:17px">${f.name}</b>
+            <span class="tiny muted" style="font-family:${f.b}">Aa · Street Bazar · 123</span>
+          </button>`).join('')}
         </div>
+        <div class="panel" style="margin-top:10px;padding:12px;background:var(--paper-2);box-shadow:none">
+          <b style="font-family:${FONT_PAIRS.find((f) => f.id === draft.theme.fontPair)?.d || FONT_PAIRS[0].d}">Live heading preview</b>
+          <p class="tiny muted" style="margin-top:4px;font-family:${FONT_PAIRS.find((f) => f.id === draft.theme.fontPair)?.b || FONT_PAIRS[0].b}">Aapke products aur store text isi font mein nazar aayenge.</p>
+        </div>
+       </div>
+       <div class="grid grid-2" style="gap:14px;margin-top:16px">
         <div class="field"><span class="label">Corner style — <span data-radius-val>${draft.theme.radius}px</span></span>
           <input type="range" min="4" max="28" value="${draft.theme.radius}" data-radius style="width:100%;accent-color:var(--marigold)">
         </div>
@@ -228,6 +236,12 @@ createStorePage.mount = (params, query, root) => {
       if (k === 'fontPair') { draft.theme.fontPair = inp.value; draft.themeId = (THEME_PRESETS.find((t) => t.id === draft.themeId) || THEME_PRESETS[0]).id }
       else draft[k] = inp.value
       renderPreview()
+    }))
+    form.querySelectorAll('[data-font]').forEach((el) => el.addEventListener('click', () => {
+      draft.theme.fontPair = el.dataset.font
+      form.querySelectorAll('[data-font]').forEach((x) => x.classList.toggle('on', x === el))
+      renderPreview()
+      paint()
     }))
     form.querySelectorAll('[data-type]').forEach((b) => b.addEventListener('click', () => {
       draft.type = b.dataset.type

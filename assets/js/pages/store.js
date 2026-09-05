@@ -2,7 +2,7 @@
 
 import { icon, esc, money, num, themeStyle, toast, timeAgo, avatar, modal } from '../ui.js'
 import { sectionHead, productCard, reviewItem, typeBadge, emptyLogin } from '../components.js'
-import { storeBySlug, storeProducts, storeReviews, currentUser, myStores, isFollowing, toggleFollow, ratingOf, state, sendMessage, updateStore } from '../store.js'
+import { storeBySlug, storeProducts, storeReviews, currentUser, myStores, isFollowing, toggleFollow, ratingOf, state, sendMessage, updateStore, FONT_PAIRS } from '../store.js'
 import { chatReply } from '../ai.js'
 
 export async function storePage(params) {
@@ -15,8 +15,8 @@ export async function storePage(params) {
   const reviews = storeReviews(s.id)
   const avg = reviews.length ? reviews.reduce((a, r) => a + r.rating, 0) / reviews.length : (s.rating || 0)
   const following = isFollowing(s.id)
-  const pair = (['pop', 'noor', 'neon', 'luxe', 'studio', 'craft'].includes(s.theme?.fontPair) ? s.theme.fontPair : 'pop')
-  const fontCSS = `--st-d:${{ pop: '"Bricolage Grotesque",sans-serif', noor: '"Playfair Display",serif', neon: '"Space Grotesk",sans-serif', luxe: '"Playfair Display",serif', studio: '"Space Grotesk",sans-serif', craft: '"Bricolage Grotesque",sans-serif' }[pair]};--st-b:${{ pop: '"Plus Jakarta Sans",sans-serif', noor: '"Karla",sans-serif', neon: '"DM Sans",sans-serif', luxe: '"Plus Jakarta Sans",sans-serif', studio: '"Plus Jakarta Sans",sans-serif', craft: '"Karla",sans-serif' }[pair]};`
+  const pair = FONT_PAIRS.find((font) => font.id === s.theme?.fontPair) || FONT_PAIRS[0]
+  const fontCSS = `--st-d:${pair.d};--st-b:${pair.b};`
 
   const socialIcons = { instagram: 'instagram', tiktok: 'tiktok', whatsapp: 'whatsapp', facebook: 'facebook', youtube: 'youtube' }
 
