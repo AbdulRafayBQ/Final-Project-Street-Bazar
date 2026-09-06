@@ -80,7 +80,14 @@ export const getAIKey = () => 'server-managed'
 let syncing = false
 
 async function api(path, options = {}) {
-const res = await fetch(path, { ...options, headers: { 'Content-Type': 'application/json', ...(options.headers || {}) } })
+const controller = new AbortController()
+const timeout = setTimeout(() => controller.abort(), 8000)
+let res
+try {
+  res = await fetch(path, { ...options, signal: controller.signal, headers: { 'Content-Type': 'application/json', ...(options.headers || {}) } })
+} finally {
+  clearTimeout(timeout)
+}
 const data = await res.json().catch(() => ({}))
 if (!res.ok) throw new Error(data.error || `API ${res.status}`)
 return data

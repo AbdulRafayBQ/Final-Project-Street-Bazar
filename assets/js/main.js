@@ -508,18 +508,18 @@ async function boot() {
     window.location.hash = '#/'
   }
 
-  try {
-    await syncPull()
-  } catch (error) {
-    console.error('Initial Supabase sync failed:', error)
-  }
-
   renderHeader()
   renderFooter()
   renderMobileNav()
   bindGlobals()
   startRouter()
   renderFloatingAIWidget()
+  syncPull().then(() => {
+    renderHeader()
+    renderFooter()
+    renderMobileNav()
+    renderRoute()
+  }).catch((error) => console.error('Initial Supabase sync failed:', error))
   const googleError = sessionStorage.getItem('street-bazar-google-error')
   if (googleError) {
     sessionStorage.removeItem('street-bazar-google-error')
