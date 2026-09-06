@@ -32,6 +32,12 @@ const safeUpsert = async (table, rows) => {
   }
 }
 
+const timestamp = (value) => {
+  if (!value) return undefined
+  const date = value instanceof Date ? value : new Date(typeof value === 'number' ? value : String(value))
+  return Number.isNaN(date.getTime()) ? undefined : date.toISOString()
+}
+
 const storeRow = (store) => ({
   id: store.id, owner_id: store.owner || store.owner_id, name: store.name, slug: store.slug,
   tagline: store.tagline, type: store.type, description: store.description, logo: store.logo,
@@ -40,7 +46,7 @@ const storeRow = (store) => ({
   rating: store.rating || 0, owner_phone: store.ownerPhone || store.owner_phone,
   cnic: store.cnic, cnic_front: store.cnicFront || store.cnic_front,
   cnic_back: store.cnicBack || store.cnic_back, personal_address: store.personalAddress || store.personal_address,
-  created_at: store.createdAt || store.created_at,
+  created_at: timestamp(store.createdAt || store.created_at),
 })
 
 const saveStore = async (store) => {
