@@ -604,6 +604,8 @@ export function createProduct(data) {
     media: data.media?.length ? data.media : [{ type: 'image', url: './images/p-kurta.png' }],
     categories: data.categories || [], tags: data.tags || [], stock: Number(data.stock) || 0,
     deliveryCharge: Number(data.deliveryCharge) || 0,
+    homeDeliveryCharge: Number(data.homeDeliveryCharge ?? data.deliveryCharge) || 0,
+    outsideDeliveryCharge: Number(data.outsideDeliveryCharge ?? data.deliveryCharge) || 0,
     sku: data.sku || '', customizable: data.customizable || { on: false, options: [] },
     wholesale: data.wholesale || { on: false, tiers: [] }, sales: 0, rating: 0,
     createdAt: Date.now(), status: 'pending',
@@ -614,8 +616,17 @@ export function createProduct(data) {
     state.warehouse = state.warehouse || []
     state.warehouse.unshift({ id: uid('w'), owner: store.owner, store: p.store, name: p.title, qty: p.stock, sku: p.sku, cost: 0, location: '', product: p.id, inventory: 'store', updatedAt: Date.now() })
   }
+  if (store?.owner) notify(store.owner, 'Product submitted for review', 'Street Bazar aapke product ko check karke publish karegi. Approval ke baad ye customers ko nazar aayega.', '#/dashboard')
   save()
   return p
+}
+export function deliveryChargeFor(product, city) {
+  if (!product) return 0
+  const store = storeById(product.store)
+  const entered = String(city || '').trim().toLowerCase()
+  const home = String(store?.city || '').trim().toLowerCase()
+  if (entered && home && entered === home) return Number(product.homeDeliveryCharge ?? product.deliveryCharge) || 0
+  return Number(product.outsideDeliveryCharge ?? product.deliveryCharge) || 0
 }
 export function updateProduct(id, data) {
   const p = productById(id); if (!p) return null
@@ -727,7 +738,12 @@ export function placeOrder({ address, etaDays = 4 }) {
   const u = currentUser(); if (!u) throw new Error('Order ke liye login zaroori hai')
   const id = orderIdGen()
   const stores = [...new Set(state.cart.map((i) => i.store))]
-  const total = cartTotal()
+  const subtotal = cartTotal()
+  const delivery = subtotal >= 5000 ? 0 : stores.reduce((total, sid) => {
+    const product = productById(state.cart.find((item) => item.store === sid)?.product)
+    return total + (product ? deliveryChargeFor(product, address?.city) : 250)
+  }, 0)
+  const total = subtotal + delivery
   const order = {
     id, user: u.id, items: state.cart.map((i) => ({ ...i })), total, status: 0,
     timeline: [{ step: 0, at: Date.now(), note: 'Order placed · payment on delivery' }],
@@ -773,6 +789,14 @@ export function sendMessage({ productId, storeId, from, text }) {
   t.messages.push({ from, text, at: Date.now() })
   t.read = false
   save(); return t
+}
+export function appendThreadMessage({ productId, storeId, customer, from, text }) {
+  const t = state.threads.find((x) => x.product === productId && x.store === storeId && x.customer === customer)
+  if (!t) return null
+  t.messages.push({ from, text, at: Date.now() })
+  t.read = false
+  save()
+  return t
 }
 export function markThreadRead(id) { const t = threadById(id); if (t) { t.read = true; save() } }
 export function unreadThreadCount() {

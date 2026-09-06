@@ -2,7 +2,7 @@
 
 import { icon, esc, money, num, themeStyle, toast, timeAgo, avatar, modal } from '../ui.js'
 import { sectionHead, productCard, reviewItem, typeBadge, emptyLogin } from '../components.js'
-import { storeBySlug, storeProducts, storeReviews, currentUser, myStores, isFollowing, toggleFollow, ratingOf, state, sendMessage, updateStore, FONT_PAIRS } from '../store.js'
+import { storeBySlug, storeProducts, storeReviews, currentUser, myStores, isFollowing, toggleFollow, ratingOf, state, sendMessage, appendThreadMessage, updateStore, FONT_PAIRS } from '../store.js'
 import { chatReply } from '../ai.js'
 
 export async function storePage(params) {
@@ -199,6 +199,7 @@ export function bindChat(box, { storeId, productId = '', who = 'Store', thread =
     setTimeout(() => {
       typing.remove()
       push({ from: 'ai', text: reply, at: Date.now() })
+      appendThreadMessage({ productId, storeId, customer: u.id, from: 'ai', text: reply })
       // owner ko notify taake wo khud bhi reply kar sake
       const store = storeByIdSafe(storeId)
       if (store) notifyOwner(store, text)

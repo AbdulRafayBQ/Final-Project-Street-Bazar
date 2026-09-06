@@ -1,7 +1,7 @@
 /* Street Bazar — Cart & checkout */
 
 import { icon, esc, money, num, toast, spinner } from '../ui.js'
-import { state, setCart, cartTotal, cartCount, productById, storeById, currentUser, placeOrder, addToCart, isPakistanPhone } from '../store.js'
+import { state, setCart, cartTotal, cartCount, productById, storeById, currentUser, placeOrder, addToCart, isPakistanPhone, deliveryChargeFor } from '../store.js'
 import { navigate, renderRoute } from '../router.js'
 
 const DELIVERY = 250
@@ -20,7 +20,7 @@ export async function cartPage() {
   const subtotal = cartTotal()
   const storeCharges = [...new Set(items.map((item) => item.store))].reduce((total, sid) => {
     const product = productById(items.find((item) => item.store === sid)?.product)
-    const charge = product?.deliveryCharge == null ? DELIVERY : Number(product.deliveryCharge)
+    const charge = product ? deliveryChargeFor(product, '') : DELIVERY
     return total + Math.max(0, charge)
   }, 0)
   const delivery = subtotal >= FREE_OVER ? 0 : storeCharges
@@ -73,6 +73,7 @@ export async function cartPage() {
           <input class="input" id="c-name" placeholder="Full name" value="${esc(u?.name || '')}">
           <input class="input" id="c-phone" type="tel" required pattern="03[0-9]{9}" inputmode="numeric" maxlength="11" placeholder="Phone (03xx-xxxxxxx)">
           <input class="input" id="c-city" placeholder="City">
+          <p class="tiny muted" id="c-delivery-note" style="margin-top:-6px">Delivery charges may differ depending on the cities.</p>
           <textarea class="textarea" id="c-address" placeholder="Full address — house, street, area" style="min-height:80px"></textarea>
           <select class="select" id="c-pay">
             <option>Cash on delivery</option>
@@ -123,6 +124,16 @@ cartPage.mount = (params, query, root) => {
     btn()
     toast('Order place ho gaya! ID: ' + order.id, 'ok')
     navigate('#/order-success/' + order.id)
+  })
+  const cityInput = root.querySelector('#c-city')
+  cityInput?.addEventListener('input', () => {
+    const city = cityInput.value.trim()
+    const charge = [...new Set(state.cart.map((item) => item.store))].reduce((total, sid) => {
+      const product = productById(state.cart.find((item) => item.store === sid)?.product)
+      return total + (product ? deliveryChargeFor(product, city) : DELIVERY)
+    }, 0)
+    const summary = root.querySelector('.sum-row:nth-of-type(2) b')
+    if (summary) summary.textContent = charge ? money(charge) : 'FREE 🎉'
   })
 }
 

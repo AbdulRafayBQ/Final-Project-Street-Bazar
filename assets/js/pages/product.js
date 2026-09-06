@@ -1,6 +1,6 @@
 /* Street Bazar — Product page (gallery, customize, wholesale, chat, reviews) */
 
-import { icon, esc, money, num, toast, timeAgo, closeModal, stars } from '../ui.js'
+import { icon, esc, money, num, toast, timeAgo, closeModal, stars, modal } from '../ui.js'
 import { productCard, reviewItem } from '../components.js'
 import { productById, storeOf, currentUser, isFollowing, addToCart, addReview, productReviews, ratingOf, storeProducts, likedProducts, toggleLike, state } from '../store.js'
 import { navigate } from '../router.js'
@@ -73,11 +73,11 @@ export async function productPage(params) {
             ${p.compareAt ? `<span class="price-old" style="font-size:16px">${money(p.compareAt)}</span>` : ''}
             ${off ? `<span class="price-off">You save ${money(p.compareAt - p.price)}</span>` : ''}
           </div>
-          <div class="tiny muted" style="margin-top:8px">${p.deliveryCharge ? `Delivery: ${money(p.deliveryCharge)}` : 'Delivery charges set by owner'}</div>
+          <div class="tiny muted" style="margin-top:8px">Delivery charges may differ depending on the cities.</div>
           <div data-wholesale-notice style="display:none;margin-top:10px;padding:8px 14px;font-size:13px;border-radius:10px;background:rgba(13,148,136,0.1);color:#0D9488;border:1px solid rgba(13,148,136,0.2)"></div>
         </div>
 
-        ${p.customizable?.on ? `<div class="opt-box">
+        ${p.customizable?.on ? `<div class="opt-box" data-customize-box style="display:none">
           <h4 class="h4">${icon('wand', '', 16)} Customize this product</h4>
           <p class="tiny muted" style="margin:-4px 0 12px">Prompt dein aur AI nayi product image generate karega. Customized order par ${p.customizable?.price ? money(p.customizable.price) + ' extra' : 'owner ka extra charge apply nahi hota'} lagega.</p>
           <div style="text-align:center;margin-bottom:12px;background:#f8f5f1;border-radius:14px;padding:8px"><canvas data-custom-canvas width="640" height="640" style="max-width:100%;height:auto;border-radius:10px"></canvas><img data-generated-preview alt="AI generated product preview" hidden style="max-width:100%;height:auto;border-radius:10px"></div>
@@ -96,6 +96,7 @@ export async function productPage(params) {
           </div>
         </div>` : ''}
 
+        ${p.customizable?.on ? `<div class="row" style="gap:8px;margin-bottom:10px"><button class="btn btn-sm btn-primary" data-product-mode="normal">Normal product</button><button class="btn btn-sm btn-ghost" data-product-mode="custom">Customize product</button></div>` : ''}
         <div class="row" style="gap:12px;flex-wrap:wrap">
           <div class="qty" data-qty-box>
             <button data-dec aria-label="Decrease">${icon('minus', '', 15)}</button>
@@ -104,6 +105,7 @@ export async function productPage(params) {
           </div>
           <button class="btn btn-grad btn-lg" style="flex:1;min-width:150px" data-buy>${icon('cart', '', 17)} <span>Add to cart</span></button>
           <button class="btn btn-primary btn-lg" data-buy-now>Buy now ${icon('arrow', '', 16)}</button>
+          <button class="icon-btn" data-open-product-chat="${p.id}" title="Chat with seller" style="width:50px;height:50px;border-radius:16px">${icon('chat', '', 19)}</button>
           <button class="icon-btn" data-like-big="${p.id}" style="width:50px;height:50px;border-radius:16px">${icon('heart', '', 19)}</button>
         </div>
 
@@ -121,33 +123,6 @@ export async function productPage(params) {
         </div>` : ''}
       </div>
     </div>
-
-    <section class="sec" id="chat" style="padding-bottom:20px">
-      <div class="grid grid-2" style="gap:26px;align-items:start">
-        <div>
-          <span class="kicker">Ask the seller</span>
-          <h2 class="h3" style="margin-top:10px">Is product ke bare mein poochein</h2>
-          <p class="muted small" style="margin-top:8px">Aapki chat ${esc(s?.name || 'store')} tak jati hai. AI pehla jawab turant deta hai — owner bhi yahin aa kar reply kar sakta hai.</p>
-          <div class="wrap-flex" style="margin-top:14px">
-            ${['Size mil jayega?', 'Wholesale rate?', 'Delivery kab tak?'].map((q) => `<button class="chip" data-quick="${esc(q)}">${esc(q)}</button>`).join('')}
-          </div>
-        </div>
-        ${u && s ? `<div class="chatbox" data-chat data-store="${s.id}" data-product="${p.id}">
-          <div class="chat-head">
-            <span class="avatar sm" style="background:${esc(s.theme?.primary || '#16110D')}">${esc(s.name.slice(0, 2).toUpperCase())}</span>
-            <div style="flex:1"><b class="small">${esc(s.name)}</b><div class="sub">Product chat · AI + owner</div></div>
-            <span class="badge badge-teal">${icon('sparkles', '', 12)} AI on</span>
-          </div>
-          <div class="chat-body" data-chat-body>
-            <div class="msg them"><div class="who">${esc(s.name)}</div>Assalam! «${esc(p.title)}» ke bare mein kuch bhi pooch sakte hain — size, delivery, wholesale ya custom option.<div class="time">${timeAgo(Date.now())}</div></div>
-          </div>
-          <div class="chat-foot">
-            <input class="input" data-chat-input placeholder="Sawaal likhein…">
-            <button class="btn btn-primary" data-chat-send>${icon('send', '', 16)}</button>
-          </div>
-        </div>` : `<div class="empty"><p class="muted">Chat ke liye login karein.</p><div style="margin-top:14px"><a class="btn btn-primary" href="#/auth"><span>Login</span></a></div></div>`}
-      </div>
-    </section>
 
     <section class="sec" style="padding-top:0">
       <div class="grid grid-3" style="gap:26px;align-items:start">
@@ -243,6 +218,13 @@ productPage.mount = (params, query, root) => {
   root.querySelector('[data-buy]')?.addEventListener('click', () => doAdd(false))
   root.querySelector('[data-buy-now]')?.addEventListener('click', () => doAdd(true))
   root.querySelector('[data-order-custom]')?.addEventListener('click', () => doAdd(true, true))
+  const customizationBox = root.querySelector('[data-customize-box]')
+  root.querySelectorAll('[data-product-mode]').forEach((button) => button.addEventListener('click', () => {
+    const custom = button.dataset.productMode === 'custom'
+    if (customizationBox) customizationBox.style.display = custom ? '' : 'none'
+    root.querySelectorAll('[data-product-mode]').forEach((x) => x.classList.toggle('btn-primary', x === button))
+    root.querySelectorAll('[data-product-mode]').forEach((x) => x.classList.toggle('btn-ghost', x !== button))
+  }))
   const canvas = root.querySelector('[data-custom-canvas]')
   const redraw = () => {
     if (!canvas) return
@@ -306,18 +288,24 @@ productPage.mount = (params, query, root) => {
   })
   if (likedProducts().includes(p.id)) { likeBtn.style.background = 'var(--magenta)'; likeBtn.style.color = '#fff' }
 
-  // chat
-  const box = root.querySelector('[data-chat]')
-  if (box) {
-    const u = currentUser()
-    const thread = state.threads.find((t) => t.product === p.id && t.store === p.store && t.customer === u?.id)
-    bindChat(box, { storeId: p.store, productId: p.id, who: s?.name || 'Store', thread })
-    root.querySelectorAll('[data-quick]').forEach((b) => b.addEventListener('click', () => {
-      const input = box.querySelector('[data-chat-input]')
-      input.value = b.dataset.quick
-      box.querySelector('[data-chat-send]').click()
-    }))
-  }
+  // Keep product chat in a dedicated modal; messages remain in state and sync to Supabase.
+  root.querySelector('[data-open-product-chat]')?.addEventListener('click', () => {
+    if (!currentUser()) return navigate('#/auth')
+    const thread = state.threads.find((t) => t.product === p.id && t.store === p.store && t.customer === currentUser()?.id)
+    modal({
+      title: 'Chat with ' + (s?.name || 'seller'),
+      wide: true,
+      body: `<div class="chatbox" data-chat data-store="${s.id}" data-product="${p.id}">
+        <div class="chat-head"><span class="avatar sm" style="background:${esc(s.theme?.primary || '#16110D')}">${esc(s.name.slice(0, 2).toUpperCase())}</span><div style="flex:1"><b class="small">${esc(s.name)}</b><div class="sub">${esc(p.title)} · AI + owner</div></div><span class="badge badge-teal">${icon('sparkles', '', 12)} AI on</span></div>
+        <div class="chat-body" data-chat-body></div>
+        <div class="chat-foot"><input class="input" data-chat-input placeholder="Ask about size, delivery or customization…"><button class="btn btn-primary" data-chat-send>${icon('send', '', 16)}</button></div>
+      </div>`,
+      onOpen: (el) => {
+        const box = el.querySelector('[data-chat]')
+        bindChat(box, { storeId: p.store, productId: p.id, who: s.name, thread })
+      },
+    })
+  })
 
   // reviews
   root.querySelector('[data-write-review]')?.addEventListener('click', () => openReviewModal(p))

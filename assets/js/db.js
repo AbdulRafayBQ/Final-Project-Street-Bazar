@@ -27,10 +27,12 @@ create table if not exists products (
   id text primary key, store_id text references stores(id), title text, description text,
   price numeric, compare_at numeric, media jsonb, categories text[], tags text[],
   stock int default 0, sku text, customizable jsonb, wholesale jsonb,
-  delivery_charge numeric default 0,
+  delivery_charge numeric default 0, home_delivery_charge numeric default 0, outside_delivery_charge numeric default 0,
   sales int default 0, status text default 'active', created_at timestamptz default now()
 );
 alter table products add column if not exists delivery_charge numeric default 0;
+alter table products add column if not exists home_delivery_charge numeric default 0;
+alter table products add column if not exists outside_delivery_charge numeric default 0;
 create table if not exists reviews (
   id text primary key, product_id text, store_id text, user_id text,
   rating int, text text, created_at timestamptz default now()

@@ -4,6 +4,7 @@ import { icon, esc, money, toast, spinner, bindMediaPicker, closeModal } from '.
 import { myStores, storeById, createProduct, updateProduct, updateWarehouseItem, productById, currentUser, allCategories, CATEGORIES, state } from '../store.js'
 import { genProductCopy, aiStatusText } from '../ai.js'
 import { navigate } from '../router.js'
+import { syncPush } from '../db.js'
 
 export async function addProductPage(params) {
   const u = currentUser()
@@ -58,8 +59,9 @@ export async function addProductPage(params) {
               <div class="field"><span class="label">Compare-at</span><input class="input" id="p-compare" type="number" min="0" value="${editing?.compareAt || ''}" placeholder="1999"></div>
               <div class="field"><span class="label">Stock *</span><input class="input" id="p-stock" type="number" min="0" value="${editing?.stock ?? ''}" placeholder="50"></div>
             </div>
-            <div class="grid grid-2" style="gap:12px">
-              <div class="field"><span class="label">Delivery charges (Rs)</span><input class="input" id="p-delivery" type="number" min="0" value="${editing?.deliveryCharge || ''}" placeholder="250"></div>
+            <div class="grid grid-3" style="gap:12px">
+              <div class="field"><span class="label">Home city delivery (Rs)</span><input class="input" id="p-home-delivery" type="number" min="0" value="${editing?.homeDeliveryCharge ?? editing?.deliveryCharge ?? ''}" placeholder="150"></div>
+              <div class="field"><span class="label">Other cities delivery (Rs)</span><input class="input" id="p-outside-delivery" type="number" min="0" value="${editing?.outsideDeliveryCharge ?? editing?.deliveryCharge ?? ''}" placeholder="300"></div>
               <div class="field"><span class="label">Customization extra price (Rs)</span><input class="input" id="p-custom-price" type="number" min="0" value="${editing?.customizable?.price || ''}" placeholder="500"></div>
             </div>
             <div class="grid grid-2" style="gap:12px">
@@ -276,15 +278,18 @@ addProductPage.mount = (params, query, root) => {
       tags: root.querySelector('#p-tags').value.split(',').map((t) => t.trim()).filter(Boolean),
       media: media.length ? media : [{ type: 'image', url: './images/p-kurta.png' }],
       wholesale: { on: wsOn.checked, tiers: wsOn.checked ? tiers : [] },
-      deliveryCharge: Number(root.querySelector('#p-delivery').value) || 0,
+      deliveryCharge: Number(root.querySelector('#p-outside-delivery').value) || 0,
+      homeDeliveryCharge: Number(root.querySelector('#p-home-delivery').value) || 0,
+      outsideDeliveryCharge: Number(root.querySelector('#p-outside-delivery').value) || 0,
       customizable: { on: custOn.checked, price: custOn.checked ? (Number(root.querySelector('#p-custom-price').value) || 0) : 0, options: custOn.checked ? options.filter((o) => o.name && o.choices.length) : [] },
     }
-    if (editing) { updateProduct(editing.id, data); btn(); toast('Product update ho gaya', 'ok'); navigate('#/product/' + editing.id) }
+    if (editing) { updateProduct(editing.id, data); await syncPush(); btn(); toast('Product update ho gaya', 'ok'); navigate('#/product/' + editing.id) }
     else {
       const p = createProduct(data)
       if (warehouseDraft) updateWarehouseItem(warehouseDraft.id, { product: p.id, inventory: 'store', qty: stock })
+      await syncPush()
       btn()
-      toast('Product live ho gaya 🎉', 'ok')
+      toast('Product review ke liye submit ho gaya. Admin approval ke baad publish hoga.', 'ok')
       navigate('#/product/' + p.id)
     }
   })

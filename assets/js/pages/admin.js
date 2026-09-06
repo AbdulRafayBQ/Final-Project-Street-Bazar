@@ -3,12 +3,13 @@
 import { icon, esc, money, num, timeAgo, toast, confirmBox, modal, closeModal } from '../ui.js'
 import { statCard } from '../components.js'
 import { state, currentUser, setRole, storeById, storeProducts, productById, userById, updateStore, deleteStore, updateProduct, deleteProduct, deleteOrder, notify, liveStores, pendingStores, lowStock } from '../store.js'
-import { isAIConnected, isConnected, deleteRemote } from '../db.js'
+import { isAIConnected, isConnected, deleteRemote, syncPush } from '../db.js'
 import { navigate } from '../router.js'
 
 const TABS = [
   { id: 'overview', label: 'Overview', icon: 'grid' },
   { id: 'requests', label: 'Store requests', icon: 'bell' },
+  { id: 'product-requests', label: 'Product requests', icon: 'box' },
   { id: 'stores', label: 'Stores', icon: 'store' },
   { id: 'products', label: 'Products', icon: 'box' },
   { id: 'users', label: 'Users', icon: 'user' },
@@ -31,6 +32,7 @@ export async function adminPage(params, query) {
 
   const tab = query.tab || 'overview'
   const pending = pendingStores()
+  const pendingProducts = state.products.filter((p) => p.status === 'pending')
 
   return `
   <div class="wrap" style="padding-top:28px">
@@ -47,11 +49,11 @@ export async function adminPage(params, query) {
 
     <div class="admin-shell" style="margin-top:26px">
       <aside class="admin-side">
-        ${TABS.map((t) => `<button class="${t.id === tab ? 'active' : ''}" data-at="${t.id}">${icon(t.icon, '', 16)} ${t.label}${t.id === 'requests' && pending.length ? `<span class="cnt">${pending.length}</span>` : ''}</button>`).join('')}
+        ${TABS.map((t) => `<button class="${t.id === tab ? 'active' : ''}" data-at="${t.id}">${icon(t.icon, '', 16)} ${t.label}${t.id === 'requests' && pending.length ? `<span class="cnt">${pending.length}</span>` : ''}${t.id === 'product-requests' && pendingProducts.length ? `<span class="cnt">${pendingProducts.length}</span>` : ''}</button>`).join('')}
         <div class="divider"></div>
         <a class="btn btn-ghost btn-sm" href="#/settings" style="width:100%">${icon('settings', '', 15)} Settings</a>
       </aside>
-      <div data-admin-body>${views[tab] ? views[tab](pending) : views.overview(pending)}</div>
+      <div data-admin-body>${views[tab] ? views[tab](tab === 'requests' ? pending : pendingProducts) : views.overview(pending)}</div>
     </div>
   </div>`
 }
@@ -129,6 +131,33 @@ const views = {
     </div>` : `<div class="empty"><div class="ic">${icon('check', '', 28)}</div><h3 class="h3">Sab requests clear hain 🎉</h3><p class="muted">Koi naya store request aate hi yahan dikhega.</p></div>`}
   `,
 
+  'product-requests': (pending) => `
+    <h3 class="h3">Product requests</h3>
+    <p class="muted small" style="margin:8px 0 20px">Review every pending product before publication: image, description, price, stock and store details.</p>
+    ${pending.length ? `<div class="grid grid-2">
+      ${pending.map((p) => {
+        const s = storeById(p.store)
+        return `<div class="card" style="padding:0">
+          <img src="${esc(p.media?.[0]?.url || './images/p-kurta.png')}" alt="${esc(p.title)}" style="width:100%;height:210px;object-fit:cover" onerror="this.src='./images/p-kurta.png'">
+          <div style="padding:16px">
+            <div class="row-between"><b class="h4">${esc(p.title)}</b><span class="badge badge-pending">pending</span></div>
+            <p class="tiny muted" style="margin-top:6px">Store: ${esc(s?.name || 'Unknown')} · Owner: ${esc(userById(s?.owner)?.name || '—')}</p>
+            <p class="small" style="margin-top:12px;white-space:pre-line">${esc(p.description || 'No description provided.')}</p>
+            <div class="row" style="gap:10px;flex-wrap:wrap;margin-top:12px">
+              <span class="badge badge-soft">${money(p.price)}</span><span class="badge badge-soft">Stock: ${num(p.stock)}</span>
+              <span class="badge badge-soft">${esc((p.categories || []).join(', ') || 'Uncategorized')}</span>
+            </div>
+            <div class="wrap-flex" style="margin-top:14px">
+              <a class="btn btn-sm btn-ghost" href="#/product/${p.id}">${icon('eye', '', 14)} Review details</a>
+              <button class="btn btn-sm btn-teal" data-approve-prod="${p.id}">${icon('check', '', 14)} Approve & publish</button>
+              <button class="btn btn-sm btn-danger" data-reject-prod="${p.id}">${icon('x', '', 14)} Reject</button>
+            </div>
+          </div>
+        </div>`
+      }).join('')}
+    </div>` : `<div class="empty"><div class="ic">${icon('check', '', 28)}</div><h3 class="h3">No pending product requests</h3><p class="muted">New owner listings will appear here for review.</p></div>`}
+  `,
+
   stores: () => `
     <h3 class="h3">All stores</h3>
     <p class="muted small" style="margin:8px 0 18px">${state.stores.length} stores — live, pending aur rejected.</p>
@@ -163,7 +192,6 @@ const views = {
           <td>${p.sales}</td>
           <td>${p.rating ? '★ ' + Number(p.rating).toFixed(1) : '—'}</td>
           <td><div class="row" style="gap:6px">
-            ${p.status === 'pending' ? `<button class="btn btn-sm btn-teal" data-approve-prod="${p.id}">${icon('check', '', 14)} Approve</button>` : ''}
             ${p.status === 'pending' ? `<button class="btn btn-sm btn-teal" data-approve-prod="${p.id}">${icon('check', '', 14)} Approve</button>` : ''}
             <button class="btn btn-sm btn-ghost" data-toggle-prod="${p.id}">${p.status === 'hidden' ? 'Show' : 'Hide'}</button>
             <button class="btn btn-sm btn-danger" data-del-prod="${p.id}">Delete</button>
@@ -255,22 +283,26 @@ adminPage.mount = (params, query, root) => {
     }, 'Reject store')
   }))
 
-  root.querySelectorAll('[data-approve-prod]').forEach((b) => b.addEventListener('click', () => {
+  root.querySelectorAll('[data-approve-prod]').forEach((b) => b.addEventListener('click', async () => {
     const p = productById(b.dataset.approveProd)
     updateProduct(p.id, { status: 'active' })
     const store = storeById(p.store)
-    if (store) notify(store.owner, 'Product approved! 🎉', '"' + p.title + '" ab customers ko nazar aa raha hai.', '#/product/' + p.id)
-    toast(p.title + ' approved — product live hai', 'ok')
-    navigate('#/admin?tab=products')
+    if (store) notify(store.owner, 'Product published! 🎉', '"' + p.title + '" has been reviewed and published by Street Bazar.', '#/product/' + p.id)
+    try { await syncPush() } catch (error) { toast('Product approved locally, but remote sync failed: ' + error.message, 'err'); return }
+    toast(p.title + ' approved and published', 'ok')
+    navigate('#/admin?tab=product-requests')
   }))
 
-  root.querySelectorAll('[data-approve-prod]').forEach((b) => b.addEventListener('click', () => {
-    const p = productById(b.dataset.approveProd)
-    updateProduct(p.id, { status: 'active' })
-    const store = storeById(p.store)
-    if (store) notify(store.owner, 'Product approved! 🎉', '"' + p.title + '" ab customers ko nazar aa raha hai.', '#/product/' + p.id)
-    toast(p.title + ' approved — product live hai', 'ok')
-    navigate('#/admin?tab=products')
+  root.querySelectorAll('[data-reject-prod]').forEach((b) => b.addEventListener('click', () => {
+    const p = productById(b.dataset.rejectProd)
+    confirmBox('Reject ' + p.title + '?', 'The owner will be notified that the product needs changes before publication.', async () => {
+      updateProduct(p.id, { status: 'rejected' })
+      const store = storeById(p.store)
+      if (store) notify(store.owner, 'Product needs changes', '"' + p.title + '" was reviewed and needs updates before Street Bazar can publish it.', '#/add-product/' + p.id)
+      try { await syncPush() } catch (error) { toast('Product rejected locally, but remote sync failed: ' + error.message, 'err'); return }
+      toast('Product request rejected')
+      navigate('#/admin?tab=product-requests')
+    }, 'Reject product')
   }))
 
   root.querySelectorAll('[data-toggle-store]').forEach((b) => b.addEventListener('click', () => {
