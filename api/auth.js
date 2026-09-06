@@ -4,6 +4,14 @@ const json = (res, status, body) => {
 
 const authKey = () => process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_ANON_KEY || process.env.SUPABASE_PUBLISHABLE_KEY
 
+const googleAccountFor = async (email) => {
+  if (!email || !process.env.SUPABASE_SERVICE_ROLE_KEY) return false
+  const users = await supabaseRequest(`/auth/v1/admin/users?filter=${encodeURIComponent(email)}`, {}, process.env.SUPABASE_SERVICE_ROLE_KEY)
+  const list = Array.isArray(users) ? users : users.users || []
+  const match = list.find((item) => String(item.email || '').toLowerCase() === email.toLowerCase())
+  return Boolean(match?.identities?.some((identity) => identity.provider === 'google'))
+}
+
 const supabaseRequest = async (path, options = {}, requestKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_ANON_KEY || process.env.SUPABASE_PUBLISHABLE_KEY) => {
   const base = (process.env.SUPABASE_URL || '').trim().replace(/\/$/, '')
   const key = String(requestKey || '').trim()
@@ -34,6 +42,9 @@ export default async function handler(req, res) {
   try {
     const { action, name, password, token, access_token, code, code_verifier, type = 'signup', role = 'customer' } = req.body || {}
     const normalizedEmail = String(req.body?.email || '').trim().toLowerCase()
+    if (['signup', 'login'].includes(action) && await googleAccountFor(normalizedEmail)) {
+      return json(res, 409, { error: 'Is email par Google account bana hua hai. Sirf Continue with Google use karein.' })
+    }
     if (action === 'oauth' && !access_token) return json(res, 400, { error: 'Google session is missing' })
     if (action === 'oauth_code' && (!code || !code_verifier)) return json(res, 400, { error: 'Google verification is incomplete' })
     if (!['oauth', 'oauth_code', 'reset'].includes(action) && (!normalizedEmail || (action === 'verify' ? !token : action === 'forgot' ? false : !password))) {
@@ -113,16 +124,6 @@ export default async function handler(req, res) {
     }
     let profileSaved = false
     try {
-      if (action === 'signup') {
-        await supabaseRequest(`/rest/v1/users?email=eq.${encodeURIComponent(normalizedEmail)}`, {
-          method: 'DELETE',
-          headers: { Prefer: 'return=minimal' },
-        })
-        await supabaseRequest(`/rest/v1/profiles?email=eq.${encodeURIComponent(normalizedEmail)}`, {
-          method: 'DELETE',
-          headers: { Prefer: 'return=minimal' },
-        })
-      }
       await supabaseRequest('/rest/v1/users?on_conflict=id', {
         method: 'POST',
         headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },

@@ -109,9 +109,16 @@ if (syncing) return
 syncing = true
 try {
   const userId = state.session
+  const isDemo = (item) => item?.demo === true
+  const stores = state.stores.filter((store) => !isDemo(store))
+  const storeIds = new Set(stores.map((store) => store.id))
+  const products = state.products.filter((product) => !isDemo(product) && storeIds.has(product.store))
   const payload = {
     ...state,
-    users: state.users.map(({ pass, ...user }) => user),
+    users: state.users.filter((user) => !isDemo(user)).map(({ pass, ...user }) => user),
+    stores,
+    products,
+    isDemo: false,
     settings: { ...state.settings, supabase: {}, ai: {} },
   }
 

@@ -503,11 +503,6 @@ async function restoreGoogleSession() {
 }
 
 async function boot() {
-  const isReload = performance.navigation?.type === 1 || performance.getEntriesByType?.('navigation')?.[0]?.type === 'reload'
-  if (isReload && window.location.hash !== '#/' && window.location.hash !== '') {
-    window.location.hash = '#/'
-  }
-
   renderHeader()
   renderFooter()
   renderMobileNav()
@@ -538,7 +533,7 @@ async function boot() {
   setTimeout(hide, 800)
 }
 
-Promise.resolve(restoreGoogleSession()).finally(() => boot())
+Promise.resolve(restoreGoogleSession()).then(boot, boot)
 /* =========================================================
    STREET BAZAR — GLOBAL SCROLL & MOTION EFFECTS
    ========================================================= */

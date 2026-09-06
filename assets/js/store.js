@@ -444,15 +444,51 @@ function seed() {
 /* ---------------- persistence ---------------- */
 export let state = load()
 
+function emptyState() {
+  return {
+    version: 1, isDemo: false, users: [], stores: [], products: [], reviews: [], orders: [],
+    follows: [], threads: [], likes: [], warehouse: [], cart: [], notifications: [], aiLog: [],
+    settings: {
+      supabase: { url: '', key: '' },
+      ai: { key: '', base: 'https://api.openai.com/v1', model: 'gpt-4o-mini' },
+      brand: { name: 'Street Bazar', tagline: 'Har gali ka apna bazaar' },
+      lastSync: null,
+    },
+  }
+}
+
+function withoutDemoData(value) {
+  const clean = value && typeof value === 'object' ? value : emptyState()
+  const demoUsers = new Set(['u-admin', 'u-hassan', 'u-sana', 'u-bilal', 'u-mariam', 'u-ali', 'u-zoya'])
+  const users = (clean.users || []).filter((u) => !u.demo && !demoUsers.has(u.id) && !String(u.email || '').endsWith('@demo.pk'))
+  const stores = (clean.stores || []).filter((s) => !s.demo)
+  const storeIds = new Set(stores.map((s) => s.id))
+  const products = (clean.products || []).filter((p) => !p.demo && storeIds.has(p.store))
+  const productIds = new Set(products.map((p) => p.id))
+  const keep = (item) => !item?.demo && (!item?.store || storeIds.has(item.store)) && (!item?.product || productIds.has(item.product))
+  return {
+    ...emptyState(), ...clean, isDemo: false, users, stores, products,
+    reviews: (clean.reviews || []).filter(keep),
+    orders: (clean.orders || []).filter((o) => !demoUsers.has(o.user) && (o.items || []).every((item) => productIds.has(item.product))),
+    follows: (clean.follows || []).filter((f) => !demoUsers.has(f.user) && storeIds.has(f.store)),
+    threads: (clean.threads || []).filter((t) => !demoUsers.has(t.customer) && (!t.store || storeIds.has(t.store)) && (!t.product || productIds.has(t.product))),
+    likes: (clean.likes || []).filter((l) => !demoUsers.has(l.user) && productIds.has(l.product)),
+  }
+}
+
 function load() {
   try {
     const raw = localStorage.getItem(KEY)
     if (raw) {
       const parsed = JSON.parse(raw)
-      if (parsed && parsed.version === 1) return parsed
+      if (parsed && parsed.version === 1) {
+        const clean = withoutDemoData(parsed)
+        try { localStorage.setItem(KEY, JSON.stringify(clean)) } catch { /* ignore quota */ }
+        return clean
+      }
     }
   } catch { /* corrupted storage — fall through to seed */ }
-  const fresh = seed()
+  const fresh = emptyState()
   try { localStorage.setItem(KEY, JSON.stringify(fresh)) } catch { /* ignore quota */ }
   return fresh
 }

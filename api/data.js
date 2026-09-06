@@ -32,6 +32,20 @@ const safeUpsert = async (table, rows) => {
   }
 }
 
+const isDemo = (item) => item?.demo === true
+const cleanPayload = (payload) => {
+  const stores = (payload.stores || []).filter((s) => !isDemo(s))
+  const storeIds = new Set(stores.map((s) => s.id))
+  const products = (payload.products || []).filter((p) => !isDemo(p) && storeIds.has(p.store || p.store_id))
+  return {
+    ...payload,
+    isDemo: false,
+    users: (payload.users || []).filter((u) => !isDemo(u) && !String(u.email || '').endsWith('@demo.pk') && !['u-admin', 'u-hassan', 'u-sana', 'u-bilal', 'u-mariam', 'u-ali', 'u-zoya'].includes(u.id)),
+    stores,
+    products,
+  }
+}
+
 export default async function handler(req, res) {
   try {
     if (req.method === 'GET') {
@@ -40,7 +54,7 @@ export default async function handler(req, res) {
         request('/rest/v1/stores?select=*'),
         request('/rest/v1/products?select=*'),
       ])
-      const payload = stateRows[0]?.payload || {}
+      const payload = cleanPayload(stateRows[0]?.payload || {})
       const stores = (storeRows || []).map((s) => ({
         id: s.id, owner: s.owner_id, name: s.name, slug: s.slug, tagline: s.tagline,
         type: s.type, description: s.description, logo: s.logo, banner: s.banner,
@@ -89,7 +103,7 @@ export default async function handler(req, res) {
       return json(res, 200, { ok: true })
     }
     if (req.method !== 'POST') return json(res, 405, { error: 'Method not allowed' })
-    const payload = req.body || {}
+    const payload = cleanPayload(req.body || {})
     if (payload.action === 'product') {
       const product = payload.product
       if (!product?.id) return json(res, 400, { error: 'Product data is required' })
