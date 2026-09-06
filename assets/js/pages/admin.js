@@ -3,7 +3,7 @@
 import { icon, esc, money, num, timeAgo, toast, confirmBox, modal, closeModal } from '../ui.js'
 import { statCard } from '../components.js'
 import { state, currentUser, setRole, storeById, storeProducts, productById, userById, updateStore, deleteStore, updateProduct, deleteProduct, deleteOrder, notify, liveStores, pendingStores, lowStock } from '../store.js'
-import { isAIConnected, isConnected, deleteRemote, syncPush } from '../db.js'
+import { isAIConnected, isConnected, deleteRemote, syncProduct } from '../db.js'
 import { navigate } from '../router.js'
 
 const TABS = [
@@ -288,7 +288,7 @@ adminPage.mount = (params, query, root) => {
     updateProduct(p.id, { status: 'active' })
     const store = storeById(p.store)
     if (store) notify(store.owner, 'Product published! 🎉', '"' + p.title + '" has been reviewed and published by Street Bazar.', '#/product/' + p.id)
-    try { await syncPush() } catch (error) { toast('Product approved locally, but remote sync failed: ' + error.message, 'err'); return }
+    try { await syncProduct(p) } catch (error) { toast('Product approved locally, but remote sync failed: ' + error.message, 'err'); return }
     toast(p.title + ' approved and published', 'ok')
     navigate('#/admin?tab=product-requests')
   }))
@@ -299,7 +299,7 @@ adminPage.mount = (params, query, root) => {
       updateProduct(p.id, { status: 'rejected' })
       const store = storeById(p.store)
       if (store) notify(store.owner, 'Product needs changes', '"' + p.title + '" was reviewed and needs updates before Street Bazar can publish it.', '#/add-product/' + p.id)
-      try { await syncPush() } catch (error) { toast('Product rejected locally, but remote sync failed: ' + error.message, 'err'); return }
+      try { await syncProduct(p) } catch (error) { toast('Product rejected locally, but remote sync failed: ' + error.message, 'err'); return }
       toast('Product request rejected')
       navigate('#/admin?tab=product-requests')
     }, 'Reject product')

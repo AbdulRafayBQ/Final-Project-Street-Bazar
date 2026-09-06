@@ -4,7 +4,7 @@ import { icon, esc, money, toast, spinner, bindMediaPicker, closeModal } from '.
 import { myStores, storeById, createProduct, updateProduct, updateWarehouseItem, productById, currentUser, allCategories, CATEGORIES, state } from '../store.js'
 import { genProductCopy, aiStatusText } from '../ai.js'
 import { navigate } from '../router.js'
-import { syncPush } from '../db.js'
+import { syncProduct } from '../db.js'
 
 export async function addProductPage(params) {
   const u = currentUser()
@@ -286,13 +286,13 @@ addProductPage.mount = (params, query, root) => {
     try {
       if (editing) {
         updateProduct(editing.id, data)
-        try { await syncPush() } catch (error) { console.error('Product update sync failed:', error); toast('Product local save ho gaya, lekin server sync failed: ' + error.message, 'err') }
+        try { await syncProduct(productById(editing.id)) } catch (error) { console.error('Product update sync failed:', error); toast('Product local save ho gaya, lekin server sync failed: ' + error.message, 'err') }
         toast('Product update ho gaya', 'ok')
         navigate('#/product/' + editing.id)
       } else {
         const p = createProduct(data)
         if (warehouseDraft) updateWarehouseItem(warehouseDraft.id, { product: p.id, inventory: 'store', qty: stock })
-        try { await syncPush() } catch (error) { console.error('Product submission sync failed:', error); toast('Product local save ho gaya, lekin server sync failed: ' + error.message, 'err') }
+        try { await syncProduct(p) } catch (error) { console.error('Product submission sync failed:', error); toast('Product local save ho gaya, lekin server sync failed: ' + error.message, 'err') }
         toast('Product review ke liye submit ho gaya. Admin approval ke baad publish hoga.', 'ok')
         navigate('#/product/' + p.id)
       }
