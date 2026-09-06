@@ -171,16 +171,18 @@ authPage.mount = (params, query, root) => {
     body.querySelector('#forgot-password')?.addEventListener('click', () => { mode = 'forgot'; paint() })
     body.querySelector('#au-go')?.addEventListener('click', async (e) => {
       const btn = spinner(e.currentTarget)
-      const email = body.querySelector('#au-email').value.trim()
+      const email = body.querySelector('#au-email')?.value.trim() || ''
       const pass = body.querySelector('#au-pass')?.value || ''
       await new Promise((r) => setTimeout(r, 500))
       try {
         if (mode === 'forgot') {
           await authRequest('forgot', { email })
+          sessionStorage.setItem('street-bazar-reset-email', email)
           btn(); paint(); toast('Password reset email bhej di gayi. Email mein link open karein.', 'ok'); return
         }
         if (mode === 'reset') {
           const resetEmail = sessionStorage.getItem('street-bazar-reset-email') || email
+          if (!resetEmail) throw new Error('Reset email session expire ho gaya. Forgot password dobara use karein.')
           const verify = await authRequest('verify', { email: resetEmail, token: body.querySelector('#au-code').value.trim(), type: 'email' })
           sessionStorage.setItem('street-bazar-reset-token', verify.access_token)
           mode = 'resetPassword'; btn(); paint(); toast('OTP verify ho gaya. Ab new password set karein.', 'ok'); return
