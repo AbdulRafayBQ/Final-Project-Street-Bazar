@@ -35,25 +35,6 @@ export async function adminPage(params, query) {
     </div></div></section>`
   }
 
-  adminPage.mount = (params, query, root) => {
-    let signature = ''
-    const refresh = async () => {
-      try {
-        await syncPull()
-        const next = JSON.stringify([
-          ...state.stores.filter((store) => store.status === 'pending').map((store) => store.id),
-          ...state.products.filter((product) => product.status === 'pending').map((product) => product.id),
-        ].sort())
-        if (signature && next !== signature) await renderRoute()
-        signature = next
-      } catch (error) {
-        console.error('Admin request polling failed:', error)
-      }
-    }
-    refresh()
-    root._adminRefreshTimer = setInterval(refresh, 5000)
-  }
-
   const tab = query.tab || 'overview'
   const pending = pendingStores()
   const pendingProducts = state.products.filter((p) => p.status === 'pending')
@@ -290,6 +271,23 @@ const views = {
 }
 
 adminPage.mount = (params, query, root) => {
+  let signature = ''
+  const refresh = async () => {
+    try {
+      await syncPull()
+      const next = JSON.stringify([
+        ...state.stores.filter((store) => store.status === 'pending').map((store) => store.id),
+        ...state.products.filter((product) => product.status === 'pending').map((product) => product.id),
+      ].sort())
+      if (signature && next !== signature) await renderRoute()
+      signature = next
+    } catch (error) {
+      console.error('Admin request polling failed:', error)
+    }
+  }
+  refresh()
+  root._adminRefreshTimer = setInterval(refresh, 5000)
+
   root.querySelector('[data-as-admin]')?.addEventListener('click', () => {
     import('../store.js').then(({ login }) => {
       try { login('admin@streetbazar.pk', 'admin1234'); toast('Admin mode on', 'ok'); navigate('#/admin') } catch (e) { toast(e.message, 'err') }
