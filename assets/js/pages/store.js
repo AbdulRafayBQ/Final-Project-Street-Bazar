@@ -1,6 +1,6 @@
 /* Street Bazar — Store page (themed, responsive) */
 
-import { icon, esc, money, num, themeStyle, toast, timeAgo, avatar, modal } from '../ui.js'
+import { icon, esc, money, num, themeStyle, toast, timeAgo, avatar, modal, reveal } from '../ui.js'
 import { sectionHead, productCard, reviewItem, typeBadge, emptyLogin } from '../components.js'
 import { storeBySlug, storeProducts, storeReviews, currentUser, myStores, isFollowing, toggleFollow, ratingOf, state, sendMessage, appendThreadMessage, updateStore, FONT_PAIRS } from '../store.js'
 
@@ -146,11 +146,16 @@ storePage.mount = (params, query, root) => {
 
   // category filter
   const grid = root.querySelector('[data-product-grid]')
+  const renderProducts = (list) => {
+    grid.innerHTML = list.length ? list.map(productCard).join('') : `<div class="empty" style="grid-column:1/-1"><p class="muted">Is category mein abhi kuch nahi.</p></div>`
+    reveal(grid)
+  }
+  reveal(grid)
   root.querySelectorAll('[data-store-cats] .chip').forEach((b) => b.addEventListener('click', () => {
     root.querySelectorAll('[data-store-cats] .chip').forEach((x) => x.classList.toggle('active', x === b))
-    const cat = b.dataset.scat
-    const list = storeProducts(s.id).filter((p) => !cat || (p.categories || []).includes(cat))
-    grid.innerHTML = list.length ? list.map(productCard).join('') : `<div class="empty" style="grid-column:1/-1"><p class="muted">Is category mein abhi kuch nahi.</p></div>`
+    const cat = String(b.dataset.scat || '').trim().toLowerCase()
+    const list = storeProducts(s.id).filter((p) => !cat || (p.categories || []).some((value) => String(value).trim().toLowerCase() === cat))
+    renderProducts(list)
   }))
 
   // chat
