@@ -42,9 +42,10 @@ export default async function handler(req, res) {
 
     let auth
     if (action === 'forgot') {
-      await supabaseRequest('/auth/v1/otp', {
+      const origin = `${req.headers['x-forwarded-proto'] || 'https'}://${req.headers.host}`
+      await supabaseRequest('/auth/v1/recover', {
         method: 'POST',
-        body: JSON.stringify({ email: normalizedEmail, create_user: false }),
+        body: JSON.stringify({ email: normalizedEmail, redirect_to: `${origin}/` }),
       }, authKey())
       return json(res, 200, { sent: true })
     } else if (action === 'reset') {

@@ -177,8 +177,7 @@ authPage.mount = (params, query, root) => {
       try {
         if (mode === 'forgot') {
           await authRequest('forgot', { email })
-          sessionStorage.setItem('street-bazar-reset-email', email)
-          mode = 'reset'; btn(); paint(); toast('Password reset OTP email par bhej diya gaya', 'ok'); return
+          btn(); paint(); toast('Password reset email bhej di gayi. Email mein Reset Password button dabayein.', 'ok'); return
         }
         if (mode === 'reset') {
           const resetEmail = sessionStorage.getItem('street-bazar-reset-email') || email
