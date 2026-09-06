@@ -1,6 +1,6 @@
 /* Street Bazar — Create / Edit Store wizard with live interface preview */
 
-import { icon, esc, money, toast, modal, closeModal, readFile, themeStyle, spinner } from '../ui.js'
+import { icon, esc, money, toast, modal, closeModal, readFile, readImage, themeStyle, spinner } from '../ui.js'
 import { THEME_PRESETS, FONT_PAIRS, STORE_TYPES, CATEGORIES, createStore, updateStore, storeById, currentUser, allCategories, isPakistanPhone } from '../store.js'
 import { navigate } from '../router.js'
 
@@ -11,7 +11,7 @@ let draft = null
 function blank() {
   return {
     name: '', tagline: '', type: 'home', city: '', address: '', description: '',
-    ownerPhone: '', cnic: '', personalAddress: '',
+    ownerPhone: '', cnic: '', cnicFront: '', cnicBack: '', personalAddress: '',
     logo: '', banner: '', themeId: 'bazaar',
     theme: { ...THEME_PRESETS[0] },
     categories: [], socials: { instagram: '', whatsapp: '', tiktok: '', facebook: '', youtube: '' },
@@ -24,7 +24,7 @@ export async function createStorePage(params) {
   draft = editing ? {
     name: editing.name, tagline: editing.tagline, type: editing.type, city: editing.city, address: editing.address,
     description: editing.description, logo: editing.logo, banner: editing.banner,
-    ownerPhone: editing.ownerPhone || '', cnic: editing.cnic || '', personalAddress: editing.personalAddress || '',
+    ownerPhone: editing.ownerPhone || '', cnic: editing.cnic || '', cnicFront: editing.cnicFront || '', cnicBack: editing.cnicBack || '', personalAddress: editing.personalAddress || '',
     themeId: editing.theme?.id || 'bazaar', theme: { ...editing.theme },
     categories: [...(editing.categories || [])], socials: { instagram: '', whatsapp: '', tiktok: '', facebook: '', youtube: '', ...(editing.socials || {}) },
     sale: editing.sale ? { text: editing.sale.text, until: new Date(editing.sale.until).toISOString().slice(0, 10) } : { text: '', until: '' },
@@ -129,8 +129,12 @@ createStorePage.mount = (params, query, root) => {
         <h4 class="h4">Owner verification (admin ke liye private)</h4>
         <p class="tiny muted">CNIC aur personal details public nahi hongi. Admin approval ke liye zaroori hain.</p>
         <div class="grid grid-2" style="gap:12px;margin-top:10px">
-          <div class="field"><span class="label">Owner phone *</span><input class="input" data-f="ownerPhone" value="${esc(draft.ownerPhone)}" type="tel" required pattern="03[0-9]{9}" inputmode="numeric" maxlength="11" placeholder="03XXXXXXXXX"></div>
-          <div class="field"><span class="label">CNIC *</span><input class="input" data-f="cnic" value="${esc(draft.cnic)}" inputmode="numeric" maxlength="13" placeholder="13 digit CNIC"></div>
+          <div class="field"><span class="label">Owner phone *</span><input class="input" data-f="ownerPhone" value="${esc(draft.ownerPhone)}" type="tel" required inputmode="numeric" maxlength="11" placeholder="03XXXXXXXXX"></div>
+          <div class="field"><span class="label">CNIC *</span><input class="input" data-f="cnic" value="${esc(draft.cnic)}" inputmode="numeric" maxlength="15" placeholder="42123-4356789-4"></div>
+        </div>
+        <div class="grid grid-2" style="gap:12px">
+          <div class="field"><span class="label">CNIC front photo *</span><input class="input" type="file" id="cnic-front-in" accept="image/*"><div class="tiny muted">${draft.cnicFront ? 'Front photo uploaded' : 'Upload front side'}</div></div>
+          <div class="field"><span class="label">CNIC back photo *</span><input class="input" type="file" id="cnic-back-in" accept="image/*"><div class="tiny muted">${draft.cnicBack ? 'Back photo uploaded' : 'Upload back side'}</div></div>
         </div>
         <div class="field"><span class="label">Personal address *</span><textarea class="textarea" data-f="personalAddress" placeholder="Owner ka verification address">${esc(draft.personalAddress)}</textarea></div>
         <div class="pill-note">${icon('info', '', 14)} Home business ho toh bhi store bilkul normal dikhega — sirf type badge alag hoga.</div>
@@ -279,18 +283,29 @@ createStorePage.mount = (params, query, root) => {
       draft.theme.dark = e.target.checked
       renderPreview()
     })
-    const bindUpload = (id, key) => {
+    const bindUpload = (id, key, reader = readFile) => {
       const inp = form.querySelector('#' + id)
       inp?.addEventListener('change', async () => {
         const f = inp.files?.[0]
         if (!f) return
-        draft[key] = await readFile(f)
+        draft[key] = await reader(f)
         toast(key === 'logo' ? 'Logo lag gaya' : 'Banner lag gaya')
         paint(); renderPreview()
       })
     }
     bindUpload('logo-in', 'logo')
     bindUpload('banner-in', 'banner')
+    bindUpload('cnic-front-in', 'cnicFront', readImage)
+    bindUpload('cnic-back-in', 'cnicBack', readImage)
+    form.querySelector('[data-f="cnic"]')?.addEventListener('input', (e) => {
+      const digits = e.target.value.replace(/\D/g, '').slice(0, 13)
+      e.target.value = digits.length > 12 ? `${digits.slice(0, 5)}-${digits.slice(5, 12)}-${digits.slice(12)}` : digits
+      draft.cnic = e.target.value
+    })
+    form.querySelector('[data-f="ownerPhone"]')?.addEventListener('input', (e) => {
+      e.target.value = e.target.value.replace(/\D/g, '').slice(0, 11)
+      draft.ownerPhone = e.target.value
+    })
     form.querySelectorAll('[data-url]').forEach((inp) => inp.addEventListener('change', () => {
       draft[inp.dataset.url] = inp.value.trim()
       renderPreview()
@@ -335,7 +350,8 @@ createStorePage.mount = (params, query, root) => {
   const onPublish = async (e) => {
     if (!draft.name.trim()) return toast('Store ka naam zaroori hai', 'err')
     if (!isPakistanPhone(draft.ownerPhone)) return toast('Owner phone 11 digits ka hona chahiye (03XXXXXXXXX)', 'err')
-    if (!/^\d{13}$/.test(draft.cnic.replace(/\D/g, ''))) return toast('CNIC 13 digits ka hona chahiye', 'err')
+    if (!/^\d{5}-\d{7}-\d$/.test(draft.cnic)) return toast('CNIC is format mein likhein: 42123-4356789-4', 'err')
+    if (!draft.cnicFront || !draft.cnicBack) return toast('CNIC front aur back dono photos upload karein', 'err')
     if (!draft.personalAddress.trim()) return toast('Personal address zaroori hai', 'err')
     const btn = e?.currentTarget || form.querySelector('[data-publish]')
     const done = btn ? spinner(btn) : () => {}
@@ -368,7 +384,8 @@ createStorePage.mount = (params, query, root) => {
       if (step === 0) {
         if (!draft.name.trim()) return toast('Store ka naam zaroori hai', 'err')
         if (!isPakistanPhone(draft.ownerPhone)) return toast('Owner phone 11 digits ka hona chahiye (03XXXXXXXXX)', 'err')
-        if (!/^\d{13}$/.test(draft.cnic.replace(/\D/g, ''))) return toast('CNIC 13 digits ka hona chahiye', 'err')
+        if (!/^\d{5}-\d{7}-\d$/.test(draft.cnic)) return toast('CNIC is format mein likhein: 42123-4356789-4', 'err')
+        if (!draft.cnicFront || !draft.cnicBack) return toast('CNIC front aur back dono photos upload karein', 'err')
         if (!draft.personalAddress.trim()) return toast('Personal address zaroori hai', 'err')
       }
       step = Math.min(STEPS.length - 1, step + 1); paint()

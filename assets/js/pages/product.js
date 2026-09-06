@@ -39,6 +39,11 @@ export async function productPage(params) {
         ${p.media?.length > 1 ? `<div class="gallery-thumbs" data-thumbs>
           ${p.media.map((m, i) => `<button class="${i === 0 ? 'active' : ''}" data-i="${i}">${m.type === 'video' ? `<video src="${esc(m.url)}" muted></video>` : `<img src="${esc(m.url)}" alt="">`}</button>`).join('')}
         </div>` : ''}
+        <div class="panel desktop-description" style="margin-top:22px;box-shadow:var(--shadow-s)">
+          <h3 class="h4">Description</h3>
+          <p class="small" style="margin-top:10px;line-height:1.9;white-space:pre-line">${esc(p.description)}</p>
+          ${p.tags?.length ? `<div class="wrap-flex" style="margin-top:14px">${p.tags.map((t) => `<span class="chip static tiny">#${esc(t)}</span>`).join('')}</div>` : ''}
+        </div>
       </div>
 
       <div class="stack reveal" style="gap:18px">
@@ -121,7 +126,7 @@ export async function productPage(params) {
       </div>
     </div>
 
-    <div class="panel" style="margin-top:22px;box-shadow:var(--shadow-s)">
+    <div class="panel mobile-description" style="margin-top:22px;box-shadow:var(--shadow-s)">
       <h3 class="h4">Description</h3>
       <p class="small" style="margin-top:10px;line-height:1.9;white-space:pre-line">${esc(p.description)}</p>
       ${p.tags?.length ? `<div class="wrap-flex" style="margin-top:14px">${p.tags.map((t) => `<span class="chip static tiny">#${esc(t)}</span>`).join('')}</div>` : ''}

@@ -209,6 +209,8 @@ function readOptimizedMedia(file) {
     if (file.size > 2 * 1024 * 1024) {
       throw new Error('Video file 2MB se chhoti rakhein ya direct video link use karein.')
     }
+
+    export const readImage = (file) => readOptimizedMedia(file)
     return readFile(file)
   }
   return new Promise((resolve, reject) => {

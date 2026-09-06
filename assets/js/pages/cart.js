@@ -91,6 +91,9 @@ export async function cartPage() {
 
 cartPage.mount = (params, query, root) => {
   const repaint = () => { renderRoute() }
+  root.querySelector('#c-phone')?.addEventListener('input', (e) => {
+    e.target.value = e.target.value.replace(/\D/g, '').slice(0, 11)
+  })
 
   root.querySelectorAll('[data-inc]').forEach((b) => b.addEventListener('click', () => {
     const key = b.closest('[data-line]').dataset.line

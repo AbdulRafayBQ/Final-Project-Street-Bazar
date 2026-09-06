@@ -568,7 +568,7 @@ export function createStore(data) {
     id: uid('s'), owner: state.session, name: data.name, slug: slugify(data.name) + '-' + Math.random().toString(36).slice(2, 5),
     tagline: data.tagline || '', type: data.type, city: data.city || '', address: data.address || '',
     description: data.description || '', logo: data.logo || '', banner: data.banner || '',
-    ownerPhone: data.ownerPhone || '', cnic: data.cnic || '', personalAddress: data.personalAddress || '',
+    ownerPhone: data.ownerPhone || '', cnic: data.cnic || '', cnicFront: data.cnicFront || '', cnicBack: data.cnicBack || '', personalAddress: data.personalAddress || '',
     theme: { ...preset, ...(data.theme || {}) }, categories: data.categories || [], socials: data.socials || {},
     sale: data.sale && data.sale.text ? data.sale : null, status: 'pending', rating: 0, followers: 0, createdAt: Date.now(),
   }

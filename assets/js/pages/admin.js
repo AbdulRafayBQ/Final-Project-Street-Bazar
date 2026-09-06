@@ -120,7 +120,12 @@ const views = {
               <span class="tiny muted">· ${esc(s.type)} · ${esc(s.city || '—')}</span>
               <span class="tiny muted">· ${(s.categories || []).join(', ') || 'no categories'}</span>
             </div>
-            <div class="pill-note" style="margin-top:10px"><b>CNIC:</b> ${esc(s.cnic || 'Not provided')} · <b>Phone:</b> ${esc(s.ownerPhone || 'Not provided')}<br><b>Personal address:</b> ${esc(s.personalAddress || 'Not provided')}</div>
+            <div class="pill-note" style="margin-top:10px"><b>CNIC:</b> ${esc(s.cnic || 'Not provided')} · <b>Phone:</b> ${esc(s.ownerPhone || 'Not provided')}<br><b>Personal address:</b> ${esc(s.personalAddress || 'Not provided')}
+              <div class="row" style="gap:10px;margin-top:10px">
+                ${s.cnicFront ? `<a href="${esc(s.cnicFront)}" target="_blank" rel="noopener"><img src="${esc(s.cnicFront)}" alt="CNIC front" style="width:110px;height:70px;object-fit:cover;border-radius:8px"></a>` : '<span class="tiny muted">CNIC front missing</span>'}
+                ${s.cnicBack ? `<a href="${esc(s.cnicBack)}" target="_blank" rel="noopener"><img src="${esc(s.cnicBack)}" alt="CNIC back" style="width:110px;height:70px;object-fit:cover;border-radius:8px"></a>` : '<span class="tiny muted">CNIC back missing</span>'}
+              </div>
+            </div>
             <div class="wrap-flex" style="margin-top:14px">
               <a class="btn btn-sm btn-ghost" href="#/store/${s.slug}">${icon('eye', '', 14)} Preview</a>
               <button class="btn btn-sm btn-teal" data-approve="${s.id}">${icon('check', '', 14)} Approve</button>
@@ -292,7 +297,7 @@ adminPage.mount = (params, query, root) => {
     updateProduct(p.id, { status: 'active' })
     const store = storeById(p.store)
     if (store) notify(store.owner, 'Product published! 🎉', '"' + p.title + '" has been reviewed and published by Street Bazar.', '#/product/' + p.id)
-    try { await syncProduct(p) } catch (error) { toast('Product approved locally, but remote sync failed: ' + error.message, 'err'); return }
+    try { await syncProduct(p) } catch (error) { toast('Product approved locally, but changes could not be saved: ' + error.message, 'err'); return }
     toast(p.title + ' approved and published', 'ok')
     navigate('#/admin?tab=product-requests')
   }))
@@ -303,7 +308,7 @@ adminPage.mount = (params, query, root) => {
       updateProduct(p.id, { status: 'rejected' })
       const store = storeById(p.store)
       if (store) notify(store.owner, 'Product needs changes', '"' + p.title + '" was reviewed and needs updates before Street Bazar can publish it.', '#/add-product/' + p.id)
-      try { await syncProduct(p) } catch (error) { toast('Product rejected locally, but remote sync failed: ' + error.message, 'err'); return }
+      try { await syncProduct(p) } catch (error) { toast('Product rejected locally, but changes could not be saved: ' + error.message, 'err'); return }
       toast('Product request rejected')
       navigate('#/admin?tab=product-requests')
     }, 'Reject product')

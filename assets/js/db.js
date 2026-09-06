@@ -23,6 +23,8 @@ create table if not exists stores (
 alter table stores add column if not exists owner_phone text;
 alter table stores add column if not exists cnic text;
 alter table stores add column if not exists personal_address text;
+alter table stores add column if not exists cnic_front text;
+alter table stores add column if not exists cnic_back text;
 create table if not exists products (
   id text primary key, store_id text references stores(id), title text, description text,
   price numeric, compare_at numeric, media jsonb, categories text[], tags text[],
@@ -147,7 +149,7 @@ export async function syncBoth() {
   try {
     await syncPush()
     await syncPull()
-    toast('Supabase sync complete — database live hai', 'ok')
+    toast('Changes successfully saved', 'ok')
     return true
   } catch (e) {
     toast('Sync failed: ' + e.message, 'err')
