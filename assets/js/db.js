@@ -146,6 +146,12 @@ export async function syncProduct(product) {
   save()
 }
 
+export async function syncStore(store) {
+  await api('/api/data', { method: 'POST', body: JSON.stringify({ action: 'store', store }) })
+  state.settings.lastSync = Date.now()
+  save()
+}
+
 export async function deleteRemote(table, id) {
   await api('/api/data', { method: 'DELETE', body: JSON.stringify({ table, id }) })
 }

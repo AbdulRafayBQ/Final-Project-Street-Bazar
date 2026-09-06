@@ -3,7 +3,7 @@
 import { icon, esc, money, toast, modal, closeModal, readFile, readImage, themeStyle, spinner } from '../ui.js'
 import { THEME_PRESETS, FONT_PAIRS, STORE_TYPES, CATEGORIES, createStore, updateStore, storeById, currentUser, allCategories, isPakistanPhone } from '../store.js'
 import { navigate } from '../router.js'
-import { syncPush } from '../db.js'
+import { syncStore } from '../db.js'
 
 const STEPS = ['Basics', 'Design & fonts', 'Branding', 'Categories & links', 'Preview & publish']
 
@@ -363,13 +363,13 @@ createStorePage.mount = (params, query, root) => {
     }
     if (params.id) {
       updateStore(params.id, data)
-      try { await syncPush() } catch (error) { done(); toast('Store local save ho gaya, lekin server par save nahi ho saka: ' + error.message, 'err'); return }
+      try { await syncStore(storeById(params.id)) } catch (error) { done(); toast('Store local save ho gaya, lekin server par save nahi ho saka: ' + error.message, 'err'); return }
       done()
       toast('Store update ho gaya', 'ok')
       navigate('#/store/' + storeById(params.id).slug)
     } else {
       const s = createStore(data)
-      try { await syncPush() } catch (error) { done(); toast('Store local save ho gaya, lekin admin ko request nahi mili: ' + error.message, 'err'); return }
+      try { await syncStore(s) } catch (error) { done(); toast('Store local save ho gaya, lekin admin ko request nahi mili: ' + error.message, 'err'); return }
       done()
       toast('Store ban gaya! Admin approval ke baad live ho jayega 🎉', 'ok')
       navigate('#/store/' + s.slug)
