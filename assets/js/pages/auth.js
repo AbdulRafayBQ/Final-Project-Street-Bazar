@@ -68,7 +68,7 @@ export async function authPage(params, query) {
 }
 
 authPage.mount = (params, query, root) => {
-  let mode = query.reset ? 'reset' : 'signin'
+  let mode = query.reset ? (sessionStorage.getItem('street-bazar-recovery-token') ? 'resetPassword' : 'reset') : 'signin'
   const body = root.querySelector('[data-auth-body]')
   const redirect = query.next ? '#' + query.next : '#/'
 
@@ -177,8 +177,7 @@ authPage.mount = (params, query, root) => {
       try {
         if (mode === 'forgot') {
           await authRequest('forgot', { email })
-          sessionStorage.setItem('street-bazar-reset-email', email)
-          mode = 'reset'; btn(); paint(); toast('Password reset OTP email par bhej diya gaya', 'ok'); return
+          btn(); paint(); toast('Password reset email bhej di gayi. Email mein link open karein.', 'ok'); return
         }
         if (mode === 'reset') {
           const resetEmail = sessionStorage.getItem('street-bazar-reset-email') || email
@@ -187,11 +186,12 @@ authPage.mount = (params, query, root) => {
           mode = 'resetPassword'; btn(); paint(); toast('OTP verify ho gaya. Ab new password set karein.', 'ok'); return
         }
         if (mode === 'resetPassword') {
-          const accessToken = sessionStorage.getItem('street-bazar-reset-token')
-          if (!accessToken) throw new Error('OTP session expire ho gaya. Dobara Forgot password karein.')
+          const accessToken = sessionStorage.getItem('street-bazar-recovery-token') || sessionStorage.getItem('street-bazar-reset-token')
+          if (!accessToken) throw new Error('Reset session expire ho gaya. Dobara Forgot password karein.')
           await authRequest('reset', { access_token: accessToken, password: pass })
           sessionStorage.removeItem('street-bazar-reset-email')
           sessionStorage.removeItem('street-bazar-reset-token')
+          sessionStorage.removeItem('street-bazar-recovery-token')
           mode = 'signin'; btn(); paint(); toast('Password update ho gaya', 'ok'); return
         }
         if (mode === 'signin') {
