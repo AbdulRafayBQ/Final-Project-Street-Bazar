@@ -3,7 +3,7 @@
 import { icon, esc, money, num, timeAgo, toast, confirmBox, modal, closeModal } from '../ui.js'
 import { statCard } from '../components.js'
 import { state, currentUser, setRole, storeById, storeProducts, productById, userById, updateStore, deleteStore, updateProduct, deleteProduct, deleteOrder, notify, liveStores, pendingStores, lowStock } from '../store.js'
-import { isAIConnected, isConnected, deleteRemote, syncProduct, syncPull } from '../db.js'
+import { isAIConnected, isConnected, deleteRemote, syncProduct, syncStore, syncPull } from '../db.js'
 import { navigate, renderRoute } from '../router.js'
 
 const TABS = [
@@ -298,10 +298,11 @@ adminPage.mount = (params, query, root) => {
 
   root.querySelectorAll('[data-at]').forEach((b) => b.addEventListener('click', () => navigate('#/admin?tab=' + b.dataset.at)))
 
-  root.querySelectorAll('[data-approve]').forEach((b) => b.addEventListener('click', () => {
+  root.querySelectorAll('[data-approve]').forEach((b) => b.addEventListener('click', async () => {
     const s = storeById(b.dataset.approve)
     updateStore(s.id, { status: 'live' })
     notify(s.owner, 'Store approved! 🎉', 'Aapka store "' + s.name + '" ab live hai.', '#/store/' + s.slug)
+    try { await syncStore(s) } catch (error) { toast('Store local update ho gaya, lekin server save nahi hua: ' + error.message, 'err'); return }
     toast(s.name + ' approved — store live hai', 'ok')
     navigate('#/admin?tab=requests')
   }))
@@ -311,6 +312,7 @@ adminPage.mount = (params, query, root) => {
     confirmBox('Reject ' + s.name + '?', 'Owner ko rejection ka notify chala jayega.', () => {
       updateStore(s.id, { status: 'rejected', rejectReason: 'Rejected by admin review' })
       notify(s.owner, 'Store request rejected', 'Reason: policy guideline mismatch.', '#/')
+      syncStore(s).catch((error) => toast('Store local update ho gaya, lekin server save nahi hua: ' + error.message, 'err'))
       toast('Request rejected')
       navigate('#/admin?tab=requests')
     }, 'Reject store')

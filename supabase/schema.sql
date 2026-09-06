@@ -117,3 +117,16 @@ alter table cart_items enable row level security;
 alter table saved_products enable row level security;
 alter table warehouse_items enable row level security;
 alter table app_state enable row level security;
+
+-- Optional one-time fresh-start reset. Run manually in Supabase SQL Editor.
+-- This removes marketplace data but keeps authentication accounts.
+-- delete from app_state;
+-- delete from warehouse_items;
+-- delete from cart_items;
+-- delete from saved_products;
+-- delete from threads;
+-- delete from follows;
+-- delete from reviews;
+-- delete from orders;
+-- delete from products;
+-- delete from stores;

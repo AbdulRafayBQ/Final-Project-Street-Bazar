@@ -289,9 +289,15 @@ createStorePage.mount = (params, query, root) => {
       inp?.addEventListener('change', async () => {
         const f = inp.files?.[0]
         if (!f) return
-        draft[key] = await reader(f)
-        toast(key === 'logo' ? 'Logo lag gaya' : 'Banner lag gaya')
-        paint(); renderPreview()
+        try {
+          draft[key] = await reader(f)
+          toast(key === 'logo' ? 'Logo lag gaya' : key === 'banner' ? 'Banner lag gaya' : 'CNIC photo lag gayi', 'ok')
+          paint(); renderPreview()
+        } catch (error) {
+          toast(error.message || 'Image upload nahi ho saki', 'err')
+        } finally {
+          inp.value = ''
+        }
       })
     }
     bindUpload('logo-in', 'logo')
