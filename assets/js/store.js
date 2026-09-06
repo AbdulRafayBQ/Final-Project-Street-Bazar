@@ -7,6 +7,7 @@ const DAY = 86400000
 const now = Date.now()
 
 export const CATEGORIES = ['Fashion', 'Electronics', 'Mobile Accessories', 'Home & Kitchen', 'Food & Groceries', 'Beauty & Care', 'Handicraft', 'Footwear', 'Jewelry', 'Books & Stationery', 'Sports & Outdoors', 'Kids & Baby', 'Pets', 'Automotive', 'Health & Wellness']
+export const isPakistanPhone = (value) => /^03\d{9}$/.test(String(value || '').replace(/\D/g, ''))
 
 export const STORE_TYPES = [
   { id: 'home', label: 'Home Business', icon: 'home', hint: 'Ghar se chalate hain — small batch, personal touch' },

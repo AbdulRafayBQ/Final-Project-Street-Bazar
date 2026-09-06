@@ -1,7 +1,7 @@
 /* Street Bazar — Cart & checkout */
 
 import { icon, esc, money, num, toast, spinner } from '../ui.js'
-import { state, setCart, cartTotal, cartCount, productById, storeById, currentUser, placeOrder, addToCart } from '../store.js'
+import { state, setCart, cartTotal, cartCount, productById, storeById, currentUser, placeOrder, addToCart, isPakistanPhone } from '../store.js'
 import { navigate, renderRoute } from '../router.js'
 
 const DELIVERY = 250
@@ -71,7 +71,7 @@ export async function cartPage() {
         <h4 class="h4">Delivery details</h4>
         <div class="stack" style="margin-top:12px">
           <input class="input" id="c-name" placeholder="Full name" value="${esc(u?.name || '')}">
-          <input class="input" id="c-phone" placeholder="Phone (03xx-xxxxxxx)">
+          <input class="input" id="c-phone" type="tel" required pattern="03[0-9]{9}" inputmode="numeric" maxlength="11" placeholder="Phone (03xx-xxxxxxx)">
           <input class="input" id="c-city" placeholder="City">
           <textarea class="textarea" id="c-address" placeholder="Full address — house, street, area" style="min-height:80px"></textarea>
           <select class="select" id="c-pay">
@@ -116,7 +116,7 @@ cartPage.mount = (params, query, root) => {
     const city = root.querySelector('#c-city').value.trim()
     const line = root.querySelector('#c-address').value.trim()
     if (!name || !phone || !line) return toast('Name, phone aur address bharein', 'err')
-    if (!/^03\d{9}$/.test(phone.replace(/\D/g, ''))) return toast('Phone number exactly 11 digits ka hona chahiye (03XXXXXXXXX)', 'err')
+    if (!isPakistanPhone(phone)) return toast('Phone number exactly 11 digits ka hona chahiye (03XXXXXXXXX)', 'err')
     const btn = spinner(e.currentTarget)
     await new Promise((r) => setTimeout(r, 800))
     const order = placeOrder({ address: { name, phone, city, line }, etaDays: 4 })

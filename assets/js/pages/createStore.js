@@ -1,7 +1,7 @@
 /* Street Bazar — Create / Edit Store wizard with live interface preview */
 
 import { icon, esc, money, toast, modal, closeModal, readFile, themeStyle, spinner } from '../ui.js'
-import { THEME_PRESETS, FONT_PAIRS, STORE_TYPES, CATEGORIES, createStore, updateStore, storeById, currentUser, allCategories } from '../store.js'
+import { THEME_PRESETS, FONT_PAIRS, STORE_TYPES, CATEGORIES, createStore, updateStore, storeById, currentUser, allCategories, isPakistanPhone } from '../store.js'
 import { navigate } from '../router.js'
 
 const STEPS = ['Basics', 'Design & fonts', 'Branding', 'Categories & links', 'Preview & publish']
@@ -129,7 +129,7 @@ createStorePage.mount = (params, query, root) => {
         <h4 class="h4">Owner verification (admin ke liye private)</h4>
         <p class="tiny muted">CNIC aur personal details public nahi hongi. Admin approval ke liye zaroori hain.</p>
         <div class="grid grid-2" style="gap:12px;margin-top:10px">
-          <div class="field"><span class="label">Owner phone *</span><input class="input" data-f="ownerPhone" value="${esc(draft.ownerPhone)}" inputmode="numeric" maxlength="11" placeholder="03XXXXXXXXX"></div>
+          <div class="field"><span class="label">Owner phone *</span><input class="input" data-f="ownerPhone" value="${esc(draft.ownerPhone)}" type="tel" required pattern="03[0-9]{9}" inputmode="numeric" maxlength="11" placeholder="03XXXXXXXXX"></div>
           <div class="field"><span class="label">CNIC *</span><input class="input" data-f="cnic" value="${esc(draft.cnic)}" inputmode="numeric" maxlength="13" placeholder="13 digit CNIC"></div>
         </div>
         <div class="field"><span class="label">Personal address *</span><textarea class="textarea" data-f="personalAddress" placeholder="Owner ka verification address">${esc(draft.personalAddress)}</textarea></div>
@@ -334,7 +334,7 @@ createStorePage.mount = (params, query, root) => {
 
   const onPublish = async (e) => {
     if (!draft.name.trim()) return toast('Store ka naam zaroori hai', 'err')
-    if (!/^03\d{9}$/.test(draft.ownerPhone.replace(/\D/g, ''))) return toast('Owner phone 11 digits ka hona chahiye (03XXXXXXXXX)', 'err')
+    if (!isPakistanPhone(draft.ownerPhone)) return toast('Owner phone 11 digits ka hona chahiye (03XXXXXXXXX)', 'err')
     if (!/^\d{13}$/.test(draft.cnic.replace(/\D/g, ''))) return toast('CNIC 13 digits ka hona chahiye', 'err')
     if (!draft.personalAddress.trim()) return toast('Personal address zaroori hai', 'err')
     const btn = e?.currentTarget || form.querySelector('[data-publish]')
@@ -364,7 +364,15 @@ createStorePage.mount = (params, query, root) => {
   form.addEventListener('click', (e) => {
     const next = e.target.closest('[data-next]')
     const prev = e.target.closest('[data-prev]')
-    if (next) { step = Math.min(STEPS.length - 1, step + 1); paint() }
+    if (next) {
+      if (step === 0) {
+        if (!draft.name.trim()) return toast('Store ka naam zaroori hai', 'err')
+        if (!isPakistanPhone(draft.ownerPhone)) return toast('Owner phone 11 digits ka hona chahiye (03XXXXXXXXX)', 'err')
+        if (!/^\d{13}$/.test(draft.cnic.replace(/\D/g, ''))) return toast('CNIC 13 digits ka hona chahiye', 'err')
+        if (!draft.personalAddress.trim()) return toast('Personal address zaroori hai', 'err')
+      }
+      step = Math.min(STEPS.length - 1, step + 1); paint()
+    }
     if (prev) { step = Math.max(0, step - 1); paint() }
   })
 

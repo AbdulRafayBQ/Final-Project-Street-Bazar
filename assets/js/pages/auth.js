@@ -103,7 +103,8 @@ authPage.mount = (params, query, root) => {
       <p class="muted small" style="margin:8px 0 18px">OTP verify ho gaya. Ab apna new password set karein.</p>
       <div class="stack">
         <div class="field"><span class="label">New password</span><div class="password-wrap"><input class="input" id="au-pass" type="password" placeholder="6+ characters"><button type="button" class="password-toggle" data-password-toggle>Show</button></div></div>
-        <button class="btn btn-grad btn-lg btn-block" id="au-go">Update password</button>
+        <div class="field"><span class="label">Confirm password</span><input class="input" id="au-confirm-pass" type="password" placeholder="Dobara password likhein"></div>
+        <button class="btn btn-grad btn-lg btn-block" id="au-go">Update password & sign in</button>
       </div>`,
     signup: () => `
       <h2 class="h3">Bazaar mein aapka swagat hai</h2>
@@ -176,8 +177,10 @@ authPage.mount = (params, query, root) => {
       await new Promise((r) => setTimeout(r, 500))
       try {
         if (mode === 'forgot') {
+          if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error('Valid email address likhein')
           await authRequest('forgot', { email })
-          btn(); paint(); toast('Password reset email bhej di gayi. Email mein Reset Password button dabayein.', 'ok'); return
+          sessionStorage.setItem('street-bazar-reset-email', email)
+          mode = 'reset'; btn(); paint(); toast('OTP email par bhej diya gaya', 'ok'); return
         }
         if (mode === 'reset') {
           const resetEmail = sessionStorage.getItem('street-bazar-reset-email') || email
@@ -189,11 +192,20 @@ authPage.mount = (params, query, root) => {
         if (mode === 'resetPassword') {
           const accessToken = sessionStorage.getItem('street-bazar-recovery-token') || sessionStorage.getItem('street-bazar-reset-token')
           if (!accessToken) throw new Error('Reset session expire ho gaya. Dobara Forgot password karein.')
+          if (pass.length < 6) throw new Error('Password kam se kam 6 characters ka ho')
+          const confirmPass = body.querySelector('#au-confirm-pass')?.value || ''
+          if (pass !== confirmPass) throw new Error('Dono passwords same hone chahiye')
           await authRequest('reset', { access_token: accessToken, password: pass })
+          const resetEmail = sessionStorage.getItem('street-bazar-reset-email')
+          if (!resetEmail) throw new Error('Reset email session expire ho gaya. Dobara Forgot password karein.')
+          const loginResult = await authRequest('login', { email: resetEmail, password: pass })
+          await syncPull()
+          state.users = state.users.filter((user) => user.email.toLowerCase() !== resetEmail.toLowerCase())
+          state.users.push(loginResult.user); state.session = loginResult.user.id; save()
           sessionStorage.removeItem('street-bazar-reset-email')
           sessionStorage.removeItem('street-bazar-reset-token')
           sessionStorage.removeItem('street-bazar-recovery-token')
-          mode = 'signin'; btn(); paint(); toast('Password update ho gaya', 'ok'); return
+          btn(); toast('Password update ho gaya — aap login ho gaye', 'ok'); navigate(redirect); return
         }
         if (mode === 'signin') {
           let u

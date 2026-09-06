@@ -119,7 +119,6 @@ const views = {
               <span class="tiny muted">· ${(s.categories || []).join(', ') || 'no categories'}</span>
             </div>
             <div class="pill-note" style="margin-top:10px"><b>CNIC:</b> ${esc(s.cnic || 'Not provided')} · <b>Phone:</b> ${esc(s.ownerPhone || 'Not provided')}<br><b>Personal address:</b> ${esc(s.personalAddress || 'Not provided')}</div>
-            <div class="pill-note" style="margin-top:10px"><b>CNIC:</b> ${esc(s.cnic || 'Not provided')} · <b>Phone:</b> ${esc(s.ownerPhone || 'Not provided')}<br><b>Personal address:</b> ${esc(s.personalAddress || 'Not provided')}</div>
             <div class="wrap-flex" style="margin-top:14px">
               <a class="btn btn-sm btn-ghost" href="#/store/${s.slug}">${icon('eye', '', 14)} Preview</a>
               <button class="btn btn-sm btn-teal" data-approve="${s.id}">${icon('check', '', 14)} Approve</button>
