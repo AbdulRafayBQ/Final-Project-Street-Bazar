@@ -18,11 +18,6 @@ const TABS = [
 ]
 
 export async function adminPage(params, query) {
-  try {
-    await syncPull()
-  } catch (error) {
-    console.error('Admin request refresh failed:', error)
-  }
   const u = currentUser()
   if (!u || u.role !== 'admin') {
     return `<section class="sec"><div class="wrap"><div class="panel" style="max-width:520px;margin:0 auto;text-align:center">

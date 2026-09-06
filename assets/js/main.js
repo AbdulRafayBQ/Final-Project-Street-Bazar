@@ -533,7 +533,8 @@ async function boot() {
   setTimeout(hide, 800)
 }
 
-Promise.resolve(restoreGoogleSession()).then(boot, boot)
+restoreGoogleSession()
+boot()
 /* =========================================================
    STREET BAZAR — GLOBAL SCROLL & MOTION EFFECTS
    ========================================================= */
