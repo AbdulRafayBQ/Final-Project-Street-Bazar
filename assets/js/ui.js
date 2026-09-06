@@ -210,7 +210,6 @@ function readOptimizedMedia(file) {
       throw new Error('Video file 2MB se chhoti rakhein ya direct video link use karein.')
     }
 
-    export const readImage = (file) => readOptimizedMedia(file)
     return readFile(file)
   }
   return new Promise((resolve, reject) => {
@@ -233,6 +232,8 @@ function readOptimizedMedia(file) {
     reader.readAsDataURL(file)
   })
 }
+
+export const readImage = (file) => readOptimizedMedia(file)
 
 export function mediaPickerHTML(id = 'media') {
   return `
