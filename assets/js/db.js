@@ -113,12 +113,6 @@ try {
     settings: { ...state.settings, supabase: {}, ai: {} },
   }
 
-  export async function syncProduct(product) {
-    await api('/api/data', { method: 'POST', body: JSON.stringify({ action: 'product', product }) })
-    state.settings.lastSync = Date.now()
-    save()
-  }
-
   payload.user_id = userId
   delete payload.session
   await api('/api/data', { method: 'POST', body: JSON.stringify(payload) })
@@ -127,6 +121,12 @@ try {
 } finally {
   syncing = false
 }
+}
+
+export async function syncProduct(product) {
+  await api('/api/data', { method: 'POST', body: JSON.stringify({ action: 'product', product }) })
+  state.settings.lastSync = Date.now()
+  save()
 }
 
 export async function deleteRemote(table, id) {
