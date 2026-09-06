@@ -37,12 +37,20 @@ const cleanPayload = (payload) => {
   const stores = (payload.stores || []).filter((s) => !isDemo(s))
   const storeIds = new Set(stores.map((s) => s.id))
   const products = (payload.products || []).filter((p) => !isDemo(p) && storeIds.has(p.store || p.store_id))
+  const productIds = new Set(products.map((p) => p.id))
+  const demoUsers = new Set(['u-admin', 'u-hassan', 'u-sana', 'u-bilal', 'u-mariam', 'u-ali', 'u-zoya'])
+  const keepRelated = (item) => !isDemo(item) && (!item.store || storeIds.has(item.store || item.store_id)) && (!item.product || productIds.has(item.product || item.product_id))
   return {
     ...payload,
     isDemo: false,
-    users: (payload.users || []).filter((u) => !isDemo(u) && !String(u.email || '').endsWith('@demo.pk') && !['u-admin', 'u-hassan', 'u-sana', 'u-bilal', 'u-mariam', 'u-ali', 'u-zoya'].includes(u.id)),
+    users: (payload.users || []).filter((u) => !isDemo(u) && !String(u.email || '').endsWith('@demo.pk') && !demoUsers.has(u.id)),
     stores,
     products,
+    reviews: (payload.reviews || []).filter(keepRelated),
+    orders: (payload.orders || []).filter((o) => !demoUsers.has(o.user || o.user_id) && (o.items || []).every((item) => productIds.has(item.product))),
+    follows: (payload.follows || []).filter((f) => !demoUsers.has(f.user || f.user_id) && storeIds.has(f.store || f.store_id)),
+    threads: (payload.threads || []).filter((t) => !demoUsers.has(t.customer || t.customer_id) && keepRelated(t)),
+    likes: (payload.likes || []).filter((l) => !demoUsers.has(l.user || l.user_id) && productIds.has(l.product || l.product_id)),
   }
 }
 
