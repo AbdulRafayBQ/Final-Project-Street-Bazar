@@ -32,6 +32,33 @@ const safeUpsert = async (table, rows) => {
   }
 }
 
+const storeRow = (store) => ({
+  id: store.id, owner_id: store.owner || store.owner_id, name: store.name, slug: store.slug,
+  tagline: store.tagline, type: store.type, description: store.description, logo: store.logo,
+  banner: store.banner, theme: store.theme, categories: store.categories, socials: store.socials,
+  address: store.address, city: store.city, sale: store.sale, status: store.status,
+  rating: store.rating || 0, owner_phone: store.ownerPhone || store.owner_phone,
+  cnic: store.cnic, cnic_front: store.cnicFront || store.cnic_front,
+  cnic_back: store.cnicBack || store.cnic_back, personal_address: store.personalAddress || store.personal_address,
+  created_at: store.createdAt || store.created_at,
+})
+
+const saveStore = async (store) => {
+  try {
+    await upsert('stores', [storeRow(store)])
+  } catch (error) {
+    if (!/cnic|schema cache|column/i.test(error.message)) throw error
+    const rows = await request('/rest/v1/app_state?select=payload&key=eq.global&limit=1')
+    const payload = rows[0]?.payload || {}
+    payload.stores = [store, ...(payload.stores || []).filter((item) => item.id !== store.id)]
+    await request('/rest/v1/app_state?on_conflict=key', {
+      method: 'POST',
+      headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
+      body: JSON.stringify({ key: 'global', payload }),
+    })
+  }
+}
+
 const isDemo = (item) => item?.demo === true
 const cleanPayload = (payload) => {
   const stores = (payload.stores || []).filter((s) => !isDemo(s))
@@ -115,16 +142,7 @@ export default async function handler(req, res) {
     if (payload.action === 'store') {
       const store = payload.store
       if (!store?.id || !store.name) return json(res, 400, { error: 'Store data is required' })
-      await upsert('stores', [{
-        id: store.id, owner_id: store.owner || store.owner_id, name: store.name, slug: store.slug,
-        tagline: store.tagline, type: store.type, description: store.description, logo: store.logo,
-        banner: store.banner, theme: store.theme, categories: store.categories, socials: store.socials,
-        address: store.address, city: store.city, sale: store.sale, status: store.status,
-        rating: store.rating || 0, owner_phone: store.ownerPhone || store.owner_phone,
-        cnic: store.cnic, cnic_front: store.cnicFront || store.cnic_front,
-        cnic_back: store.cnicBack || store.cnic_back, personal_address: store.personalAddress || store.personal_address,
-        created_at: store.createdAt || store.created_at,
-      }])
+      await saveStore(store)
       return json(res, 200, { ok: true })
     }
     if (payload.action === 'product') {

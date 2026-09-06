@@ -40,6 +40,9 @@ alter table stores add column if not exists personal_address text;
 alter table stores add column if not exists cnic_front text;
 alter table stores add column if not exists cnic_back text;
 
+-- Run this migration after the table already exists so REST schema cache is refreshed.
+notify pgrst, 'reload schema';
+
 create table if not exists products (
   id text primary key, store_id text references stores(id), title text,
   description text, price numeric, compare_at numeric, media jsonb,
