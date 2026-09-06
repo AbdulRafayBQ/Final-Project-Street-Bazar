@@ -77,7 +77,7 @@ settingsPage.mount = (params, query, root) => {
       if (res.source === 'live') {
         toast('🎉 Live AI Success: ' + res.text.slice(0, 45) + '…', 'ok')
       } else {
-        toast('⚠️ API fail ho gayi, fallback active hai. Key aur Model verify karein.', 'err')
+        toast('⚠️ AI service temporarily unavailable. Please try again later.', 'err')
       }
     } catch (err) {
       toast('AI Error: ' + err.message, 'err')
