@@ -283,14 +283,23 @@ addProductPage.mount = (params, query, root) => {
       outsideDeliveryCharge: Number(root.querySelector('#p-outside-delivery').value) || 0,
       customizable: { on: custOn.checked, price: custOn.checked ? (Number(root.querySelector('#p-custom-price').value) || 0) : 0, options: custOn.checked ? options.filter((o) => o.name && o.choices.length) : [] },
     }
-    if (editing) { updateProduct(editing.id, data); await syncPush(); btn(); toast('Product update ho gaya', 'ok'); navigate('#/product/' + editing.id) }
-    else {
-      const p = createProduct(data)
-      if (warehouseDraft) updateWarehouseItem(warehouseDraft.id, { product: p.id, inventory: 'store', qty: stock })
-      await syncPush()
+    try {
+      if (editing) {
+        updateProduct(editing.id, data)
+        try { await syncPush() } catch (error) { console.error('Product update sync failed:', error); toast('Product local save ho gaya, lekin server sync failed: ' + error.message, 'err') }
+        toast('Product update ho gaya', 'ok')
+        navigate('#/product/' + editing.id)
+      } else {
+        const p = createProduct(data)
+        if (warehouseDraft) updateWarehouseItem(warehouseDraft.id, { product: p.id, inventory: 'store', qty: stock })
+        try { await syncPush() } catch (error) { console.error('Product submission sync failed:', error); toast('Product local save ho gaya, lekin server sync failed: ' + error.message, 'err') }
+        toast('Product review ke liye submit ho gaya. Admin approval ke baad publish hoga.', 'ok')
+        navigate('#/product/' + p.id)
+      }
+    } catch (error) {
+      toast(error.message || 'Product save nahi ho saka', 'err')
+    } finally {
       btn()
-      toast('Product review ke liye submit ho gaya. Admin approval ke baad publish hoga.', 'ok')
-      navigate('#/product/' + p.id)
     }
   })
 }

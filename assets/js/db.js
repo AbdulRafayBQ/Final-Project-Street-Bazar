@@ -87,6 +87,9 @@ const timeout = setTimeout(() => controller.abort(), 8000)
 let res
 try {
   res = await fetch(path, { ...options, signal: controller.signal, headers: { 'Content-Type': 'application/json', ...(options.headers || {}) } })
+} catch (error) {
+  if (error.name === 'AbortError') throw new Error('Server response timed out. Please try again.')
+  throw error
 } finally {
   clearTimeout(timeout)
 }
