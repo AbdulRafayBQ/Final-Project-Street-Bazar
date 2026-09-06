@@ -204,6 +204,34 @@ export function readFile(file) {
   })
 }
 
+function readOptimizedMedia(file) {
+  if (file.type.startsWith('video')) {
+    if (file.size > 2 * 1024 * 1024) {
+      throw new Error('Video file 2MB se chhoti rakhein ya direct video link use karein.')
+    }
+    return readFile(file)
+  }
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onerror = reject
+    reader.onload = () => {
+      const image = new Image()
+      image.onerror = reject
+      image.onload = () => {
+        const max = 1200
+        const scale = Math.min(1, max / Math.max(image.width, image.height))
+        const canvas = document.createElement('canvas')
+        canvas.width = Math.max(1, Math.round(image.width * scale))
+        canvas.height = Math.max(1, Math.round(image.height * scale))
+        canvas.getContext('2d').drawImage(image, 0, 0, canvas.width, canvas.height)
+        resolve(canvas.toDataURL('image/jpeg', 0.78))
+      }
+      image.src = reader.result
+    }
+    reader.readAsDataURL(file)
+  })
+}
+
 export function mediaPickerHTML(id = 'media') {
   return `
     <div class="field">
@@ -228,11 +256,16 @@ export function bindMediaPicker(root, list = [], onChange) {
   }
   paint()
   input?.addEventListener('change', async () => {
-    for (const f of Array.from(input.files || [])) {
-      const url = await readFile(f)
-      list.push({ type: f.type.startsWith('video') ? 'video' : 'image', url })
+    try {
+      for (const f of Array.from(input.files || [])) {
+        const url = await readOptimizedMedia(f)
+        list.push({ type: f.type.startsWith('video') ? 'video' : 'image', url })
+      }
+      paint(); onChange?.(list)
+    } catch (error) {
+      toast(error.message || 'Media upload nahi ho saka', 'err')
     }
-    paint(); onChange?.(list); input.value = ''
+    input.value = ''
   })
   urlIn?.addEventListener('keydown', (e) => {
     if (e.key !== 'Enter') return
