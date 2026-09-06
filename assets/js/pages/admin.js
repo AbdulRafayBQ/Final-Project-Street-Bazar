@@ -3,8 +3,8 @@
 import { icon, esc, money, num, timeAgo, toast, confirmBox, modal, closeModal } from '../ui.js'
 import { statCard } from '../components.js'
 import { state, currentUser, setRole, storeById, storeProducts, productById, userById, updateStore, deleteStore, updateProduct, deleteProduct, deleteOrder, notify, liveStores, pendingStores, lowStock } from '../store.js'
-import { isAIConnected, isConnected, deleteRemote, syncProduct } from '../db.js'
-import { navigate } from '../router.js'
+import { isAIConnected, isConnected, deleteRemote, syncProduct, syncPull } from '../db.js'
+import { navigate, renderRoute } from '../router.js'
 
 const TABS = [
   { id: 'overview', label: 'Overview', icon: 'grid' },
@@ -18,6 +18,11 @@ const TABS = [
 ]
 
 export async function adminPage(params, query) {
+  try {
+    await syncPull()
+  } catch (error) {
+    console.error('Admin request refresh failed:', error)
+  }
   const u = currentUser()
   if (!u || u.role !== 'admin') {
     return `<section class="sec"><div class="wrap"><div class="panel" style="max-width:520px;margin:0 auto;text-align:center">
@@ -28,6 +33,25 @@ export async function adminPage(params, query) {
         <a class="btn btn-grad" href="#/auth">${icon('shield', '', 16)} <span>Admin sign in</span></a>
       </div>
     </div></div></section>`
+  }
+
+  adminPage.mount = (params, query, root) => {
+    let signature = ''
+    const refresh = async () => {
+      try {
+        await syncPull()
+        const next = JSON.stringify([
+          ...state.stores.filter((store) => store.status === 'pending').map((store) => store.id),
+          ...state.products.filter((product) => product.status === 'pending').map((product) => product.id),
+        ].sort())
+        if (signature && next !== signature) await renderRoute()
+        signature = next
+      } catch (error) {
+        console.error('Admin request polling failed:', error)
+      }
+    }
+    refresh()
+    root._adminRefreshTimer = setInterval(refresh, 5000)
   }
 
   const tab = query.tab || 'overview'

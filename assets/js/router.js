@@ -49,6 +49,10 @@ export async function renderRoute() {
   void view.offsetWidth
   view.classList.add('page-enter')
   window.scrollTo({ top: 0, behavior: 'instant' in window ? 'instant' : 'auto' })
+  if (view._adminRefreshTimer) {
+    clearInterval(view._adminRefreshTimer)
+    view._adminRefreshTimer = null
+  }
 
   try {
     view.innerHTML = await page(params, query)

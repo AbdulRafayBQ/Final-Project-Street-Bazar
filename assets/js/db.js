@@ -82,6 +82,7 @@ export const isConnected = () => true
 export const isAIConnected = () => true
 export const getAIKey = () => 'server-managed'
 let syncing = false
+let syncingPromise = null
 
 async function api(path, options = {}) {
 const controller = new AbortController()
@@ -105,9 +106,10 @@ return api('/api/auth', { method: 'POST', body: JSON.stringify({ action, ...payl
 }
 
 export async function syncPush() {
-if (syncing) return
+if (syncingPromise) return syncingPromise
 syncing = true
-try {
+syncingPromise = (async () => {
+ try {
   const userId = state.session
   const isDemo = (item) => item?.demo === true
   const stores = state.stores.filter((store) => !isDemo(store))
@@ -127,8 +129,14 @@ try {
   await api('/api/data', { method: 'POST', body: JSON.stringify(payload) })
   state.settings.lastSync = Date.now()
   save()
+ } finally {
+   syncing = false
+ }
+})()
+try {
+  return await syncingPromise
 } finally {
-  syncing = false
+  syncingPromise = null
 }
 }
 
