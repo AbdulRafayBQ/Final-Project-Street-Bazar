@@ -35,8 +35,31 @@ const safeUpsert = async (table, rows) => {
 export default async function handler(req, res) {
   try {
     if (req.method === 'GET') {
-      const rows = await request('/rest/v1/app_state?select=payload&key=eq.global&limit=1')
-      return json(res, 200, rows[0]?.payload || null)
+      const [stateRows, storeRows, productRows] = await Promise.all([
+        request('/rest/v1/app_state?select=payload&key=eq.global&limit=1'),
+        request('/rest/v1/stores?select=*'),
+        request('/rest/v1/products?select=*'),
+      ])
+      const payload = stateRows[0]?.payload || {}
+      const stores = (storeRows || []).map((s) => ({
+        id: s.id, owner: s.owner_id, name: s.name, slug: s.slug, tagline: s.tagline,
+        type: s.type, description: s.description, logo: s.logo, banner: s.banner,
+        theme: s.theme, categories: s.categories || [], socials: s.socials || {},
+        address: s.address, city: s.city, sale: s.sale, status: s.status,
+        rating: s.rating, ownerPhone: s.owner_phone, cnic: s.cnic,
+        cnicFront: s.cnic_front, cnicBack: s.cnic_back, personalAddress: s.personal_address,
+        createdAt: s.created_at,
+      }))
+      const products = (productRows || []).map((p) => ({
+        id: p.id, store: p.store_id, title: p.title, description: p.description,
+        price: p.price, compareAt: p.compare_at, media: p.media || [], categories: p.categories || [],
+        tags: p.tags || [], stock: p.stock, sku: p.sku, customizable: p.customizable,
+        wholesale: p.wholesale, deliveryCharge: p.delivery_charge,
+        homeDeliveryCharge: p.home_delivery_charge, outsideDeliveryCharge: p.outside_delivery_charge,
+        sales: p.sales, status: p.status, createdAt: p.created_at,
+      }))
+      const merge = (local, remote) => [...remote, ...(local || []).filter((item) => !remote.some((row) => row.id === item.id))]
+      return json(res, 200, { ...payload, stores: merge(payload.stores, stores), products: merge(payload.products, products) })
     }
     if (req.method === 'DELETE') {
       const { table, id } = req.body || {}

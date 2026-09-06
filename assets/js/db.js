@@ -139,7 +139,17 @@ export async function syncPull() {
 const remote = await api('/api/data')
 if (!remote) return
 const session = state.session
-Object.assign(state, remote, { session })
+const mergeById = (remoteItems, localItems) => {
+  const incoming = Array.isArray(remoteItems) ? remoteItems : []
+  const localOnly = (Array.isArray(localItems) ? localItems : []).filter((item) => !incoming.some((row) => row.id === item.id))
+  return [...incoming, ...localOnly]
+}
+Object.assign(state, remote, {
+  users: mergeById(remote.users, state.users),
+  stores: mergeById(remote.stores, state.stores),
+  products: mergeById(remote.products, state.products),
+  session,
+})
 save()
 }
 
