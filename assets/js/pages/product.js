@@ -77,7 +77,8 @@ export async function productPage(params) {
           <div data-wholesale-notice style="display:none;margin-top:10px;padding:8px 14px;font-size:13px;border-radius:10px;background:rgba(13,148,136,0.1);color:#0D9488;border:1px solid rgba(13,148,136,0.2)"></div>
         </div>
 
-        ${p.customizable?.on ? `<div class="opt-box" data-customize-box style="display:none">
+        ${p.customizable?.on ? `<div class="row" style="gap:8px;margin-top:16px"><button class="btn btn-sm btn-primary" data-product-mode="normal">Normal product</button><button class="btn btn-sm btn-ghost" data-product-mode="custom">Customize product</button></div>
+        <div class="opt-box" data-customize-box style="display:none">
           <h4 class="h4">${icon('wand', '', 16)} Customize this product</h4>
           <p class="tiny muted" style="margin:-4px 0 12px">Prompt dein aur AI nayi product image generate karega. Customized order par ${p.customizable?.price ? money(p.customizable.price) + ' extra' : 'owner ka extra charge apply nahi hota'} lagega.</p>
           <div style="text-align:center;margin-bottom:12px;background:#f8f5f1;border-radius:14px;padding:8px"><canvas data-custom-canvas width="640" height="640" style="max-width:100%;height:auto;border-radius:10px"></canvas><img data-generated-preview alt="AI generated product preview" hidden style="max-width:100%;height:auto;border-radius:10px"></div>
@@ -85,6 +86,10 @@ export async function productPage(params) {
           <button class="btn btn-primary btn-block" style="margin-top:10px" data-ai-design-generate>${icon('sparkles', '', 15)} Generate with AI</button>
           <button class="btn btn-grad btn-block" style="margin-top:10px" data-order-custom hidden>${icon('wand', '', 15)} Order this design</button>
           <div class="tiny muted" data-custom-status style="margin-top:8px">Live editor changes stay on this product; AI may generate a separate design image.</div>
+          <div class="row" style="gap:10px;margin-top:12px">
+            <button class="btn btn-grad" data-custom-buy>${icon('cart', '', 15)} Add customized product</button>
+            <button class="btn btn-primary" data-custom-buy-now>Buy customized ${icon('arrow', '', 15)}</button>
+          </div>
         </div>` : ''}
 
         ${tiers.length ? `<div class="opt-box" style="border-color:rgba(15,167,155,.4);background:rgba(15,167,155,.05)">
@@ -96,8 +101,7 @@ export async function productPage(params) {
           </div>
         </div>` : ''}
 
-        ${p.customizable?.on ? `<div class="row" style="gap:8px;margin-bottom:10px"><button class="btn btn-sm btn-primary" data-product-mode="normal">Normal product</button><button class="btn btn-sm btn-ghost" data-product-mode="custom">Customize product</button></div>` : ''}
-        <div class="row" style="gap:12px;flex-wrap:wrap">
+        <div class="row" data-normal-actions style="gap:12px;flex-wrap:wrap">
           <div class="qty" data-qty-box>
             <button data-dec aria-label="Decrease">${icon('minus', '', 15)}</button>
             <span data-qty-val>1</span>
@@ -108,9 +112,6 @@ export async function productPage(params) {
           <button class="icon-btn" data-open-product-chat="${p.id}" title="Chat with seller" style="width:50px;height:50px;border-radius:16px">${icon('chat', '', 19)}</button>
           <button class="icon-btn" data-like-big="${p.id}" style="width:50px;height:50px;border-radius:16px">${icon('heart', '', 19)}</button>
         </div>
-
-        <div class="progress"><i style="width:${Math.min(100, (p.stock / 120) * 100)}%"></i></div>
-        <div class="tiny muted">${p.stock <= 0 ? 'Out of stock' : 'In stock'}${p.wholesale?.on ? ' · wholesale ke liye quantity 12+' : ''}</div>
 
         <div class="trust-row">
           <div>${icon('truck', '', 15)} Delivery 2–5 days</div>
@@ -154,6 +155,11 @@ productPage.mount = (params, query, root) => {
 
   // gallery
   const main = root.querySelector('[data-gallery-main]')
+  main?.addEventListener('click', () => {
+    const media = p.media?.[0]
+    if (!media) return
+    modal({ title: p.title, wide: true, body: media.type === 'video' ? `<video src="${esc(media.url)}" controls autoplay style="width:100%;max-height:75vh;object-fit:contain"></video>` : `<img src="${esc(media.url)}" alt="${esc(p.title)}" style="width:100%;max-height:75vh;object-fit:contain">` })
+  })
   root.querySelectorAll('[data-thumbs] button')?.forEach((b) => b.addEventListener('click', () => {
     root.querySelectorAll('[data-thumbs] button').forEach((x) => x.classList.toggle('active', x === b))
     const m = p.media[Number(b.dataset.i)]
@@ -217,11 +223,15 @@ productPage.mount = (params, query, root) => {
   }
   root.querySelector('[data-buy]')?.addEventListener('click', () => doAdd(false))
   root.querySelector('[data-buy-now]')?.addEventListener('click', () => doAdd(true))
+  root.querySelector('[data-custom-buy]')?.addEventListener('click', () => doAdd(false, true))
+  root.querySelector('[data-custom-buy-now]')?.addEventListener('click', () => doAdd(true, true))
   root.querySelector('[data-order-custom]')?.addEventListener('click', () => doAdd(true, true))
   const customizationBox = root.querySelector('[data-customize-box]')
   root.querySelectorAll('[data-product-mode]').forEach((button) => button.addEventListener('click', () => {
     const custom = button.dataset.productMode === 'custom'
     if (customizationBox) customizationBox.style.display = custom ? '' : 'none'
+    const normalActions = root.querySelector('[data-normal-actions]')
+    if (normalActions) normalActions.style.display = custom ? 'none' : ''
     root.querySelectorAll('[data-product-mode]').forEach((x) => x.classList.toggle('btn-primary', x === button))
     root.querySelectorAll('[data-product-mode]').forEach((x) => x.classList.toggle('btn-ghost', x !== button))
   }))

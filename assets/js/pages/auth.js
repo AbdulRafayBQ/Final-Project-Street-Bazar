@@ -139,7 +139,7 @@ authPage.mount = (params, query, root) => {
       input.type = input.type === 'password' ? 'text' : 'password'
       e.currentTarget.textContent = input.type === 'password' ? 'Show' : 'Hide'
     })
-    body.querySelector('[data-google-auth]')?.addEventListener('click', async (event) => {
+    body.querySelector('[data-google-auth], #google-auth')?.addEventListener('click', async (event) => {
       const button = event.currentTarget
       button.disabled = true
       try {

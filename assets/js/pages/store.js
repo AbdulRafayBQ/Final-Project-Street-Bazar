@@ -3,7 +3,6 @@
 import { icon, esc, money, num, themeStyle, toast, timeAgo, avatar, modal } from '../ui.js'
 import { sectionHead, productCard, reviewItem, typeBadge, emptyLogin } from '../components.js'
 import { storeBySlug, storeProducts, storeReviews, currentUser, myStores, isFollowing, toggleFollow, ratingOf, state, sendMessage, appendThreadMessage, updateStore, FONT_PAIRS } from '../store.js'
-import { chatReply } from '../ai.js'
 
 export async function storePage(params) {
   const s = storeBySlug(params.slug) || null
@@ -116,8 +115,7 @@ export async function storePage(params) {
           ${u ? `<div class="chatbox" data-chat data-store="${s.id}">
             <div class="chat-head">
               ${avatar(s.name, 'sm')}
-              <div style="flex:1"><b class="small">${esc(s.name)}</b><div class="sub">Usually replies within 1 hour · AI jawab bhi deta hai</div></div>
-              <span class="badge badge-teal">${icon('sparkles', '', 12)} AI on</span>
+              <div style="flex:1"><b class="small">${esc(s.name)}</b><div class="sub">Owner usually replies within 1 hour</div></div>
             </div>
             <div class="chat-body" data-chat-body>
               <div class="msg them"><div class="who">${esc(s.name)}</div>Assalam-o-alaikum! Bataiye kis product ke bare mein poochna hai? Main aapki madad khusus koshish se karta hoon.<div class="time">${timeAgo(Date.now())}</div></div>
@@ -151,7 +149,7 @@ storePage.mount = (params, query, root) => {
   root.querySelectorAll('[data-store-cats] .chip').forEach((b) => b.addEventListener('click', () => {
     root.querySelectorAll('[data-store-cats] .chip').forEach((x) => x.classList.toggle('active', x === b))
     const cat = b.dataset.scat
-    const list = storeProducts(s.id).filter((p) => !cat || p.categories.includes(cat))
+    const list = storeProducts(s.id).filter((p) => !cat || (p.categories || []).includes(cat))
     grid.innerHTML = list.length ? list.map(productCard).join('') : `<div class="empty" style="grid-column:1/-1"><p class="muted">Is category mein abhi kuch nahi.</p></div>`
   }))
 
@@ -191,19 +189,8 @@ export function bindChat(box, { storeId, productId = '', who = 'Store', thread =
     const msg = { from: u.id, text, at: Date.now() }
     push(msg)
     const thread = sendMessage({ productId, storeId, from: u.id, text })
-    const typing = document.createElement('div')
-    typing.className = 'msg ai'
-    typing.innerHTML = `<div class="who">Bazar AI</div><span class="typing"><i></i><i></i><i></i></span>`
-    body.appendChild(typing); body.scrollTop = body.scrollHeight
-    const reply = chatReply({ question: text, productId, storeId })
-    setTimeout(() => {
-      typing.remove()
-      push({ from: 'ai', text: reply, at: Date.now() })
-      appendThreadMessage({ productId, storeId, customer: u.id, from: 'ai', text: reply })
-      // owner ko notify taake wo khud bhi reply kar sake
-      const store = storeByIdSafe(storeId)
-      if (store) notifyOwner(store, text)
-    }, 900)
+    const store = storeByIdSafe(storeId)
+    if (store) notifyOwner(store, text)
   }
   send?.addEventListener('click', submit)
   input?.addEventListener('keydown', (e) => { if (e.key === 'Enter') submit() })

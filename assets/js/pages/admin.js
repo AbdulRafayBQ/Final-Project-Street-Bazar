@@ -138,7 +138,11 @@ const views = {
       ${pending.map((p) => {
         const s = storeById(p.store)
         return `<div class="card" style="padding:0">
-          <img src="${esc(p.media?.[0]?.url || './images/p-kurta.png')}" alt="${esc(p.title)}" style="width:100%;height:210px;object-fit:cover" onerror="this.src='./images/p-kurta.png'">
+          <div style="display:flex;gap:8px;overflow:auto;padding:10px;background:var(--paper-2)">
+            ${(p.media || []).map((m) => m.type === 'video'
+              ? `<video src="${esc(m.url)}" controls muted style="width:150px;height:150px;object-fit:contain;background:#111;border-radius:10px;flex:none"></video>`
+              : `<img src="${esc(m.url)}" alt="${esc(p.title)}" style="width:150px;height:150px;object-fit:contain;background:#fff;border-radius:10px;flex:none" onerror="this.src='./images/p-kurta.png'">`).join('')}
+          </div>
           <div style="padding:16px">
             <div class="row-between"><b class="h4">${esc(p.title)}</b><span class="badge badge-pending">pending</span></div>
             <p class="tiny muted" style="margin-top:6px">Store: ${esc(s?.name || 'Unknown')} · Owner: ${esc(userById(s?.owner)?.name || '—')}</p>
