@@ -469,9 +469,8 @@ export const productById = (id) => state.products.find((p) => p.id === id) || nu
 export const storeById = (id) => state.stores.find((s) => s.id === id) || null
 export const storeBySlug = (s) => state.stores.find((x) => x.slug === s) || null
 export const storeOf = (p) => storeById(p?.store)
-// Stores remain discoverable while awaiting review; only explicitly hidden or rejected stores stay private.
-export const liveStores = () => state.stores.filter((s) => s.status !== 'hidden' && s.status !== 'rejected')
-export const storeProducts = (id) => state.products.filter((p) => p.store === id && p.status !== 'hidden')
+export const liveStores = () => state.stores.filter((s) => s.status === 'live')
+export const storeProducts = (id) => state.products.filter((p) => p.store === id && p.status === 'active' && storeById(id)?.status === 'live')
 export const myStores = () => { const u = currentUser(); return u ? state.stores.filter((s) => s.owner === u.id) : [] }
 export const isFollowing = (id) => state.follows.some((f) => f.user === state.session && f.store === id)
 export const followedStores = () => { const u = currentUser(); return u ? state.follows.filter((f) => f.user === u.id).map((f) => storeById(f.store)).filter(Boolean) : [] }
@@ -506,7 +505,7 @@ export function searchAll(q = '') {
   const s = q.toLowerCase().trim()
   if (!s) return { products: [], stores: [] }
   const products = state.products.filter((p) =>
-    p.status !== 'hidden' && (p.title.toLowerCase().includes(s) || (p.tags || []).join(' ').toLowerCase().includes(s) || (p.categories || []).join(' ').toLowerCase().includes(s)))
+    p.status === 'active' && storeById(p.store)?.status === 'live' && (p.title.toLowerCase().includes(s) || (p.tags || []).join(' ').toLowerCase().includes(s) || (p.categories || []).join(' ').toLowerCase().includes(s)))
   const stores = liveStores().filter((st) => (st.name + ' ' + st.tagline + ' ' + (st.categories || []).join(' ')).toLowerCase().includes(s))
   return { products, stores }
 }
@@ -568,6 +567,7 @@ export function createStore(data) {
     id: uid('s'), owner: state.session, name: data.name, slug: slugify(data.name) + '-' + Math.random().toString(36).slice(2, 5),
     tagline: data.tagline || '', type: data.type, city: data.city || '', address: data.address || '',
     description: data.description || '', logo: data.logo || '', banner: data.banner || '',
+    ownerPhone: data.ownerPhone || '', cnic: data.cnic || '', personalAddress: data.personalAddress || '',
     theme: { ...preset, ...(data.theme || {}) }, categories: data.categories || [], socials: data.socials || {},
     sale: data.sale && data.sale.text ? data.sale : null, status: 'pending', rating: 0, followers: 0, createdAt: Date.now(),
   }
@@ -605,7 +605,7 @@ export function createProduct(data) {
     deliveryCharge: Number(data.deliveryCharge) || 0,
     sku: data.sku || '', customizable: data.customizable || { on: false, options: [] },
     wholesale: data.wholesale || { on: false, tiers: [] }, sales: 0, rating: 0,
-    createdAt: Date.now(), status: 'active',
+    createdAt: Date.now(), status: 'pending',
   }
   state.products.unshift(p)
   const store = storeById(p.store)

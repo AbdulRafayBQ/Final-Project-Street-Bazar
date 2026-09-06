@@ -10,6 +10,7 @@ export async function storePage(params) {
   if (!s) return `<section class="sec"><div class="wrap"><div class="empty"><h3 class="h3">Store nahi mila</h3><p class="muted">Ye store exist nahi karta ya hata diya gaya hai.</p><div style="margin-top:16px"><a class="btn btn-primary" href="#/explore"><span>Explore stores</span></a></div></div></div></section>`
 
   const u = currentUser()
+  if (s.status !== 'live' && s.owner !== u?.id && u?.role !== 'admin') return `<section class="sec"><div class="wrap"><div class="empty"><h3 class="h3">Store approval mein hai</h3><p class="muted">Admin approval ke baad ye store customers ko nazar aayega.</p><a class="btn btn-ghost" href="#/" style="margin-top:16px">Back to home</a></div></div></section>`
   const isOwner = u && s.owner === u.id
   const products = storeProducts(s.id)
   const reviews = storeReviews(s.id)

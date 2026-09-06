@@ -30,9 +30,13 @@ create table if not exists stores (
   owner_id uuid references users(id),
   name text, slug text unique, tagline text, type text, description text,
   logo text, banner text, theme jsonb, categories text[], socials jsonb,
-  address text, city text, sale jsonb, status text default 'pending',
+  address text, city text, sale jsonb, owner_phone text, cnic text, personal_address text,
+  status text default 'pending',
   rating numeric default 0, created_at timestamptz default now()
 );
+alter table stores add column if not exists owner_phone text;
+alter table stores add column if not exists cnic text;
+alter table stores add column if not exists personal_address text;
 
 create table if not exists products (
   id text primary key, store_id text references stores(id), title text,

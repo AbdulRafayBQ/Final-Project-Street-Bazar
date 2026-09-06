@@ -12,6 +12,8 @@ export async function productPage(params) {
 
   const s = storeOf(p)
   const u = currentUser()
+  const canReview = u?.role === 'admin' || s?.owner === u?.id
+  if ((p.status !== 'active' || s?.status !== 'live') && !canReview) return `<section class="sec"><div class="wrap"><div class="empty"><h3 class="h3">Product review mein hai</h3><p class="muted">Admin approval ke baad ye product customers ko available hoga.</p><a class="btn btn-ghost" href="#/explore" style="margin-top:16px">Explore marketplace</a></div></div></section>`
   const reviews = productReviews(p.id)
   const r = ratingOf(p)
   const off = p.compareAt && p.compareAt > p.price ? Math.round((1 - p.price / p.compareAt) * 100) : 0

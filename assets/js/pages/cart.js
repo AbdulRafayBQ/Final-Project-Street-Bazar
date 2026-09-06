@@ -116,6 +116,7 @@ cartPage.mount = (params, query, root) => {
     const city = root.querySelector('#c-city').value.trim()
     const line = root.querySelector('#c-address').value.trim()
     if (!name || !phone || !line) return toast('Name, phone aur address bharein', 'err')
+    if (!/^03\d{9}$/.test(phone.replace(/\D/g, ''))) return toast('Phone number exactly 11 digits ka hona chahiye (03XXXXXXXXX)', 'err')
     const btn = spinner(e.currentTarget)
     await new Promise((r) => setTimeout(r, 800))
     const order = placeOrder({ address: { name, phone, city, line }, etaDays: 4 })

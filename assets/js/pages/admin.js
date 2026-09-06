@@ -118,6 +118,8 @@ const views = {
               <span class="tiny muted">· ${esc(s.type)} · ${esc(s.city || '—')}</span>
               <span class="tiny muted">· ${(s.categories || []).join(', ') || 'no categories'}</span>
             </div>
+            <div class="pill-note" style="margin-top:10px"><b>CNIC:</b> ${esc(s.cnic || 'Not provided')} · <b>Phone:</b> ${esc(s.ownerPhone || 'Not provided')}<br><b>Personal address:</b> ${esc(s.personalAddress || 'Not provided')}</div>
+            <div class="pill-note" style="margin-top:10px"><b>CNIC:</b> ${esc(s.cnic || 'Not provided')} · <b>Phone:</b> ${esc(s.ownerPhone || 'Not provided')}<br><b>Personal address:</b> ${esc(s.personalAddress || 'Not provided')}</div>
             <div class="wrap-flex" style="margin-top:14px">
               <a class="btn btn-sm btn-ghost" href="#/store/${s.slug}">${icon('eye', '', 14)} Preview</a>
               <button class="btn btn-sm btn-teal" data-approve="${s.id}">${icon('check', '', 14)} Approve</button>
@@ -162,6 +164,8 @@ const views = {
           <td>${p.sales}</td>
           <td>${p.rating ? '★ ' + Number(p.rating).toFixed(1) : '—'}</td>
           <td><div class="row" style="gap:6px">
+            ${p.status === 'pending' ? `<button class="btn btn-sm btn-teal" data-approve-prod="${p.id}">${icon('check', '', 14)} Approve</button>` : ''}
+            ${p.status === 'pending' ? `<button class="btn btn-sm btn-teal" data-approve-prod="${p.id}">${icon('check', '', 14)} Approve</button>` : ''}
             <button class="btn btn-sm btn-ghost" data-toggle-prod="${p.id}">${p.status === 'hidden' ? 'Show' : 'Hide'}</button>
             <button class="btn btn-sm btn-danger" data-del-prod="${p.id}">Delete</button>
           </div></td>
@@ -250,6 +254,24 @@ adminPage.mount = (params, query, root) => {
       toast('Request rejected')
       navigate('#/admin?tab=requests')
     }, 'Reject store')
+  }))
+
+  root.querySelectorAll('[data-approve-prod]').forEach((b) => b.addEventListener('click', () => {
+    const p = productById(b.dataset.approveProd)
+    updateProduct(p.id, { status: 'active' })
+    const store = storeById(p.store)
+    if (store) notify(store.owner, 'Product approved! 🎉', '"' + p.title + '" ab customers ko nazar aa raha hai.', '#/product/' + p.id)
+    toast(p.title + ' approved — product live hai', 'ok')
+    navigate('#/admin?tab=products')
+  }))
+
+  root.querySelectorAll('[data-approve-prod]').forEach((b) => b.addEventListener('click', () => {
+    const p = productById(b.dataset.approveProd)
+    updateProduct(p.id, { status: 'active' })
+    const store = storeById(p.store)
+    if (store) notify(store.owner, 'Product approved! 🎉', '"' + p.title + '" ab customers ko nazar aa raha hai.', '#/product/' + p.id)
+    toast(p.title + ' approved — product live hai', 'ok')
+    navigate('#/admin?tab=products')
   }))
 
   root.querySelectorAll('[data-toggle-store]').forEach((b) => b.addEventListener('click', () => {

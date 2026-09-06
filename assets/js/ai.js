@@ -223,7 +223,7 @@ export async function genCategorySuggestion({ rough, storeName }) {
 }
 
 export async function assistantReply({ question }) {
-  const catalogProducts = state.products.filter((p) => p.status !== 'hidden' && !p.demo && !storeById(p.store)?.demo)
+  const catalogProducts = state.products.filter((p) => p.status === 'active' && storeById(p.store)?.status === 'live' && !p.demo && !storeById(p.store)?.demo)
   const catalog = catalogProducts.map((p) => {
     const store = storeById(p.store)
     return `${p.title} | ${store?.name || 'Store'} | Rs ${p.price} | ${p.stock > 0 ? 'in stock' : 'out of stock'} | ${[...(p.categories || []), ...(p.tags || [])].join(', ')}`
