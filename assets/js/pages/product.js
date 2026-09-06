@@ -39,18 +39,14 @@ export async function productPage(params) {
         ${p.media?.length > 1 ? `<div class="gallery-thumbs" data-thumbs>
           ${p.media.map((m, i) => `<button class="${i === 0 ? 'active' : ''}" data-i="${i}">${m.type === 'video' ? `<video src="${esc(m.url)}" muted></video>` : `<img src="${esc(m.url)}" alt="">`}</button>`).join('')}
         </div>` : ''}
-        <div class="panel" style="margin-top:22px;box-shadow:var(--shadow-s)">
-          <h3 class="h4">Description</h3>
-          <p class="small" style="margin-top:10px;line-height:1.9;white-space:pre-line">${esc(p.description)}</p>
-          ${p.tags?.length ? `<div class="wrap-flex" style="margin-top:14px">${p.tags.map((t) => `<span class="chip static tiny">#${esc(t)}</span>`).join('')}</div>` : ''}
-        </div>
       </div>
 
       <div class="stack reveal" style="gap:18px">
         ${s ? `<div class="row-between" style="background:#fff;border:1px solid var(--line);border-radius:var(--r-m);padding:10px 14px">
           <a class="row" href="#/store/${s.slug}">
             <span class="avatar sm" style="background:${esc(s.theme?.primary || '#16110D')}">${esc(s.name.slice(0, 2).toUpperCase())}</span>
-            <div><b class="small">${esc(s.name)}</b><div class="tiny muted">${num(s.followers)} followers · ${s.rating ? '★ ' + Number(s.rating).toFixed(1) : 'New store'}</div></div>
+            <div><b class="small">${esc(s.name)}</b><div class="tiny muted">${num(s.followers)} followers · ${s.rating ? '★ ' + Number(s.rating).toFixed(1) : 'New store'}</div>            </div>
+
           </a>
           <button class="btn btn-sm ${isFollowing(s.id) ? 'btn-primary' : 'btn-ghost'} follow-btn ${isFollowing(s.id) ? 'on' : ''}" data-follow="${s.id}">${isFollowing(s.id) ? 'Following' : 'Follow'}</button>
         </div>` : ''}
@@ -123,6 +119,12 @@ export async function productPage(params) {
           ${Object.entries(s.socials || {}).filter(([, v]) => v).map(([k, v]) => `<a class="chip" href="${esc(v)}" target="_blank" rel="noopener">${icon(k === 'whatsapp' ? 'whatsapp' : k === 'instagram' ? 'instagram' : k === 'tiktok' ? 'tiktok' : k === 'facebook' ? 'facebook' : 'youtube', '', 14)} ${k}</a>`).join('')}
         </div>` : ''}
       </div>
+    </div>
+
+    <div class="panel" style="margin-top:22px;box-shadow:var(--shadow-s)">
+      <h3 class="h4">Description</h3>
+      <p class="small" style="margin-top:10px;line-height:1.9;white-space:pre-line">${esc(p.description)}</p>
+      ${p.tags?.length ? `<div class="wrap-flex" style="margin-top:14px">${p.tags.map((t) => `<span class="chip static tiny">#${esc(t)}</span>`).join('')}</div>` : ''}
     </div>
 
     <section class="sec" style="padding-top:0">
