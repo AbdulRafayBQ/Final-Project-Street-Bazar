@@ -178,13 +178,13 @@ export function openAIScan() {
         const q = el.querySelector('#scan-q').value.trim()
         const out = el.querySelector('#scan-out')
         if (!q) return toast('Kuch toh likhein', 'err')
-        out.innerHTML = '<div class="ai-out"><span class="lbl">AI is scanning…</span>Database mein products, stores aur categories check ho rahe hain…</div>'
+        out.innerHTML = '<div class="ai-out"><span class="lbl">Ask AI</span>Soch raha hoon…</div>'
         const res = await assistantReply({ question: q })
         const { products, stores } = searchAll(q)
         const extra = products.length ? [] : liveStores().map((s) => storeProducts(s.id).find((p) => p.categories.some((c) => c.toLowerCase().includes(q.toLowerCase().split(' ')[0])))).filter(Boolean).slice(0, 2)
         const hits = [...products, ...extra].slice(0, 3)
         out.innerHTML = `
-          <div class="ai-out"><span class="lbl">AI · ${res.source === 'live' ? 'live model' : 'Bazar Brain'}</span>${esc(res.text).replace(/\n/g, '<br>')}</div>
+          <div class="ai-out"><span class="lbl">Ask AI</span>${esc(res.text).replace(/\n/g, '<br>')}</div>
           ${hits.length ? `<div style="margin-top:14px" class="stack">${hits.map((p) => {
             const st = storeById(p.store)
             return `<div class="card" style="padding:12px;display:flex;gap:12px;align-items:center">

@@ -19,7 +19,7 @@ export async function explore(params = {}, query = {}) {
           ${icon('search', '', 17)}
           <input class="input" id="ex-q" value="${esc(q)}" placeholder="Product ya category search karein…" style="padding-left:42px;border-radius:99px">
         </div>
-        <button class="btn btn-grad" id="ex-ai">${icon('box', '', 16)} <span>AI scan</span></button>
+        <button class="btn btn-grad" id="ex-ai">${icon('box', '', 16)} <span>Ask AI</span></button>
       </div>
       <div class="catalog-filters" style="margin-top:12px">
         <input class="input price-input" id="ex-min" type="number" min="0" placeholder="Min price">
@@ -63,9 +63,9 @@ explore.mount = (params, query, root) => {
       return b.price - a.price
     })
     root.querySelector('#ex-results').innerHTML = list.length
-      ? `${sectionHead({ kicker: 'Products', title: `${num(list.length)} <span class="grad-text">products</span> mile` })}<div class="grid grid-4 stagger">${list.map(productCard).join('')}</div>`
-      : `<div class="empty reveal"><div class="ic">${icon('search', '', 30)}</div><h3 class="h3">Kuch nahi mila</h3><p class="muted">Try another keyword, ya AI scan se pooch lein kya dhoondna hai.</p><div style="margin-top:16px"><button class="btn btn-grad" onclick="document.getElementById('ex-ai').click()">${icon('sparkles', '', 15)} <span>AI scan</span></button></div></div>`
-    root.querySelector('#ex-count').textContent = `${num(list.length)} products`
+      ? `${sectionHead({ kicker: 'Products', title: cat ? `${num(list.length)} <span class="grad-text">products</span> mile` : 'Products' })}<div class="grid grid-4 stagger">${list.map(productCard).join('')}</div>`
+      : `<div class="empty reveal"><div class="ic">${icon('search', '', 30)}</div><h3 class="h3">Kuch nahi mila</h3><p class="muted">Try another keyword, ya Ask AI se pooch lein.</p><div style="margin-top:16px"><button class="btn btn-grad" onclick="document.getElementById('ex-ai').click()">${icon('box', '', 15)} <span>Ask AI</span></button></div></div>`
+    root.querySelector('#ex-count').textContent = cat ? `${num(list.length)} products` : ''
   }
   paint()
 

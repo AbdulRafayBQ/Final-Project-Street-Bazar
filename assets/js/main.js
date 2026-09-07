@@ -246,7 +246,7 @@ function renderFloatingAIWidget() {
       <div class="floating-ai-body" id="floating-ai-msgs">
         <div class="msg ai">
           <div class="who">Bazar AI</div>
-          Main Street Bazar ka assistant hoon. Products, stores ya order status ke bare mein pooch sakte hain.
+          Aap kya dhoond rahe hain?
           <div class="time">Just now</div>
         </div>
       </div>
@@ -301,7 +301,7 @@ function renderFloatingAIWidget() {
       const aiMsg = document.createElement('div')
       aiMsg.className = 'msg ai'
       const resultCards = (res.matches || []).map((match) => `<a class="ai-result" href="${esc(match.href)}"><b>${esc(match.title)}</b><span>${esc(match.store)} · Rs ${Number(match.price || 0).toLocaleString('en-PK')}</span></a>`).join('')
-      aiMsg.innerHTML = `<div class="who">Bazar AI ${res.source === 'live' ? '(Live Gemini)' : ''}</div><div class="ai-copy">${esc(res.text).replace(/\n/g, '<br>')}</div>${resultCards ? `<div class="ai-results">${resultCards}</div>` : ''}<div class="time">Just now</div>`
+      aiMsg.innerHTML = `<div class="who">Bazar AI</div><div class="ai-copy">${esc(res.text).replace(/\n/g, '<br>')}</div>${resultCards ? `<div class="ai-results">${resultCards}</div>` : ''}<div class="time">Just now</div>`
       msgs.appendChild(aiMsg)
     } catch (e) {
       typing.remove()

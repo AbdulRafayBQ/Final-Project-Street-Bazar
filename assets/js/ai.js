@@ -230,7 +230,7 @@ export async function assistantReply({ question, history = [] }) {
   }).join('\n')
   const liveStores = state.stores.filter((store) => !store.demo && store.status !== 'hidden').map((store) => `${store.name} | ${store.type || 'Store'} | ${store.city || ''} | ${store.description || ''}`).join('\n')
   const memory = history.slice(-6).map((item) => `${item.role === 'user' ? 'Customer' : 'You'}: ${item.text}`).join('\n')
-  const r = await think('assistant', { prompt: `You are Street Bazar's concise, friendly shopping assistant. Reply naturally in Roman Urdu/English with a light helpful suggestion only when it directly helps. Never greet the customer, say salam, walaikum salam, hello, hi, or hey unless the customer's current message clearly starts with a greeting. Remember the recent conversation below so follow-up questions make sense, but do not repeat old greetings or old answers. Answer ONLY what the customer asked, do not list unrelated stores/products, and keep replies to 1-3 short sentences (maximum 55 words). Never mention databases, Supabase, APIs, backend systems, internal data, or technical implementation. For budget/category requests, briefly describe the matching shopping options; the app will show clickable cards. Use only the shopping information below and never invent data. Recent conversation:\n${memory || '(first message)'}\nShopping information:\n${catalog || '(no matching shopping information)'}\nStores:\n${liveStores || '(no store information)'}`, user: question }, async () => {
+  const r = await think('assistant', { prompt: `You are a concise shopping assistant. Reply naturally in Roman Urdu/English. Answer only what the customer asked; do not add suggestions, recommendations, greetings, personal details, or technical/internal project information. Never mention databases, Supabase, APIs, backend systems, catalogs, live systems, or implementation. Keep replies to 1-2 short sentences. If the customer asks about a product and a matching item exists, give the matching item link through the app result cards. Recent conversation:\n${memory || '(first message)'}\nShopping information:\n${catalog || '(no matching shopping information)'}\nStores:\n${liveStores || '(no store information)'}`, user: question }, async () => {
     const q = T(question).toLowerCase()
     if (q.includes('sale') || q.includes('offer')) {
       const list = state.stores.filter((s) => !s.demo && s.sale && s.sale.until > Date.now())
@@ -274,5 +274,5 @@ export async function assistantReply({ question, history = [] }) {
 }
 
 export function aiStatusText() {
-  return isAIConnected() ? 'Live AI connected · server managed' : 'Bazar Brain (offline mode)'
+  return 'Shopping assistant'
 }
