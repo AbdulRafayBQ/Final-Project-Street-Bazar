@@ -313,7 +313,8 @@ function renderFloatingAIWidget() {
       typing.remove()
       const aiMsg = document.createElement('div')
       aiMsg.className = 'msg ai'
-      aiMsg.innerHTML = `<div class="who">Bazar AI ${res.source === 'live' ? '(Live Gemini)' : ''}</div>${esc(res.text)}<div class="time">Just now</div>`
+      const resultCards = (res.matches || []).map((match) => `<a class="ai-result" href="${esc(match.href)}"><b>${esc(match.title)}</b><span>${esc(match.store)} · Rs ${Number(match.price || 0).toLocaleString('en-PK')}</span></a>`).join('')
+      aiMsg.innerHTML = `<div class="who">Bazar AI ${res.source === 'live' ? '(Live Gemini)' : ''}</div><div class="ai-copy">${esc(res.text).replace(/\n/g, '<br>')}</div>${resultCards ? `<div class="ai-results">${resultCards}</div>` : ''}<div class="time">Just now</div>`
       msgs.appendChild(aiMsg)
     } catch (e) {
       typing.remove()

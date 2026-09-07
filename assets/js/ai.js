@@ -22,11 +22,11 @@ async function api(system, user, maxTokens = 800, image = '') {
   return data.text || ''
 }
 
-async function think(kind, system, offline, label = '') {
+async function think(kind, system, offline, label = '', maxTokens = 800) {
   logAI(kind, label || kind)
   if (isAIConnected()) {
     try {
-      const out = await api(system.prompt, system.user, 800, system.image || '')
+      const out = await api(system.prompt, system.user, maxTokens, system.image || '')
       if (out) return { text: out, source: 'live' }
     } catch (e) {
       console.warn('AI API failed, using Bazar Brain fallback:', e.message)
@@ -148,7 +148,7 @@ export function chatReply({ question, productId, storeId }) {
   const opts = p?.customizable?.on ? (p.customizable.options || []).map((o) => o.name + ': ' + o.choices.map((c) => c.label).join(', ')).join(' | ') : ''
   const tiers = p?.wholesale?.on ? (p.wholesale.tiers || []).map((t) => num(t.qty) + '+ pcs = ' + money(t.price)).join(', ') : ''
 
-  if (has('hi', 'salam', 'hello', 'assalam', 'hey')) return `Walaikum salam! 👋 ${s ? s.name : 'Street Bazar'} mein aapka swagat hai. Bataiye kis product ke bare mein poochna hai?`
+  if (/^(hi|hello|hey|salam|assalam(?:u|o)?-?alaikum)\b/i.test(q.trim())) return `Walaikum salam! 👋 ${s ? s.name : 'Street Bazar'} mein aapka swagat hai. Bataiye?`
   if (has('price', 'rate', 'cost', 'kitne', 'qemat', 'daam')) return p ? `${p.title} ki current price ${money(p.price)} hai${p.compareAt ? ' (was ' + money(p.compareAt) + ')' : ''}. ${tiers ? 'Wholesale: ' + tiers + '.' : ''}` : 'Product ka naam batayein, main price bata deta hoon.'
   if (has('size', 'fit', 'measure')) return opts ? `Options available: ${options2(opts)}. Agar confusion ho toh apna usual size batayein — main owner se confirm karwa deta hoon.` : 'Is product mein single size available hai. Custom size chahiye toh order note mein likh dein.'
   if (has('custom', 'personal', 'print', 'embroid', 'design', 'apna')) return p?.customizable?.on ? `Haan ji! ${p.title} customize ho sakta hai — ${opts}. Custom order 24–48 ghante extra leta hai.` : 'Filhaal ye product ready-made hai. Custom request chahiye toh owner se chat karein, wo koshish karega.'
@@ -229,11 +229,11 @@ export async function assistantReply({ question }) {
     return `${p.title} | ${store?.name || 'Store'} | Rs ${p.price} | ${p.stock > 0 ? 'in stock' : 'out of stock'} | ${[...(p.categories || []), ...(p.tags || [])].join(', ')}`
   }).join('\n')
   const liveStores = state.stores.filter((store) => !store.demo && store.status !== 'hidden').map((store) => `${store.name} | ${store.type || 'Store'} | ${store.city || ''} | ${store.description || ''}`).join('\n')
-  const r = await think('assistant', { prompt: `You are the Street Bazar customer assistant. Answer in clear English mixed with Roman Urdu, maximum 120 words. You guide customers across this website: real stores, real products, prices, stock, categories, customization, wholesale, delivery, cart, checkout, order tracking, wishlist, follows, and seller chat. Only use the live store/product data below. Never invent or recommend demo/fake stores, products, prices, ratings, or features. If no live match exists, clearly say it is not listed and suggest the closest real match only. For product questions include the exact store and current price when available. Catalog:\n${catalog || '(empty live catalog)'}\nStores:\n${liveStores || '(empty live stores)'}`, user: question }, async () => {
+  const r = await think('assistant', { prompt: `You are Street Bazar's concise shopping assistant. Reply like a normal helpful human in Roman Urdu/English. Answer ONLY what the customer asked; do not add greetings unless the customer greeted first, do not repeat the question, do not list unrelated stores/products, and do not make unsolicited recommendations. Keep replies to 1-3 short sentences (maximum 55 words). For a budget/category request, say how many matching live products/stores were found and let the app show clickable results. Use only the catalog below and never invent data. Catalog:\n${catalog || '(empty live catalog)'}\nStores:\n${liveStores || '(empty live stores)'}`, user: question }, async () => {
     const q = T(question).toLowerCase()
     if (q.includes('sale') || q.includes('offer')) {
       const list = state.stores.filter((s) => !s.demo && s.sale && s.sale.until > Date.now())
-      return list.length ? 'Active sales right now:\n' + list.map((s) => '• ' + s.name + ' — ' + s.sale.text).join('\n') : 'Filhaal koi live sale nahi hai, lekin For You feed check karte rahein.'
+      return list.length ? `${list.length} active sale${list.length === 1 ? '' : 's'} mil rahi hain.` : 'Filhaal koi live sale nahi hai.'
     }
     if (q.includes('follow')) {
       const u = currentUser()
@@ -242,7 +242,7 @@ export async function assistantReply({ question }) {
     }
     if (q.includes('cheap') || q.includes('best price') || q.includes('budget')) {
       const cheap = catalogProducts.filter((p) => p.stock > 0).sort((a, b) => a.price - b.price).slice(0, 3)
-      return 'Budget picks:\n' + cheap.map((p) => '• ' + p.title + ' — ' + money(p.price)).join('\n')
+      return cheap.length ? `${cheap.length} budget product${cheap.length === 1 ? '' : 's'} available hain.` : 'Is waqt budget mein product nahi mila.'
     }
     if (q.includes('track') || q.includes('order')) return 'Track page par Order ID (SB-XXXXXX) daliye — status, courier note aur expected delivery sab aa jayega.'
     const words = q.split(/\s+/).filter((w) => w.length > 2 && !['under', 'price', 'chahiye', 'mujhe', 'please'].includes(w))
@@ -254,7 +254,19 @@ export async function assistantReply({ question }) {
     const hit = candidates[0]?.p || searchAll(question).products.find((p) => !p.demo && !storeById(p.store)?.demo)
     if (hit) return chatReply({ question, productId: hit.id, storeId: hit.store })
     return catalogProducts.length ? 'Main live catalog search kar sakta hoon — product ka naam, category ya budget batayein.' : 'Abhi live store catalog mein koi product listed nahi. Owner ke publish karne ke baad main real product suggest karunga.'
-  }, question)
+  }, question, 220)
+  const q = T(question).toLowerCase()
+  const maxPrice = Number(q.match(/(?:under|below|less than|se kam|tak)\s*(?:rs\.?\s*)?(\d[\d,]*)/)?.[1]?.replace(/,/g, '') || 0)
+  const words = q.split(/\s+/).filter((word) => word.length > 2 && !['under', 'below', 'less', 'than', 'se', 'kam', 'tak', 'price', 'chahiye', 'mujhe', 'please', 'hai', 'koi'].includes(word))
+  const matches = catalogProducts.map((p) => {
+    const text = `${p.title} ${(p.tags || []).join(' ')} ${(p.categories || []).join(' ')}`.toLowerCase()
+    return { p, score: words.filter((word) => text.includes(word)).length + (maxPrice && p.price <= maxPrice ? 1 : 0) }
+  }).filter(({ p, score }) => score > 0 && (!maxPrice || p.price <= maxPrice)).sort((a, b) => b.score - a.score || a.p.price - b.p.price).slice(0, 6)
+  r.matches = matches.map(({ p }) => {
+    const store = storeById(p.store)
+    return { type: 'product', id: p.id, title: p.title, store: store?.name || 'Store', price: p.price, href: `#/product/${p.id}` }
+  })
+  if (r.matches.length && !/product|store|available|mil|found/i.test(r.text)) r.text += ` ${r.matches.length} matching option${r.matches.length === 1 ? '' : 's'} neeche hain.`
   return r
 }
 
