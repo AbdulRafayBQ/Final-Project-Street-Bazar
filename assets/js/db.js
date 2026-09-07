@@ -152,6 +152,10 @@ export async function syncStore(store) {
   save()
 }
 
+export async function syncThread(thread) {
+  await api('/api/data', { method: 'POST', body: JSON.stringify({ action: 'thread', thread }) })
+}
+
 export async function deleteRemote(table, id) {
   await api('/api/data', { method: 'DELETE', body: JSON.stringify({ table, id }) })
 }

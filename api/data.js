@@ -154,6 +154,19 @@ export default async function handler(req, res) {
       await upsert('products', [{ id: product.id, store_id: product.store || product.store_id, title: product.title, description: product.description, price: product.price, compare_at: product.compareAt || product.compare_at, media: product.media, categories: product.categories, tags: product.tags, stock: product.stock, sku: product.sku, customizable: product.customizable, wholesale: product.wholesale, delivery_charge: product.deliveryCharge || 0, home_delivery_charge: product.homeDeliveryCharge ?? product.deliveryCharge ?? 0, outside_delivery_charge: product.outsideDeliveryCharge ?? product.deliveryCharge ?? 0, sales: product.sales, status: product.status, created_at: timestamp(product.createdAt || product.created_at) }])
       return json(res, 200, { ok: true })
     }
+    if (payload.action === 'thread') {
+      const thread = payload.thread
+      if (!thread?.id) return json(res, 400, { error: 'Thread data is required' })
+      await upsert('threads', [{
+        id: thread.id,
+        product_id: thread.product || thread.product_id || null,
+        store_id: thread.store || thread.store_id,
+        customer_id: thread.customer || thread.customer_id,
+        messages: thread.messages || [],
+        updated_at: timestamp(thread.updatedAt || thread.updated_at || Date.now()),
+      }])
+      return json(res, 200, { ok: true })
+    }
     await request('/rest/v1/app_state?on_conflict=key', {
       method: 'POST',
       headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },

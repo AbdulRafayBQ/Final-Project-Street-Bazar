@@ -4,7 +4,7 @@ import { icon, esc, money, num, toast, modal, closeModal, timeAgo, spinner, conf
 import { statCard, emptyLogin } from '../components.js'
 import { myStores, storeById, storeProducts, storeOrders, storeRevenue, storeSales, currentUser, lowStock, productById, updateProduct, updateStore, deleteStore, advanceOrder, cancelOrder, addStock, storeThreads, threadById, markThreadRead, userById, save, ownerWarehouse, addWarehouseItem, updateWarehouseItem, deleteWarehouseItem } from '../store.js'
 import { genStockPlan } from '../ai.js'
-import { authRequest } from '../db.js'
+import { authRequest, syncThread } from '../db.js'
 import { navigate } from '../router.js'
 
 export async function dashboardPage() {
@@ -224,6 +224,7 @@ function openReply(threadId) {
           th.messages.push({ from: currentUser().id, text: v, at: Date.now() })
           th.read = true
           save()
+          syncThread(th).catch((error) => console.error('Owner reply sync failed:', error))
           el.querySelector('[data-in]').value = ''
           const div = document.createElement('div')
           div.className = 'msg me'

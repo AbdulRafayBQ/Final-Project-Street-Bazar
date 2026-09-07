@@ -3,6 +3,7 @@
 import { icon, esc, money, num, themeStyle, toast, timeAgo, avatar, modal, reveal } from '../ui.js'
 import { sectionHead, productCard, reviewItem, typeBadge, emptyLogin } from '../components.js'
 import { storeBySlug, storeProducts, storeReviews, currentUser, myStores, isFollowing, toggleFollow, ratingOf, state, sendMessage, appendThreadMessage, updateStore, FONT_PAIRS } from '../store.js'
+import { syncThread } from '../db.js'
 
 export async function storePage(params) {
   const s = storeBySlug(params.slug) || null
@@ -196,6 +197,7 @@ export function bindChat(box, { storeId, productId = '', who = 'Store', thread =
     const thread = sendMessage({ productId, storeId, from: u.id, text })
     const store = storeByIdSafe(storeId)
     if (store) notifyOwner(store, text)
+    try { await syncThread(thread) } catch (error) { console.error('Chat message sync failed:', error) }
   }
   send?.addEventListener('click', submit)
   input?.addEventListener('keydown', (e) => { if (e.key === 'Enter') submit() })
