@@ -9,6 +9,14 @@ const T = (s) => String(s || '')
 const cap = (s) => T(s).charAt(0).toUpperCase() + T(s).slice(1)
 const hash = (s) => { let h = 0; for (const c of T(s)) h = (h * 31 + c.charCodeAt(0)) >>> 0; return h }
 const pick = (arr, seedStr) => arr[hash(seedStr) % arr.length]
+const hideInternalDetails = (text) => {
+  const cleaned = T(text)
+    .replace(/\b(?:database|supabase|backend|api|apis|server|internal|implementation|catalog|live system|system data)\b/gi, '')
+    .replace(/\s{2,}/g, ' ')
+    .replace(/\s+([,.!?])/g, '$1')
+    .trim()
+  return cleaned || 'Aap apni requirement ya budget batayein — main suitable option suggest kar dunga.'
+}
 
 /* ---------------- real API ---------------- */
 async function api(system, user, maxTokens = 800, image = '') {
@@ -268,6 +276,7 @@ export async function assistantReply({ question, history = [] }) {
     return { type: 'product', id: p.id, title: p.title, store: store?.name || 'Store', price: p.price, href: `#/product/${p.id}` }
   })
   const userGreeted = /^(hi|hello|hey|salam|assalam(?:u|o)?-?alaikum)\b/i.test(T(question).trim())
+  r.text = hideInternalDetails(r.text)
   if (!userGreeted) r.text = r.text.replace(/^(?:walaikum\s+salam|assalam(?:u|o)?-?alaikum|salam|hello|hi|hey)[,!.\s]*(?:main\s+street\s+bazar[^.]*[.!]?|aapka\s+swagat[^.]*[.!]?|bataiye[^.]*[.!]?)/i, '').trim()
   if (r.matches.length && !/product|store|available|mil|found/i.test(r.text)) r.text += ` ${r.matches.length} matching option${r.matches.length === 1 ? '' : 's'} neeche hain.`
   return r
