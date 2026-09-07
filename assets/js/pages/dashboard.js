@@ -2,10 +2,10 @@
 
 import { icon, esc, money, num, toast, modal, closeModal, timeAgo, spinner, confirmBox } from '../ui.js'
 import { statCard, emptyLogin } from '../components.js'
-import { myStores, storeById, storeProducts, storeOrders, storeRevenue, storeSales, currentUser, lowStock, productById, updateProduct, updateStore, deleteStore, advanceOrder, cancelOrder, addStock, storeThreads, threadById, markThreadRead, userById, save, ownerWarehouse, addWarehouseItem, updateWarehouseItem, deleteWarehouseItem } from '../store.js'
+import { state, myStores, storeById, storeProducts, storeOrders, storeRevenue, storeSales, currentUser, lowStock, productById, updateProduct, updateStore, deleteStore, advanceOrder, cancelOrder, addStock, storeThreads, threadById, markThreadRead, userById, save, ownerWarehouse, addWarehouseItem, updateWarehouseItem, deleteWarehouseItem } from '../store.js'
 import { genStockPlan } from '../ai.js'
 import { authRequest, syncThread, syncPull } from '../db.js'
-import { navigate } from '../router.js'
+import { navigate, renderRoute } from '../router.js'
 
 export async function dashboardPage() {
   const u = currentUser()

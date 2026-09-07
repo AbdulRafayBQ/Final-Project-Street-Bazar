@@ -173,6 +173,7 @@ Object.assign(state, remote, {
   users: mergeById(remote.users, state.users),
   stores: mergeById(remote.stores, state.stores),
   products: mergeById(remote.products, state.products),
+  threads: mergeById(remote.threads, state.threads),
   session,
 })
 save()
