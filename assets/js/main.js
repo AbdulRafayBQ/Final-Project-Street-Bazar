@@ -80,6 +80,8 @@ function renderHeader() {
   }, { once: false })
 }
 
+window.addEventListener('street-bazar:notifications-changed', renderHeader)
+
 function openNotifications() {
   const existing = $('[data-noti-panel]')
   existing?.remove()

@@ -33,6 +33,9 @@ messagesPage.mount = (params, query, root) => {
     const store = storeById(thread?.store)
     const product = productById(thread?.product)
     if (!thread || !store || !main) return
+    state.notifications.filter((notification) => notification.to === currentUser()?.id && notification.link === '#/messages').forEach((notification) => { notification.read = true })
+    localStorage.setItem('street-bazar-v1', JSON.stringify(state))
+    window.dispatchEvent(new Event('street-bazar:notifications-changed'))
     thread.readByCustomer = true
     thread.read = true
     import('../db.js').then(({ syncThread }) => syncThread(thread)).catch((error) => console.error('Read receipt sync failed:', error))

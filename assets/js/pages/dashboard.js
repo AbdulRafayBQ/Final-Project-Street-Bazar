@@ -215,6 +215,9 @@ dashboardPage.mount = (params, query, root) => {
 function openReply(threadId) {
   const th = threadById(threadId)
   if (!th) return
+  state.notifications.filter((notification) => notification.to === currentUser()?.id && notification.link === '#/dashboard').forEach((notification) => { notification.read = true })
+  localStorage.setItem('street-bazar-v1', JSON.stringify(state))
+  window.dispatchEvent(new Event('street-bazar:notifications-changed'))
   const store = storeById(th.store)
   const product = productById(th.product)
   th.readByOwner = true
