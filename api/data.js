@@ -54,14 +54,11 @@ const saveStore = async (store) => {
     await upsert('stores', [storeRow(store)])
   } catch (error) {
     if (!/cnic|schema cache|column/i.test(error.message)) throw error
-    const rows = await request('/rest/v1/app_state?select=payload&key=eq.global&limit=1')
-    const payload = rows[0]?.payload || {}
-    payload.stores = [store, ...(payload.stores || []).filter((item) => item.id !== store.id)]
-    await request('/rest/v1/app_state?on_conflict=key', {
-      method: 'POST',
-      headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
-      body: JSON.stringify({ key: 'global', payload }),
-    })
+    const row = storeRow(store)
+    delete row.cnic
+    delete row.cnic_front
+    delete row.cnic_back
+    await upsert('stores', [row])
   }
 }
 
