@@ -151,16 +151,7 @@ export default async function handler(req, res) {
     if (payload.action === 'product') {
       const product = payload.product
       if (!product?.id) return json(res, 400, { error: 'Product data is required' })
-      const rows = await request('/rest/v1/app_state?select=payload&key=eq.global&limit=1')
-      const current = rows[0]?.payload || {}
-      const products = Array.isArray(current.products) ? current.products.filter((item) => item.id !== product.id) : []
-      current.products = [product, ...products]
-      await request('/rest/v1/app_state?on_conflict=key', {
-        method: 'POST',
-        headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
-        body: JSON.stringify({ key: 'global', payload: current }),
-      })
-      await safeUpsert('products', [{ id: product.id, store_id: product.store || product.store_id, title: product.title, description: product.description, price: product.price, compare_at: product.compareAt || product.compare_at, media: product.media, categories: product.categories, tags: product.tags, stock: product.stock, sku: product.sku, customizable: product.customizable, wholesale: product.wholesale, delivery_charge: product.deliveryCharge || 0, home_delivery_charge: product.homeDeliveryCharge ?? product.deliveryCharge ?? 0, outside_delivery_charge: product.outsideDeliveryCharge ?? product.deliveryCharge ?? 0, sales: product.sales, status: product.status, created_at: product.createdAt || product.created_at }])
+      await upsert('products', [{ id: product.id, store_id: product.store || product.store_id, title: product.title, description: product.description, price: product.price, compare_at: product.compareAt || product.compare_at, media: product.media, categories: product.categories, tags: product.tags, stock: product.stock, sku: product.sku, customizable: product.customizable, wholesale: product.wholesale, delivery_charge: product.deliveryCharge || 0, home_delivery_charge: product.homeDeliveryCharge ?? product.deliveryCharge ?? 0, outside_delivery_charge: product.outsideDeliveryCharge ?? product.deliveryCharge ?? 0, sales: product.sales, status: product.status, created_at: timestamp(product.createdAt || product.created_at) }])
       return json(res, 200, { ok: true })
     }
     await request('/rest/v1/app_state?on_conflict=key', {
