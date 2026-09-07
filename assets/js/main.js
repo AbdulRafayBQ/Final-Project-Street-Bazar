@@ -251,11 +251,6 @@ function renderFloatingAIWidget() {
         </div>
       </div>
 
-      <div style="padding:8px 12px;background:#fff;border-top:1px solid var(--line);display:flex;gap:6px;overflow-x:auto" id="floating-ai-chips">
-        <button class="chip tiny" data-q="Cheap products under Rs 2000">💰 Cheap products</button>
-        <button class="chip tiny" data-q="Where is my order?">📦 Track order</button>
-        <button class="chip tiny" data-q="Suggest top rated stores">🏪 Popular stores</button>
-      </div>
 
       <div class="floating-ai-foot">
         <input class="input" id="floating-ai-input" placeholder="Poochhein (e.g. kurta, delivery time)..." style="font-size:13px;padding:9px 14px">
@@ -320,7 +315,6 @@ function renderFloatingAIWidget() {
 
   sendBtn.addEventListener('click', () => sendQuery())
   input.addEventListener('keydown', (e) => { if (e.key === 'Enter') sendQuery() })
-  $$('#floating-ai-chips button').forEach((b) => b.addEventListener('click', () => sendQuery(b.dataset.q)))
 }
 
 /* ---------------- global interactions ---------------- */

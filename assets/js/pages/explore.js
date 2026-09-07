@@ -30,6 +30,7 @@ export async function explore(params = {}, query = {}) {
         <button class="chip ${!activeCat ? 'active' : ''}" data-cat="">${icon('grid', '', 14)} All</button>
         ${allCategories().map((c) => `<button class="chip ${activeCat === c ? 'active' : ''}" data-cat="${esc(c)}">${esc(c)}</button>`).join('')}
       </div>
+      <select class="input mobile-filter-select" id="ex-cat-select" aria-label="Product category"><option value="">All categories</option>${allCategories().map((c) => `<option value="${esc(c)}">${esc(c)}</option>`).join('')}</select>
       <div class="row-between" style="margin-top:18px;flex-wrap:wrap;gap:10px">
         <div class="small muted" id="ex-count"></div>
       </div>
@@ -73,6 +74,7 @@ explore.mount = (params, query, root) => {
   root.querySelector('#ex-max').addEventListener('input', (e) => { maxPrice = Number(e.target.value) || 0; paint() })
   root.querySelector('#ex-sort-select').addEventListener('change', (e) => { sort = e.target.value; paint() })
   root.querySelector('#ex-ai').addEventListener('click', openAIScan)
+  root.querySelector('#ex-cat-select')?.addEventListener('change', (e) => { cat = e.target.value; root.querySelectorAll('#ex-cats .chip').forEach((x) => x.classList.toggle('active', x.dataset.cat === cat)); paint() })
   root.querySelectorAll('#ex-cats .chip').forEach((b) => b.addEventListener('click', () => {
     cat = b.dataset.cat
     root.querySelectorAll('#ex-cats .chip').forEach((x) => x.classList.toggle('active', x === b))
