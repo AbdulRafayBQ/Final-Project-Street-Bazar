@@ -106,6 +106,14 @@ export function avatar(user, cls = '') {
   return `<span class="avatar ${cls}" style="background:linear-gradient(135deg,hsl(${hue} 80% 52%),hsl(${(hue + 40) % 360} 85% 48%))" title="${esc(name)}">${esc(initials(name))}</span>`
 }
 
+export function storeAvatar(store, cls = '') {
+  const name = store?.name || 'Store'
+  const fallback = esc(initials(name))
+  return store?.logo
+    ? `<span class="avatar ${cls} store-avatar"><img src="${esc(store.logo)}" alt="${esc(name)}" onerror="this.style.display='none';this.nextElementSibling.style.display='grid'"><span style="display:none">${fallback}</span></span>`
+    : `<span class="avatar ${cls}">${fallback}</span>`
+}
+
 /* ---------------- toasts ---------------- */
 export function toast(msg, type = 'ok') {
   const root = $('#toast-root')

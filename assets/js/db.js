@@ -160,6 +160,10 @@ export async function syncFollow(follow, following) {
   await api('/api/data', { method: 'POST', body: JSON.stringify({ action: 'follow', follow, following }) })
 }
 
+export async function syncNotification(notification) {
+  await api('/api/data', { method: 'POST', body: JSON.stringify({ action: 'notification', notification }) })
+}
+
 export async function deleteRemote(table, id) {
   await api('/api/data', { method: 'DELETE', body: JSON.stringify({ table, id }) })
 }

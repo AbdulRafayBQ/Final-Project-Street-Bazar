@@ -1,6 +1,6 @@
 /* Street Bazar — Product page (gallery, customize, wholesale, chat, reviews) */
 
-import { icon, esc, money, num, toast, timeAgo, closeModal, stars, modal } from '../ui.js'
+import { icon, esc, money, num, toast, timeAgo, closeModal, stars, modal, storeAvatar } from '../ui.js'
 import { productCard, reviewItem } from '../components.js'
 import { productById, storeOf, currentUser, isFollowing, addToCart, addReview, productReviews, ratingOf, storeProducts, likedProducts, toggleLike, state } from '../store.js'
 import { navigate } from '../router.js'
@@ -49,7 +49,7 @@ export async function productPage(params) {
       <div class="stack reveal" style="gap:18px">
         ${s ? `<div class="row-between" style="background:#fff;border:1px solid var(--line);border-radius:var(--r-m);padding:10px 14px">
           <a class="row" href="#/store/${s.slug}">
-            <span class="avatar sm" style="background:${esc(s.theme?.primary || '#16110D')}">${esc(s.name.slice(0, 2).toUpperCase())}</span>
+            ${storeAvatar(s, 'sm')}
             <div><b class="small">${esc(s.name)}</b><div class="tiny muted">${num(s.followers)} followers · ${s.rating ? '★ ' + Number(s.rating).toFixed(1) : 'New store'}</div>            </div>
 
           </a>
@@ -313,7 +313,7 @@ productPage.mount = (params, query, root) => {
       title: 'Chat with ' + (s?.name || 'seller'),
       wide: true,
       body: `<div class="chatbox" data-chat data-store="${s.id}" data-product="${p.id}">
-        <div class="chat-head"><span class="avatar sm" style="background:${esc(s.theme?.primary || '#16110D')}">${esc(s.name.slice(0, 2).toUpperCase())}</span><div style="flex:1"><b class="small">${esc(s.name)}</b><div class="sub">${esc(p.title)} · AI + owner</div></div><span class="badge badge-teal">${icon('sparkles', '', 12)} AI on</span></div>
+        <div class="chat-head">${storeAvatar(s, 'sm')}<div style="flex:1"><b class="small">${esc(s.name)}</b><div class="sub">${esc(p.title)} · AI + owner</div></div><span class="badge badge-teal">${icon('sparkles', '', 12)} AI on</span></div>
         <div class="chat-body" data-chat-body></div>
         <div class="chat-foot"><input class="input" data-chat-input placeholder="Ask about size, delivery or customization…"><button class="btn btn-primary" data-chat-send>${icon('send', '', 16)}</button></div>
       </div>`,

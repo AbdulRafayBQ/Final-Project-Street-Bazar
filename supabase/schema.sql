@@ -75,9 +75,13 @@ create table if not exists threads (
   customer_id uuid references users(id),
   messages jsonb,
   read boolean default false,
+  read_by_owner boolean default false,
+  read_by_customer boolean default false,
   updated_at timestamptz default now()
 );
 alter table threads add column if not exists read boolean default false;
+alter table threads add column if not exists read_by_owner boolean default false;
+alter table threads add column if not exists read_by_customer boolean default false;
 
 create table if not exists cart_items (
   id text primary key, user_id uuid references users(id),

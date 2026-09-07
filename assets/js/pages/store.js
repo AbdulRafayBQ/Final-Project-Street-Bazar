@@ -1,9 +1,9 @@
 /* Street Bazar — Store page (themed, responsive) */
 
-import { icon, esc, money, num, themeStyle, toast, timeAgo, avatar, modal, reveal } from '../ui.js'
+import { icon, esc, money, num, themeStyle, toast, timeAgo, avatar, storeAvatar, modal, reveal } from '../ui.js'
 import { sectionHead, productCard, reviewItem, typeBadge, emptyLogin } from '../components.js'
 import { storeBySlug, storeProducts, storeReviews, currentUser, myStores, isFollowing, toggleFollow, ratingOf, state, sendMessage, appendThreadMessage, updateStore, FONT_PAIRS } from '../store.js'
-import { syncThread } from '../db.js'
+import { syncThread, syncNotification } from '../db.js'
 
 export async function storePage(params) {
   const s = storeBySlug(params.slug) || null
@@ -115,7 +115,7 @@ export async function storePage(params) {
         <div data-panel="chat" hidden>
           ${u ? `<div class="chatbox" data-chat data-store="${s.id}">
             <div class="chat-head">
-              ${avatar(s.name, 'sm')}
+              ${storeAvatar(s, 'sm')}
               <div style="flex:1"><b class="small">${esc(s.name)}</b><div class="sub">Owner usually replies within 1 hour</div></div>
             </div>
             <div class="chat-body" data-chat-body>
@@ -180,7 +180,8 @@ export function bindChat(box, { storeId, productId = '', who = 'Store', thread =
     const ai = msg.from === 'ai'
     const div = document.createElement('div')
     div.className = 'msg ' + (mine ? 'me' : ai ? 'ai' : 'them')
-    div.innerHTML = `<div class="who">${mine ? 'You' : ai ? 'Bazar AI · ' + who : who}</div>${esc(msg.text)}<div class="time">${timeAgo(msg.at)}</div>`
+    const seen = mine && ((u.id === (thread?.customer || u.id) && thread?.readByCustomer) || (u.id !== thread?.customer && thread?.readByOwner))
+    div.innerHTML = `<div class="who">${mine ? 'You' : ai ? 'Bazar AI · ' + who : who}</div>${esc(msg.text)}<div class="time">${timeAgo(msg.at)}${seen ? ' · Seen' : ''}</div>`
     body.appendChild(div)
     body.scrollTop = body.scrollHeight
   }
@@ -196,7 +197,10 @@ export function bindChat(box, { storeId, productId = '', who = 'Store', thread =
     push(msg)
     const thread = sendMessage({ productId, storeId, from: u.id, text })
     const store = storeByIdSafe(storeId)
-    if (store) notifyOwner(store, text)
+    if (store) {
+      const notification = notifyOwner(store, text)
+      if (notification) syncNotification(notification).catch((error) => console.error('Message notification sync failed:', error))
+    }
     try { await syncThread(thread) } catch (error) { console.error('Chat message sync failed:', error) }
   }
   send?.addEventListener('click', submit)
@@ -207,6 +211,8 @@ function storeByIdSafe(id) { return state.stores.find((s) => s.id === id) || nul
 function notifyOwner(store, question) {
   const existing = state.threads.find((t) => t.store === store.id && t.customer === currentUser()?.id)
   if (existing) { existing.read = false; }
-  state.notifications.unshift({ id: 'n-' + Date.now(), to: store.owner, title: 'New question in ' + store.name, body: question.slice(0, 80), at: Date.now(), read: false, link: '#/dashboard' })
+  const notification = { id: 'n-' + Date.now(), to: store.owner, title: 'New question in ' + store.name, body: question.slice(0, 80), at: Date.now(), read: false, link: '#/dashboard' }
+  state.notifications.unshift(notification)
   try { localStorage.setItem('street-bazar-v1', JSON.stringify(state)) } catch { /* ignore */ }
+  return notification
 }

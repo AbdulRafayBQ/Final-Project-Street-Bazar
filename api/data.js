@@ -114,7 +114,7 @@ export default async function handler(req, res) {
       }))
       const threads = (threadRows || []).map((t) => ({
         id: t.id, product: t.product_id, store: t.store_id, customer: t.customer_id,
-        messages: t.messages || [], read: t.read ?? false, updatedAt: t.updated_at,
+        messages: t.messages || [], read: t.read ?? false, readByOwner: t.read_by_owner ?? false, readByCustomer: t.read_by_customer ?? false, updatedAt: t.updated_at,
       }))
       const follows = (followRows || []).map((f) => ({
         id: f.id, user: f.user_id, store: f.store_id, at: f.created_at,
@@ -175,6 +175,8 @@ export default async function handler(req, res) {
         customer_id: thread.customer || thread.customer_id,
         messages: thread.messages || [],
         read: thread.read ?? false,
+        read_by_owner: thread.readByOwner ?? false,
+        read_by_customer: thread.readByCustomer ?? false,
         updated_at: timestamp(thread.updatedAt || thread.updated_at || Date.now()),
       }])
       return json(res, 200, { ok: true })
@@ -189,6 +191,15 @@ export default async function handler(req, res) {
       }
       return json(res, 200, { ok: true })
     }
+    if (payload.action === 'notification') {
+      const notification = payload.notification
+      if (!notification?.id || !notification.to) return json(res, 400, { error: 'Notification data is required' })
+      const rows = await request('/rest/v1/app_state?select=payload&key=eq.global&limit=1')
+      const shared = rows[0]?.payload || {}
+      shared.notifications = [notification, ...(shared.notifications || []).filter((item) => item.id !== notification.id)].slice(0, 300)
+      await request('/rest/v1/app_state?on_conflict=key', { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify({ key: 'global', payload: shared }) })
+      return json(res, 200, { ok: true })
+    }
     await request('/rest/v1/app_state?on_conflict=key', {
       method: 'POST',
       headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
@@ -201,7 +212,7 @@ export default async function handler(req, res) {
     await safeUpsert('reviews', (payload.reviews || []).map((r) => ({ id: r.id, product_id: r.product || r.product_id, store_id: r.store || r.store_id, user_id: r.user || r.user_id, rating: r.rating, text: r.text, created_at: r.at || r.created_at })))
     await safeUpsert('orders', (payload.orders || []).map((o) => ({ id: o.id, user_id: o.user || o.user_id, items: o.items, total: o.total, status: o.status, timeline: o.timeline, eta: o.eta, address: o.address, store_ids: o.storeIds || o.store_ids, created_at: o.createdAt || o.created_at })))
     await safeUpsert('follows', (payload.follows || []).map((f) => ({ id: f.id, user_id: f.user || f.user_id, store_id: f.store || f.store_id, created_at: f.createdAt || f.created_at })))
-    await safeUpsert('threads', (payload.threads || []).map((t) => ({ id: t.id, product_id: t.product || t.product_id, store_id: t.store || t.store_id, customer_id: t.customer || t.customer_id, messages: t.messages, read: t.read ?? false, updated_at: t.updatedAt || t.updated_at })))
+    await safeUpsert('threads', (payload.threads || []).map((t) => ({ id: t.id, product_id: t.product || t.product_id, store_id: t.store || t.store_id, customer_id: t.customer || t.customer_id, messages: t.messages, read: t.read ?? false, read_by_owner: t.readByOwner ?? false, read_by_customer: t.readByCustomer ?? false, updated_at: t.updatedAt || t.updated_at })))
     await safeUpsert('cart_items', (payload.cart || []).map((item) => ({ id: item.key || item.id, user_id: payload.user_id, product_id: item.product, store_id: item.store, title: item.title, image: item.image, qty: item.qty, options: item.options, unit_price: item.unitPrice, updated_at: new Date().toISOString() })))
     await safeUpsert('saved_products', (payload.likes || []).map((like) => ({ id: like.id, user_id: like.user, product_id: like.product, created_at: like.createdAt || like.created_at })))
     await safeUpsert('warehouse_items', (payload.warehouse || []).map((item) => ({ id: item.id, owner_id: item.owner || item.owner_id, name: item.name, sku: item.sku, qty: item.qty ?? item.quantity ?? 0, cost: item.cost || 0, location: item.location, image_url: item.image || item.image_url, updated_at: item.updatedAt || item.updated_at })))

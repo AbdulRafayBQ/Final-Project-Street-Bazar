@@ -1,10 +1,10 @@
 /* Street Bazar — Owner dashboard + Warehouse (inventory) */
 
-import { icon, esc, money, num, toast, modal, closeModal, timeAgo, spinner, confirmBox } from '../ui.js'
+import { icon, esc, money, num, toast, modal, closeModal, timeAgo, spinner, confirmBox, storeAvatar, avatar } from '../ui.js'
 import { statCard, emptyLogin } from '../components.js'
 import { state, myStores, storeById, storeProducts, storeOrders, storeRevenue, storeSales, currentUser, lowStock, productById, updateProduct, updateStore, deleteStore, advanceOrder, cancelOrder, addStock, storeThreads, threadById, markThreadRead, userById, save, ownerWarehouse, addWarehouseItem, updateWarehouseItem, deleteWarehouseItem } from '../store.js'
 import { genStockPlan } from '../ai.js'
-import { authRequest, syncThread, syncPull } from '../db.js'
+import { authRequest, syncThread, syncPull, syncNotification } from '../db.js'
 import { navigate, renderRoute } from '../router.js'
 
 export async function dashboardPage() {
@@ -47,7 +47,8 @@ export async function dashboardPage() {
         <button class="active" data-tab="stores">${icon('store', '', 15)} My stores</button>
         <button data-tab="products">${icon('box', '', 15)} Products</button>
         <button data-tab="orders">${icon('truck', '', 15)} Orders (${num(orders.length)})</button>
-        <button data-tab="inbox">${icon('chat', '', 15)} Inbox ${threads.filter((t) => !t.read).length ? `<span class="badge badge-sale" style="margin-left:6px">${threads.filter((t) => !t.read).length}</span>` : ''}</button>
+        <button data-tab="store-chats">${icon('store', '', 15)} Store chats</button>
+        <button data-tab="product-chats">${icon('chat', '', 15)} Product chats ${threads.filter((t) => t.product && !t.read).length ? `<span class="badge badge-sale" style="margin-left:6px">${threads.filter((t) => t.product && !t.read).length}</span>` : ''}</button>
         <button data-tab="warehouse">${icon('layers', '', 15)} Warehouse</button>
       </div>
 
@@ -115,29 +116,24 @@ export async function dashboardPage() {
           </table></div>` : `<div class="empty"><p class="muted">Abhi koi order nahi. Customers order karte hi yahan dikhega.</p></div>`}
         </div>
 
-        <div data-panel="inbox" hidden>
-          ${threads.length ? `<div class="stack">${[...new Map(threads.map((thread) => [thread.customer, threads.filter((item) => item.customer === thread.customer)])).values()].map((contactThreads) => {
-            const first = contactThreads[0]
-            const last = contactThreads.flatMap((thread) => thread.messages).sort((a, b) => b.at - a.at)[0]
-            const who = userById(first.customer)?.name || 'Customer'
-            return `<div class="card" style="padding:14px;${contactThreads.some((thread) => !thread.read) ? 'border-color:var(--marigold)' : ''}">
-              <div class="row-between">
-                <div class="row">
-                  <span class="avatar sm">${esc(who.slice(0, 2).toUpperCase())}</span>
-                  <div><b class="small">${esc(who)} ${contactThreads.some((thread) => !thread.read) ? '· <span style="color:var(--magenta)">NEW</span>' : ''}</b>
-                  <div class="tiny muted">${contactThreads.length} conversation${contactThreads.length === 1 ? '' : 's'} · ${timeAgo(last?.at || Date.now())}</div></div>
-                </div>
-                <div class="wrap-flex">${contactThreads.map((thread) => `<button class="btn btn-sm btn-ghost" data-reply="${thread.id}">${icon('chat', '', 14)} ${esc(productById(thread.product)?.title || 'Store chat')}</button>`).join('')}</div>
-              </div>
-              <p class="small" style="margin-top:10px;color:var(--ink-3)">${esc(last?.text || '')}</p>
-            </div>`
-          }).join('')}</div>` : `<div class="empty"><p class="muted">Inbox khaali hai — customer product page se sawal karega toh yahan aayega.</p></div>`}
-        </div>
+        ${ownerChatPanel(threads.filter((thread) => !thread.product), 'store-chats', 'Store conversations', 'Customers ke general store questions yahan manage karein.')}
+        ${ownerChatPanel(threads.filter((thread) => thread.product), 'product-chats', 'Product conversations', 'Har product ke questions aur customer replies yahan milengi.')}
 
         <div data-panel="warehouse" hidden>${warehouseInner(stores[0].id)}</div>
 
       </div>
     </div>
+  </div>`
+}
+
+function ownerChatPanel(threads, panel, title, subtitle) {
+  const grouped = [...new Map(threads.map((thread) => [thread.customer, threads.filter((item) => item.customer === thread.customer)])).values()]
+  return `<div data-panel="${panel}" hidden><div class="row-between" style="margin-bottom:16px"><div><h3 class="h3">${title}</h3><p class="muted small">${subtitle}</p></div><span class="badge badge-soft">${grouped.length} customer${grouped.length === 1 ? '' : 's'}</span></div>
+    ${grouped.length ? `<div class="messenger-shell"><aside class="messenger-sidebar"><h3 class="h4">Customers</h3>${grouped.map((contactThreads) => {
+      const customer = userById(contactThreads[0].customer)
+      const last = contactThreads.flatMap((thread) => thread.messages).sort((a, b) => b.at - a.at)[0]
+      return `<button class="message-contact" data-reply="${contactThreads[0].id}">${avatar(customer || { name: 'Customer' }, 'sm')}<span class="preview"><b>${esc(customer?.name || 'Customer')}</b><span class="tiny muted">${esc(last?.text || 'New conversation')}</span></span><span class="tiny muted">${timeAgo(last?.at || Date.now())}</span></button>`
+    }).join('')}</aside><main class="messenger-main"><div class="empty" style="margin:auto"><p class="muted">Customer conversation open karne ke liye select karein.</p></div></main></div>` : `<div class="empty"><p class="muted">Abhi koi ${panel === 'store-chats' ? 'store' : 'product'} chat nahi.</p></div>`}
   </div>`
 }
 
@@ -219,13 +215,17 @@ dashboardPage.mount = (params, query, root) => {
 function openReply(threadId) {
   const th = threadById(threadId)
   if (!th) return
+  const store = storeById(th.store)
+  const product = productById(th.product)
+  th.readByOwner = true
+  th.read = true
+  syncThread(th).catch((error) => console.error('Owner read receipt sync failed:', error))
   markThreadRead(threadId)
-  document.querySelector('[data-tab="inbox"] .badge')?.remove()
   const who = userById(th.customer)?.name || 'Customer'
   modal({
-      title: 'Reply to ' + esc(who),
+      title: (product ? 'Product chat · ' : 'Store chat · ') + esc(who),
       body: `<div class="chatbox" style="height:340px">
-          <div class="chat-head"><span class="avatar sm">${esc(who.slice(0, 2).toUpperCase())}</span><div style="flex:1"><b class="small">${esc(who)}</b><div class="sub">Customer chat</div></div></div>
+          <div class="chat-head">${storeAvatar(store, 'sm')}<div style="flex:1"><b class="small">${esc(who)}</b><div class="sub">${product ? esc(product.title) : 'Store conversation'}</div></div></div>
           <div class="chat-body" data-body>
             ${th.messages.map((m) => `<div class="msg ${m.from === th.customer ? 'them' : 'me'}"><div class="who">${m.from === th.customer ? esc(who) : m.from === 'ai' ? 'Bazar AI' : 'You'}</div>${esc(m.text)}<div class="time">${timeAgo(m.at)}</div></div>`).join('')}
           </div>
@@ -239,8 +239,12 @@ function openReply(threadId) {
           if (!v) return
           th.messages.push({ from: currentUser().id, text: v, at: Date.now() })
           th.read = true
+          th.readByCustomer = false
           save()
           syncThread(th).catch((error) => console.error('Owner reply sync failed:', error))
+          const notification = { id: 'n-' + Date.now(), to: th.customer, title: 'New reply from ' + (storeById(th.store)?.name || 'store'), body: v.slice(0, 80), at: Date.now(), read: false, link: '#/messages' }
+          state.notifications.unshift(notification)
+          syncNotification(notification).catch((error) => console.error('Reply notification sync failed:', error))
           el.querySelector('[data-in]').value = ''
           const div = document.createElement('div')
           div.className = 'msg me'

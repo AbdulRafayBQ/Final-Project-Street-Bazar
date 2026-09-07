@@ -823,8 +823,10 @@ export function cancelOrder(id, reason) {
 export function sendMessage({ productId, storeId, from, text }) {
   let t = state.threads.find((x) => x.product === productId && x.store === storeId && x.customer === from)
   if (!t) { t = { id: uid('t'), product: productId, store: storeId, customer: from, read: false, messages: [] }; state.threads.unshift(t) }
-  t.messages.push({ from, text, at: Date.now() })
+  t.messages.push({ from, text, at: Date.now(), seen: false })
   t.read = false
+  if (from === t.customer) t.readByOwner = false
+  else t.readByCustomer = false
   save(); return t
 }
 export function appendThreadMessage({ productId, storeId, customer, from, text }) {

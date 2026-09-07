@@ -3,7 +3,7 @@
 import { $, $$, icon, esc, num, toast, modal, closeModal, avatar, timeAgo } from './ui.js'
 import { state, currentUser, myStores, cartCount, logout, myNotifications, unreadNotis, toggleLike, toggleFollow, productById, addToCart, save, unreadThreadCount, setRole } from './store.js'
 import { route, setNotFound, startRouter, onRender, navigate, renderRoute } from './router.js'
-import { authRequest, syncPull, syncPush, syncFollow } from './db.js'
+import { authRequest, syncPull, syncPush, syncFollow, syncNotification } from './db.js'
 
 import { home } from './pages/home.js'
 import { explore, foryou } from './pages/explore.js'
@@ -346,7 +346,13 @@ function bindGlobals() {
       const result = toggleFollow(follow.dataset.follow)
       const on = result?.on
       if (!result) return
-      syncFollow(result.follow, on).catch((error) => toast('Follow save nahi ho saka: ' + error.message, 'err'))
+      syncFollow(result.follow, on).then(() => {
+        if (on) {
+          const store = state.stores.find((item) => item.id === follow.dataset.follow)
+          const notification = state.notifications.find((item) => item.title === 'New follower 🎉' && item.to === store?.owner && item.body.includes(currentUser()?.name || ''))
+          if (notification) syncNotification(notification).catch((error) => console.error('Follow notification sync failed:', error))
+        }
+      }).catch((error) => toast('Follow save nahi ho saka: ' + error.message, 'err'))
       follow.classList.toggle('on', on)
       const label = follow.querySelector('span') || follow
       follow.innerHTML = on ? icon('check', '', 14) + ' Following' : icon('plus', '', 14) + ' <span>Follow</span>'
