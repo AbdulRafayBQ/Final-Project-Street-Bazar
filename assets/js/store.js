@@ -3,6 +3,7 @@
 import { uid, slugify } from './ui.js'
 
 const KEY = 'street-bazar-v1'
+const LOCAL_CATALOG_RESET_KEY = 'street-bazar-local-catalog-reset-v1'
 const DAY = 86400000
 const now = Date.now()
 
@@ -483,6 +484,15 @@ function load() {
       const parsed = JSON.parse(raw)
       if (parsed && parsed.version === 1) {
         const clean = withoutDemoData(parsed)
+        if (!localStorage.getItem(LOCAL_CATALOG_RESET_KEY)) {
+          clean.stores = []
+          clean.products = []
+          clean.follows = []
+          clean.threads = []
+          clean.likes = []
+          clean.reviews = []
+          localStorage.setItem(LOCAL_CATALOG_RESET_KEY, '1')
+        }
         try { localStorage.setItem(KEY, JSON.stringify(clean)) } catch { /* ignore quota */ }
         return clean
       }

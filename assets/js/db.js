@@ -121,15 +121,32 @@ syncingPromise = (async () => {
   const payload = {
     ...state,
     users: state.users.filter((user) => !isDemo(user)).map(({ pass, ...user }) => user),
-    stores,
-    products,
+    // Media is persisted through targeted store/product writes. Keeping large
+    // data URLs out of the aggregate state endpoint prevents Vercel 413s.
+    stores: stores.map(({ logo, banner, cnicFront, cnicBack, ...store }) => ({
+      ...store,
+      ...(logo && !String(logo).startsWith('data:') ? { logo } : {}),
+      ...(banner && !String(banner).startsWith('data:') ? { banner } : {}),
+    })),
+    products: products.map((product) => ({
+      ...product,
+      media: (product.media || []).map(({ url, ...media }) => ({
+        ...media,
+        ...(url && !String(url).startsWith('data:') ? { url } : {}),
+      })),
+    })),
     isDemo: false,
     settings: { ...state.settings, supabase: {}, ai: {} },
   }
 
   payload.user_id = userId
   delete payload.session
-  await api('/api/data', { method: 'POST', body: JSON.stringify(payload) })
+  const body = JSON.stringify(payload)
+  if (body.length > 1_500_000) {
+    console.warn('Skipping aggregate sync because payload is too large; targeted sync remains active.')
+    return
+  }
+  await api('/api/data', { method: 'POST', body })
   state.settings.lastSync = Date.now()
   save()
  } finally {
