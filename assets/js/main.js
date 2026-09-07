@@ -148,7 +148,7 @@ function openMobileMenu() {
     title: 'Menu',
     body: `<div class="stack">
       ${[
-        ['#/', 'Home', 'home'], ['#/explore', 'Explore bazaar', 'search'], ['#/dukanien', 'Explore Dukanien', 'store'], ['#/foryou', 'For You', 'heart'],
+        ['#/', 'Home', 'home'], ['#/explore', 'Bazaar Products', 'search'], ['#/dukanien', 'Explore Dukanien', 'store'], ['#/foryou', 'For You', 'heart'],
         ['#/cart', 'Cart (' + cartCount() + ')', 'cart'], ['#/orders', 'My orders & tracking', 'truck'], ['#/messages', 'Messages', 'chat'],
         ...(u && !hasStore ? [['#/create-store', 'Start selling', 'store']] : []),
         ...(hasStore || u?.role === 'admin' ? [['#/dashboard', 'Owner dashboard', 'layers']] : []),
@@ -186,7 +186,7 @@ function renderFooter() {
         </div>
         <div>
           <h4>Marketplace</h4>
-          <a href="#/explore">Explore bazaar</a>
+          <a href="#/explore">Bazaar Products</a>
           <a href="#/dukanien">Explore Dukanien</a>
           <a href="#/foryou">For You feed</a>
           <a href="#/explore?cat=Fashion">Fashion</a>
@@ -222,7 +222,7 @@ function renderMobileNav() {
   $('#mobile-nav').innerHTML = `
     <ul>
       <li><a href="#/" data-path="/">${icon('home', '', 20)}<span>Home</span></a></li>
-      <li><a href="#/explore" data-path="/explore">${icon('search', '', 20)}<span>Explore</span></a></li>
+      <li><a href="#/explore" data-path="/explore">${icon('search', '', 20)}<span>Bazaar Products</span></a></li>
       <li><a href="#/dukanien" data-path="/dukanien">${icon('store', '', 20)}<span>Dukanien</span></a></li>
       <li><a href="#/foryou" data-path="/foryou">${icon('heart', '', 20)}<span>For You</span></a></li>
       <li><a href="#/cart" data-path="/cart">${icon('cart', '', 20)}<span>Cart</span><span class="cart-count" data-cart-count style="display:${cartCount() ? 'grid' : 'none'}">${cartCount()}</span></a></li>
@@ -257,7 +257,7 @@ function renderFloatingAIWidget() {
       <div class="floating-ai-body" id="floating-ai-msgs">
         <div class="msg ai">
           <div class="who">Bazar AI</div>
-          Salam! main Street Bazar ka assistant hoon. Aap products dhoondne, stores explorer karne, ya order status poochne ke liye mujh se sawal kar sakte hain!
+          Main Street Bazar ka assistant hoon. Products, stores ya order status ke bare mein pooch sakte hain.
           <div class="time">Just now</div>
         </div>
       </div>

@@ -11,7 +11,7 @@ export async function explore(params = {}, query = {}) {
   return `
   <section class="sec" style="padding-bottom:20px">
     <div class="wrap">
-      <span class="kicker">Explore</span>
+      <span class="kicker">Bazaar Products</span>
       <h1 class="h1" style="margin-top:12px">Poora <span class="grad-text">bazaar</span> ek jagah.</h1>
       <p class="lead" style="margin-top:12px">Search karo, category filter karo — ya AI se scan karwa lo ki kya dhoondna hai.</p>
       <div class="catalog-searchbar" style="margin-top:24px">
@@ -24,7 +24,7 @@ export async function explore(params = {}, query = {}) {
       <div class="catalog-filters" style="margin-top:12px">
         <input class="input price-input" id="ex-min" type="number" min="0" placeholder="Min price">
         <input class="input price-input" id="ex-max" type="number" min="0" placeholder="Max price">
-        <select class="input filter-select" id="ex-sort-select" aria-label="Sort products"><option value="popular">Popular</option><option value="new">Newest</option><option value="low">Price low to high</option><option value="high">Price high to low</option></select>
+        <select class="input filter-select" id="ex-sort-select" aria-label="Sort products"><option value="popular">Popular</option><option value="low">Price low to high</option><option value="high">Price high to low</option></select>
       </div>
       <div class="chip-row" style="margin-top:20px" id="ex-cats">
         <button class="chip ${!activeCat ? 'active' : ''}" data-cat="">${icon('grid', '', 14)} All</button>
@@ -34,7 +34,6 @@ export async function explore(params = {}, query = {}) {
         <div class="small muted" id="ex-count"></div>
         <div class="seg desktop-sort" id="ex-sort">
           <button data-sort="popular" class="active">Popular</button>
-          <button data-sort="new">Newest</button>
           <button data-sort="low">Price ↑</button>
           <button data-sort="high">Price ↓</button>
         </div>
@@ -42,7 +41,7 @@ export async function explore(params = {}, query = {}) {
     </div>
   </section>
 
-  <section class="sec" style="padding-top:10px">
+  <section class="sec catalog-results-section" style="padding-top:0">
     <div class="wrap">
       <div id="ex-results"></div>
     </div>
@@ -64,7 +63,6 @@ explore.mount = (params, query, root) => {
     list = list.filter((p) => (!minPrice || p.price >= minPrice) && (!maxPrice || p.price <= maxPrice))
     list = [...list].sort((a, b) => {
       if (sort === 'popular') return b.sales - a.sales
-      if (sort === 'new') return new Date(b.createdAt) - new Date(a.createdAt)
       if (sort === 'low') return a.price - b.price
       return b.price - a.price
     })

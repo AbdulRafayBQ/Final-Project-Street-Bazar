@@ -151,6 +151,7 @@ h1,h2,h3,h4,.dsp{font-family:var(--font-d);font-weight:700;letter-spacing:-.02em
 .catalog-filters{display:flex;gap:8px;flex-wrap:wrap}
 .price-input{max-width:145px}.filter-select{max-width:190px}
 .mobile-filter-select{display:none;margin-top:12px}
+.catalog-results-section .sec-head{margin-bottom:12px}
 .badge{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:800;letter-spacing:.03em;padding:5px 10px;border-radius:99px;text-transform:uppercase}
 .badge-sale{background:var(--grad);color:#fff}
 .badge-new{background:var(--ink);color:var(--paper)}
@@ -984,8 +985,8 @@ tbody tr:hover{background:var(--paper-2)}
   position: fixed;
   bottom: 84px;
   right: 24px;
-  width: min(390px, 92vw);
-  height: 520px;
+  width: min(440px, 92vw);
+  height: 600px;
   z-index: 995;
   background: #FFFFFF;
   border: 1px solid var(--line);
@@ -1019,6 +1020,26 @@ tbody tr:hover{background:var(--paper-2)}
   padding: 12px;
   background: #FFFFFF;
   border-top: 1px solid var(--line);
+}
+@media(max-width:640px){
+  .floating-ai-btn{
+    width:54px !important;
+    height:54px !important;
+    padding:0 !important;
+    right:16px !important;
+    bottom:16px !important;
+    border-radius:50% !important;
+    justify-content:center !important;
+  }
+  .floating-ai-btn .floating-ai-label{display:none !important}
+  .floating-ai-btn .floating-ai-emoji{display:block !important;font-size:24px;line-height:1}
+  .floating-ai-btn svg{display:none !important}
+  .floating-ai-panel{
+    width:calc(100vw - 20px);
+    height:min(680px,calc(100vh - 100px));
+    right:10px;
+    bottom:82px;
+  }
 }
 /* =========================================================
    STREET BAZAR — PREMIUM MOTION SYSTEM

@@ -230,7 +230,7 @@ export async function assistantReply({ question, history = [] }) {
   }).join('\n')
   const liveStores = state.stores.filter((store) => !store.demo && store.status !== 'hidden').map((store) => `${store.name} | ${store.type || 'Store'} | ${store.city || ''} | ${store.description || ''}`).join('\n')
   const memory = history.slice(-6).map((item) => `${item.role === 'user' ? 'Customer' : 'You'}: ${item.text}`).join('\n')
-  const r = await think('assistant', { prompt: `You are Street Bazar's concise, friendly shopping assistant. Reply naturally in Roman Urdu/English with a light helpful suggestion only when it directly helps. Remember the recent conversation below so follow-up questions make sense, but do not repeat old greetings or old answers. Answer ONLY what the customer asked, do not list unrelated stores/products, and keep replies to 1-3 short sentences (maximum 55 words). For budget/category requests, say how many matching live results were found; the app will show clickable cards. Use only the catalog below and never invent data. Recent conversation:\n${memory || '(first message)'}\nCatalog:\n${catalog || '(empty live catalog)'}\nStores:\n${liveStores || '(empty live stores)'}`, user: question }, async () => {
+  const r = await think('assistant', { prompt: `You are Street Bazar's concise, friendly shopping assistant. Reply naturally in Roman Urdu/English with a light helpful suggestion only when it directly helps. Never greet the customer, say salam, walaikum salam, hello, hi, or hey unless the customer's current message clearly starts with a greeting. Remember the recent conversation below so follow-up questions make sense, but do not repeat old greetings or old answers. Answer ONLY what the customer asked, do not list unrelated stores/products, and keep replies to 1-3 short sentences (maximum 55 words). For budget/category requests, say how many matching live results were found; the app will show clickable cards. Use only the catalog below and never invent data. Recent conversation:\n${memory || '(first message)'}\nCatalog:\n${catalog || '(empty live catalog)'}\nStores:\n${liveStores || '(empty live stores)'}`, user: question }, async () => {
     const q = T(question).toLowerCase()
     if (q.includes('sale') || q.includes('offer')) {
       const list = state.stores.filter((s) => !s.demo && s.sale && s.sale.until > Date.now())
@@ -255,7 +255,7 @@ export async function assistantReply({ question, history = [] }) {
     const hit = candidates[0]?.p || searchAll(question).products.find((p) => !p.demo && !storeById(p.store)?.demo)
     if (hit) return chatReply({ question, productId: hit.id, storeId: hit.store })
     return catalogProducts.length ? 'Main live catalog search kar sakta hoon — product ka naam, category ya budget batayein.' : 'Abhi live store catalog mein koi product listed nahi. Owner ke publish karne ke baad main real product suggest karunga.'
-  }, question, question, 220)
+  }, question, 220)
   const q = T(question).toLowerCase()
   const maxPrice = Number(q.match(/(?:under|below|less than|se kam|tak)\s*(?:rs\.?\s*)?(\d[\d,]*)/)?.[1]?.replace(/,/g, '') || 0)
   const words = q.split(/\s+/).filter((word) => word.length > 2 && !['under', 'below', 'less', 'than', 'se', 'kam', 'tak', 'price', 'chahiye', 'mujhe', 'please', 'hai', 'koi'].includes(word))
@@ -267,6 +267,8 @@ export async function assistantReply({ question, history = [] }) {
     const store = storeById(p.store)
     return { type: 'product', id: p.id, title: p.title, store: store?.name || 'Store', price: p.price, href: `#/product/${p.id}` }
   })
+  const userGreeted = /^(hi|hello|hey|salam|assalam(?:u|o)?-?alaikum)\b/i.test(T(question).trim())
+  if (!userGreeted) r.text = r.text.replace(/^(?:walaikum\s+salam|assalam(?:u|o)?-?alaikum|salam|hello|hi|hey)[,!.\s]*(?:main\s+street\s+bazar[^.]*[.!]?|aapka\s+swagat[^.]*[.!]?|bataiye[^.]*[.!]?)/i, '').trim()
   if (r.matches.length && !/product|store|available|mil|found/i.test(r.text)) r.text += ` ${r.matches.length} matching option${r.matches.length === 1 ? '' : 's'} neeche hain.`
   return r
 }
