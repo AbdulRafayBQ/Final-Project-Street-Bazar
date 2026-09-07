@@ -156,6 +156,10 @@ export async function syncThread(thread) {
   await api('/api/data', { method: 'POST', body: JSON.stringify({ action: 'thread', thread }) })
 }
 
+export async function syncFollow(follow, following) {
+  await api('/api/data', { method: 'POST', body: JSON.stringify({ action: 'follow', follow, following }) })
+}
+
 export async function deleteRemote(table, id) {
   await api('/api/data', { method: 'DELETE', body: JSON.stringify({ table, id }) })
 }
@@ -174,6 +178,7 @@ Object.assign(state, remote, {
   stores: mergeById(remote.stores, state.stores),
   products: mergeById(remote.products, state.products),
   threads: mergeById(remote.threads, state.threads),
+  follows: mergeById(remote.follows, state.follows),
   session,
 })
 save()

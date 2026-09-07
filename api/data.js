@@ -87,11 +87,12 @@ const cleanPayload = (payload) => {
 export default async function handler(req, res) {
   try {
     if (req.method === 'GET') {
-      const [stateRows, storeRows, productRows, threadRows] = await Promise.all([
+      const [stateRows, storeRows, productRows, threadRows, followRows] = await Promise.all([
         request('/rest/v1/app_state?select=payload&key=eq.global&limit=1'),
         request('/rest/v1/stores?select=*'),
         request('/rest/v1/products?select=*'),
         request('/rest/v1/threads?select=*'),
+        request('/rest/v1/follows?select=*'),
       ])
       const payload = cleanPayload(stateRows[0]?.payload || {})
       const stores = (storeRows || []).map((s) => ({
@@ -113,10 +114,15 @@ export default async function handler(req, res) {
       }))
       const threads = (threadRows || []).map((t) => ({
         id: t.id, product: t.product_id, store: t.store_id, customer: t.customer_id,
-        messages: t.messages || [], updatedAt: t.updated_at,
+        messages: t.messages || [], read: t.read ?? false, updatedAt: t.updated_at,
       }))
+      const follows = (followRows || []).map((f) => ({
+        id: f.id, user: f.user_id, store: f.store_id, at: f.created_at,
+      }))
+      const followerCounts = follows.reduce((counts, follow) => counts.set(follow.store, (counts.get(follow.store) || 0) + 1), new Map())
+      stores.forEach((store) => { store.followers = followerCounts.get(store.id) || 0 })
       const merge = (local, remote) => [...remote, ...(local || []).filter((item) => !remote.some((row) => row.id === item.id))]
-      return json(res, 200, { ...payload, stores: merge(payload.stores, stores), products: merge(payload.products, products), threads: merge(payload.threads, threads) })
+      return json(res, 200, { ...payload, stores: merge(payload.stores, stores), products: merge(payload.products, products), threads: merge(payload.threads, threads), follows: merge(payload.follows, follows) })
     }
     if (req.method === 'DELETE') {
       const { table, id } = req.body || {}
@@ -168,8 +174,19 @@ export default async function handler(req, res) {
         store_id: thread.store || thread.store_id,
         customer_id: thread.customer || thread.customer_id,
         messages: thread.messages || [],
+        read: thread.read ?? false,
         updated_at: timestamp(thread.updatedAt || thread.updated_at || Date.now()),
       }])
+      return json(res, 200, { ok: true })
+    }
+    if (payload.action === 'follow') {
+      const follow = payload.follow
+      if (!follow?.id || !follow.user || !follow.store) return json(res, 400, { error: 'Follow data is required' })
+      if (payload.following === false) {
+        await request(`/rest/v1/follows?id=eq.${encodeURIComponent(follow.id)}`, { method: 'DELETE' })
+      } else {
+        await upsert('follows', [{ id: follow.id, user_id: follow.user, store_id: follow.store, created_at: timestamp(follow.at || follow.created_at || Date.now()) }])
+      }
       return json(res, 200, { ok: true })
     }
     await request('/rest/v1/app_state?on_conflict=key', {
@@ -184,7 +201,7 @@ export default async function handler(req, res) {
     await safeUpsert('reviews', (payload.reviews || []).map((r) => ({ id: r.id, product_id: r.product || r.product_id, store_id: r.store || r.store_id, user_id: r.user || r.user_id, rating: r.rating, text: r.text, created_at: r.at || r.created_at })))
     await safeUpsert('orders', (payload.orders || []).map((o) => ({ id: o.id, user_id: o.user || o.user_id, items: o.items, total: o.total, status: o.status, timeline: o.timeline, eta: o.eta, address: o.address, store_ids: o.storeIds || o.store_ids, created_at: o.createdAt || o.created_at })))
     await safeUpsert('follows', (payload.follows || []).map((f) => ({ id: f.id, user_id: f.user || f.user_id, store_id: f.store || f.store_id, created_at: f.createdAt || f.created_at })))
-    await safeUpsert('threads', (payload.threads || []).map((t) => ({ id: t.id, product_id: t.product || t.product_id, store_id: t.store || t.store_id, customer_id: t.customer || t.customer_id, messages: t.messages, updated_at: t.updatedAt || t.updated_at })))
+    await safeUpsert('threads', (payload.threads || []).map((t) => ({ id: t.id, product_id: t.product || t.product_id, store_id: t.store || t.store_id, customer_id: t.customer || t.customer_id, messages: t.messages, read: t.read ?? false, updated_at: t.updatedAt || t.updated_at })))
     await safeUpsert('cart_items', (payload.cart || []).map((item) => ({ id: item.key || item.id, user_id: payload.user_id, product_id: item.product, store_id: item.store, title: item.title, image: item.image, qty: item.qty, options: item.options, unit_price: item.unitPrice, updated_at: new Date().toISOString() })))
     await safeUpsert('saved_products', (payload.likes || []).map((like) => ({ id: like.id, user_id: like.user, product_id: like.product, created_at: like.createdAt || like.created_at })))
     await safeUpsert('warehouse_items', (payload.warehouse || []).map((item) => ({ id: item.id, owner_id: item.owner || item.owner_id, name: item.name, sku: item.sku, qty: item.qty ?? item.quantity ?? 0, cost: item.cost || 0, location: item.location, image_url: item.image || item.image_url, updated_at: item.updatedAt || item.updated_at })))

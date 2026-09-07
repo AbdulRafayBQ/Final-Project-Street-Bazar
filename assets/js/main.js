@@ -3,7 +3,7 @@
 import { $, $$, icon, esc, num, toast, modal, closeModal, avatar, timeAgo } from './ui.js'
 import { state, currentUser, myStores, cartCount, logout, myNotifications, unreadNotis, toggleLike, toggleFollow, productById, addToCart, save, unreadThreadCount, setRole } from './store.js'
 import { route, setNotFound, startRouter, onRender, navigate, renderRoute } from './router.js'
-import { authRequest, syncPull, syncPush } from './db.js'
+import { authRequest, syncPull, syncPush, syncFollow } from './db.js'
 
 import { home } from './pages/home.js'
 import { explore, foryou } from './pages/explore.js'
@@ -12,6 +12,7 @@ import { productPage } from './pages/product.js'
 import { createStorePage } from './pages/createStore.js'
 import { addProductPage } from './pages/addProduct.js'
 import { dashboardPage, warehousePage } from './pages/dashboard.js'
+import { messagesPage } from './pages/messages.js'
 import { storesPage } from './pages/stores.js'
 import { cartPage, orderSuccessPage } from './pages/cart.js'
 import { ordersPage, trackPage } from './pages/orders.js'
@@ -126,6 +127,7 @@ function openUserMenu() {
     </div>
     <div class="divider" style="margin:6px 0"></div>
     <a class="dd-item" href="#/orders"><span class="ic">${icon('truck', '', 15)}</span><div><b>My orders</b><div class="tiny muted">Track with Order ID</div></div></a>
+    <a class="dd-item" href="#/messages"><span class="ic">${icon('chat', '', 15)}</span><div><b>Messages</b><div class="tiny muted">Stores aur products se chats</div></div></a>
     ${hasStore || u.role === 'admin' ? `<a class="dd-item" href="#/dashboard"><span class="ic">${icon('store', '', 15)}</span><div><b>Owner dashboard</b><div class="tiny muted">Stores, products, inbox</div></div></a>` : `<a class="dd-item" href="#/create-store"><span class="ic">${icon('plus', '', 15)}</span><div><b>Start selling</b><div class="tiny muted">Create your store</div></div></a>`}
     <a class="dd-item" href="#/foryou"><span class="ic">${icon('heart', '', 15)}</span><div><b>For You feed</b><div class="tiny muted">Naye drops from followed stores</div></div></a>
     ${u.role === 'admin' ? `<a class="dd-item" href="#/settings"><span class="ic">${icon('settings', '', 15)}</span><div><b>Settings</b><div class="tiny muted">AI, Supabase and server settings</div></div></a>` : ''}
@@ -145,7 +147,7 @@ function openMobileMenu() {
     body: `<div class="stack">
       ${[
         ['#/', 'Home', 'home'], ['#/explore', 'Explore bazaar', 'search'], ['#/dukanien', 'Explore Dukanien', 'store'], ['#/foryou', 'For You', 'heart'],
-        ['#/cart', 'Cart (' + cartCount() + ')', 'cart'], ['#/orders', 'My orders & tracking', 'truck'],
+        ['#/cart', 'Cart (' + cartCount() + ')', 'cart'], ['#/orders', 'My orders & tracking', 'truck'], ['#/messages', 'Messages', 'chat'],
         ...(u && !hasStore ? [['#/create-store', 'Start selling', 'store']] : []),
         ...(hasStore || u?.role === 'admin' ? [['#/dashboard', 'Owner dashboard', 'layers']] : []),
         ...(u?.role === 'admin' ? [['#/settings', 'Settings', 'settings']] : []),
@@ -341,7 +343,10 @@ function bindGlobals() {
     const follow = e.target.closest('[data-follow]')
     if (follow) {
       if (!currentUser()) { toast('Follow karne ke liye login karein', 'err'); return navigate('#/auth') }
-      const on = toggleFollow(follow.dataset.follow)
+      const result = toggleFollow(follow.dataset.follow)
+      const on = result?.on
+      if (!result) return
+      syncFollow(result.follow, on).catch((error) => toast('Follow save nahi ho saka: ' + error.message, 'err'))
       follow.classList.toggle('on', on)
       const label = follow.querySelector('span') || follow
       follow.innerHTML = on ? icon('check', '', 14) + ' Following' : icon('plus', '', 14) + ' <span>Follow</span>'
@@ -389,6 +394,7 @@ route('/add-product', addProductPage)
 route('/add-product/:storeId', addProductPage)
 route('/edit-product/:pid', addProductPage)
 route('/dashboard', dashboardPage)
+route('/messages', messagesPage)
 route('/warehouse', warehousePage)
 route('/warehouse/:storeId', warehousePage)
 route('/cart', cartPage)

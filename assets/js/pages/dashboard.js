@@ -116,18 +116,18 @@ export async function dashboardPage() {
         </div>
 
         <div data-panel="inbox" hidden>
-          ${threads.length ? `<div class="stack">${threads.map((t) => {
-            const p = t.product ? storeProducts(t.store).find((x) => x.id === t.product) : null
-            const last = t.messages.at(-1)
-            const who = userById(t.customer)?.name || 'Customer'
-            return `<div class="card" style="padding:14px;${t.read ? '' : 'border-color:var(--marigold)'}">
+          ${threads.length ? `<div class="stack">${[...new Map(threads.map((thread) => [thread.customer, threads.filter((item) => item.customer === thread.customer)])).values()].map((contactThreads) => {
+            const first = contactThreads[0]
+            const last = contactThreads.flatMap((thread) => thread.messages).sort((a, b) => b.at - a.at)[0]
+            const who = userById(first.customer)?.name || 'Customer'
+            return `<div class="card" style="padding:14px;${contactThreads.some((thread) => !thread.read) ? 'border-color:var(--marigold)' : ''}">
               <div class="row-between">
                 <div class="row">
                   <span class="avatar sm">${esc(who.slice(0, 2).toUpperCase())}</span>
-                  <div><b class="small">${esc(who)} ${t.read ? '' : '· <span style="color:var(--magenta)">NEW</span>'}</b>
-                  <div class="tiny muted">${p ? 'About: ' + esc(p.title) : 'General question'} · ${timeAgo(last?.at || Date.now())}</div></div>
+                  <div><b class="small">${esc(who)} ${contactThreads.some((thread) => !thread.read) ? '· <span style="color:var(--magenta)">NEW</span>' : ''}</b>
+                  <div class="tiny muted">${contactThreads.length} conversation${contactThreads.length === 1 ? '' : 's'} · ${timeAgo(last?.at || Date.now())}</div></div>
                 </div>
-                <button class="btn btn-sm btn-ghost" data-reply="${t.id}">${icon('chat', '', 14)} Reply</button>
+                <div class="wrap-flex">${contactThreads.map((thread) => `<button class="btn btn-sm btn-ghost" data-reply="${thread.id}">${icon('chat', '', 14)} ${esc(productById(thread.product)?.title || 'Store chat')}</button>`).join('')}</div>
               </div>
               <p class="small" style="margin-top:10px;color:var(--ink-3)">${esc(last?.text || '')}</p>
             </div>`

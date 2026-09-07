@@ -739,10 +739,11 @@ export function toggleFollow(sid) {
   const u = currentUser(); if (!u) return null
   const i = state.follows.findIndex((f) => f.user === u.id && f.store === sid)
   const s = storeById(sid)
-  if (i >= 0) { state.follows.splice(i, 1); if (s) s.followers = Math.max(0, (s.followers || 0) - 1); save(); return false }
-  state.follows.push({ id: uid('f'), user: u.id, store: sid, at: Date.now() })
+  if (i >= 0) { const removed = state.follows.splice(i, 1)[0]; if (s) s.followers = Math.max(0, (s.followers || 0) - 1); save(); return { on: false, follow: removed } }
+  const follow = { id: uid('f'), user: u.id, store: sid, at: Date.now() }
+  state.follows.push(follow)
   if (s) { s.followers = (s.followers || 0) + 1; notify(s.owner, 'New follower 🎉', (u.name || 'Someone') + ' followed ' + s.name, '#/store/' + s.slug) }
-  save(); return true
+  save(); return { on: true, follow }
 }
 
 export function toggleLike(pid) {
