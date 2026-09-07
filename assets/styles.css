@@ -482,6 +482,14 @@ tbody tr:hover{background:var(--paper-2)}
 .ai-chip:hover{transform:translateY(-2px);box-shadow:0 8px 20px rgba(122,92,255,.2)}
 .ai-out{background:var(--ink);color:var(--paper);border-radius:var(--r-m);padding:16px;font-size:14px;line-height:1.7;white-space:pre-wrap;animation:pageIn .4s var(--ease-out) both}
 .ai-out .lbl{font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--gold);font-weight:800;margin-bottom:8px}
+.ai-match-card{display:flex;gap:12px;align-items:center;padding:12px;border:1px solid var(--line);border-radius:14px;background:#fff;color:var(--ink);text-decoration:none;transition:transform .2s var(--ease),border-color .2s var(--ease)}
+.ai-match-card:hover{transform:translateY(-1px);border-color:var(--accent)}
+.ai-match-card>div{min-width:0}
+@media(max-width:640px){
+  .ai-match-card{gap:9px;padding:9px}
+  .ai-match-card img{width:48px!important;height:48px!important}
+  .ai-match-card .btn{font-size:11px;padding:7px 8px}
+}
 
 /* ---------- modals & toasts ---------- */
 .modal-back{position:fixed;inset:0;background:rgba(22,17,13,.55);backdrop-filter:blur(6px);z-index:1000;display:grid;place-items:center;

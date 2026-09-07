@@ -170,7 +170,7 @@ export function openAIScan() {
       <p class="small muted">Kuch bhi likhein — AI aapko product ideas aur shopping guidance dega. Jaise "wholesale kurta" ya "custom cover".</p>
       <div class="row" style="margin-top:14px;gap:9px">
         <input class="input" id="scan-q" placeholder="e.g. brass chai set / custom phone cover">
-        <button class="btn btn-grad" id="scan-go">${icon('sparkles', '', 16)} <span>Scan</span></button>
+        <button class="btn btn-grad" id="scan-go">${icon('sparkles', '', 16)} <span>Ask AI</span></button>
       </div>
       <div id="scan-out" style="margin-top:18px"></div>`,
     onOpen: (el) => {
@@ -182,16 +182,17 @@ export function openAIScan() {
         const res = await assistantReply({ question: q })
         const { products, stores } = searchAll(q)
         const extra = products.length ? [] : liveStores().map((s) => storeProducts(s.id).find((p) => p.categories.some((c) => c.toLowerCase().includes(q.toLowerCase().split(' ')[0])))).filter(Boolean).slice(0, 2)
-        const hits = [...products, ...extra].slice(0, 3)
+        const linked = (res.matches || []).map((match) => state.products.find((p) => p.id === match.id)).filter(Boolean)
+        const hits = [...linked, ...products, ...extra].filter((p, index, list) => list.findIndex((item) => item.id === p.id) === index).slice(0, 3)
         out.innerHTML = `
           <div class="ai-out"><span class="lbl">Ask AI</span>${esc(res.text).replace(/\n/g, '<br>')}</div>
           ${hits.length ? `<div style="margin-top:14px" class="stack">${hits.map((p) => {
             const st = storeById(p.store)
-            return `<div class="card" style="padding:12px;display:flex;gap:12px;align-items:center">
+            return `<a class="ai-match-card" href="#/product/${p.id}" data-close-modal>
               <img src="${esc(p.media[0].url)}" alt="" style="width:56px;height:56px;border-radius:14px;object-fit:cover">
               <div style="flex:1"><b class="small">${esc(p.title)}</b><div class="tiny muted">Store: ${esc(st?.name || '')} · ${money(p.price)}</div></div>
-              <a class="btn btn-sm btn-primary" href="#/product/${p.id}" data-close-modal><span>Open product</span></a>
-            </div>`
+              <span class="btn btn-sm btn-primary">Open product</span>
+            </a>`
           }).join('')}</div>` : `<p class="small muted" style="margin-top:12px">Exact match nahi mili — apni requirement thori detail se batayein.</p>`}
           ${stores.length ? `<div class="wrap-flex" style="margin-top:12px">${stores.map((s) => `<a class="chip" href="#/store/${s.slug}" data-close-modal>${icon('store', '', 13)} ${esc(s.name)}</a>`).join('')}</div>` : ''}`
         out.querySelectorAll('[data-close-modal]').forEach((a) => a.addEventListener('click', () => closeModal()))

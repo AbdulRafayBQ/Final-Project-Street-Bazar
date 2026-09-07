@@ -11,6 +11,8 @@ const hash = (s) => { let h = 0; for (const c of T(s)) h = (h * 31 + c.charCodeA
 const pick = (arr, seedStr) => arr[hash(seedStr) % arr.length]
 const hideInternalDetails = (text) => {
   const cleaned = T(text)
+    .replace(/\[([^\]]+)\]\((?:app|https?):\/\/[^)]+\)/gi, '$1')
+    .replace(/\bapp:\/\/[^\s)]+/gi, '')
     .replace(/\b(?:database|supabase|backend|api|apis|server|internal|implementation|catalog|live system|system data)\b/gi, '')
     .replace(/\s{2,}/g, ' ')
     .replace(/\s+([,.!?])/g, '$1')
