@@ -871,6 +871,7 @@ tbody tr:hover{background:var(--paper-2)}
   .mobile-filter-select{display:block}
   .catalog-searchbar + .catalog-filters{margin-top:10px}
   .desktop-sort{display:none}
+  #ex-cats,#st-cats{display:none}
 }
 @media(max-width:640px){
   .desktop-description{display:none}

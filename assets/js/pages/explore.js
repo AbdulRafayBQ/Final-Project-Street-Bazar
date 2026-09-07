@@ -19,7 +19,7 @@ export async function explore(params = {}, query = {}) {
           ${icon('search', '', 17)}
           <input class="input" id="ex-q" value="${esc(q)}" placeholder="Product ya category search karein…" style="padding-left:42px;border-radius:99px">
         </div>
-        <button class="btn btn-grad" id="ex-ai">${icon('sparkles', '', 16)} <span>AI scan</span></button>
+        <button class="btn btn-grad" id="ex-ai">${icon('box', '', 16)} <span>AI scan</span></button>
       </div>
       <div class="catalog-filters" style="margin-top:12px">
         <input class="input price-input" id="ex-min" type="number" min="0" placeholder="Min price">
@@ -32,11 +32,6 @@ export async function explore(params = {}, query = {}) {
       </div>
       <div class="row-between" style="margin-top:18px;flex-wrap:wrap;gap:10px">
         <div class="small muted" id="ex-count"></div>
-        <div class="seg desktop-sort" id="ex-sort">
-          <button data-sort="popular" class="active">Popular</button>
-          <button data-sort="low">Price ↑</button>
-          <button data-sort="high">Price ↓</button>
-        </div>
       </div>
     </div>
   </section>
@@ -76,16 +71,11 @@ explore.mount = (params, query, root) => {
   root.querySelector('#ex-q').addEventListener('input', (e) => { term = e.target.value; paint() })
   root.querySelector('#ex-min').addEventListener('input', (e) => { minPrice = Number(e.target.value) || 0; paint() })
   root.querySelector('#ex-max').addEventListener('input', (e) => { maxPrice = Number(e.target.value) || 0; paint() })
-  root.querySelector('#ex-sort-select').addEventListener('change', (e) => { sort = e.target.value; root.querySelectorAll('#ex-sort button').forEach((x) => x.classList.toggle('active', x.dataset.sort === sort)); paint() })
+  root.querySelector('#ex-sort-select').addEventListener('change', (e) => { sort = e.target.value; paint() })
   root.querySelector('#ex-ai').addEventListener('click', openAIScan)
   root.querySelectorAll('#ex-cats .chip').forEach((b) => b.addEventListener('click', () => {
     cat = b.dataset.cat
     root.querySelectorAll('#ex-cats .chip').forEach((x) => x.classList.toggle('active', x === b))
-    paint()
-  }))
-  root.querySelectorAll('#ex-sort button').forEach((b) => b.addEventListener('click', () => {
-    sort = b.dataset.sort
-    root.querySelectorAll('#ex-sort button').forEach((x) => x.classList.toggle('active', x === b))
     paint()
   }))
 }

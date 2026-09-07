@@ -44,11 +44,6 @@ function renderHeader() {
         ${u && u.role === 'admin' ? `<a href="#/admin" data-path="/admin">Admin</a>` : ''}
       </nav>
 
-      <div class="hd-search">
-        ${icon('search', '', 17)}
-        <input class="input" id="global-search" placeholder="Search bazaar… (try \"kurta\")">
-      </div>
-
       <div class="hd-actions">
         <button class="icon-btn desktop-only" id="btn-bell" title="Notifications">${icon('bell', '', 18)}${unreadNotis() ? '<span class="dot"></span>' : ''}</button>
         <a class="icon-btn" href="#/cart" title="Cart">${icon('cart', '', 18)}<span class="cart-count" data-cart-count style="display:${cartCount() ? 'grid' : 'none'}">${cartCount()}</span></a>
@@ -61,12 +56,6 @@ function renderHeader() {
         ${u ? `<button class="icon-btn menu-btn" id="btn-menu" aria-label="Menu">${icon('menu', '', 18)}</button>` : ''}
       </div>
     </div>`
-
-  // search
-  const search = $('#global-search')
-  search?.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' && search.value.trim()) navigate('#/explore?q=' + encodeURIComponent(search.value.trim()))
-  })
 
   $('#btn-ai')?.addEventListener('click', () => import('./pages/home.js').then((m) => m.openAIScan()))
 
@@ -148,7 +137,7 @@ function openMobileMenu() {
     title: 'Menu',
     body: `<div class="stack">
       ${[
-        ['#/', 'Home', 'home'], ['#/explore', 'Bazaar Products', 'search'], ['#/dukanien', 'Explore Dukanien', 'store'], ['#/foryou', 'For You', 'heart'],
+        ['#/', 'Home', 'home'], ['#/explore', 'Bazaar Products', 'box'], ['#/dukanien', 'Explore Dukanien', 'store'], ['#/foryou', 'For You', 'heart'],
         ['#/cart', 'Cart (' + cartCount() + ')', 'cart'], ['#/orders', 'My orders & tracking', 'truck'], ['#/messages', 'Messages', 'chat'],
         ...(u && !hasStore ? [['#/create-store', 'Start selling', 'store']] : []),
         ...(hasStore || u?.role === 'admin' ? [['#/dashboard', 'Owner dashboard', 'layers']] : []),

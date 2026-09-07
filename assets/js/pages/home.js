@@ -165,9 +165,9 @@ home.mount = (p, q, root) => {
 
 export function openAIScan() {
   modal({
-    title: `${icon('sparkles', '', 18)} Bazar AI — catalog scan`,
+    title: `${icon('box', '', 18)} Bazar AI — product helper`,
     body: `
-      <p class="small muted">Kuch bhi likhein — AI poore database se product ya store dhoond kar direct button dega. Jaise "wholesale kurta" ya "custom cover".</p>
+      <p class="small muted">Kuch bhi likhein — AI aapko product ideas aur shopping guidance dega. Jaise "wholesale kurta" ya "custom cover".</p>
       <div class="row" style="margin-top:14px;gap:9px">
         <input class="input" id="scan-q" placeholder="e.g. brass chai set / custom phone cover">
         <button class="btn btn-grad" id="scan-go">${icon('sparkles', '', 16)} <span>Scan</span></button>
@@ -192,7 +192,7 @@ export function openAIScan() {
               <div style="flex:1"><b class="small">${esc(p.title)}</b><div class="tiny muted">Store: ${esc(st?.name || '')} · ${money(p.price)}</div></div>
               <a class="btn btn-sm btn-primary" href="#/product/${p.id}" data-close-modal><span>Open product</span></a>
             </div>`
-          }).join('')}</div>` : `<p class="small muted" style="margin-top:12px">Koi exact product nahi mili — Explore page par poora catalog dekhein.</p>`}
+          }).join('')}</div>` : `<p class="small muted" style="margin-top:12px">Exact match nahi mili — apni requirement thori detail se batayein.</p>`}
           ${stores.length ? `<div class="wrap-flex" style="margin-top:12px">${stores.map((s) => `<a class="chip" href="#/store/${s.slug}" data-close-modal>${icon('store', '', 13)} ${esc(s.name)}</a>`).join('')}</div>` : ''}`
         out.querySelectorAll('[data-close-modal]').forEach((a) => a.addEventListener('click', () => closeModal()))
       }
