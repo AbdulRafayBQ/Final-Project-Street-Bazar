@@ -147,6 +147,10 @@ h1,h2,h3,h4,.dsp{font-family:var(--font-d);font-weight:700;letter-spacing:-.02em
 .chip.static{cursor:default}
 .chip.static:hover{transform:none;border-color:var(--line)}
 .chip-row{display:flex;gap:9px;flex-wrap:wrap}
+.catalog-searchbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.catalog-filters{display:flex;gap:8px;flex-wrap:wrap}
+.price-input{max-width:145px}.filter-select{max-width:190px}
+.mobile-filter-select{display:none;margin-top:12px}
 .badge{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:800;letter-spacing:.03em;padding:5px 10px;border-radius:99px;text-transform:uppercase}
 .badge-sale{background:var(--grad);color:#fff}
 .badge-new{background:var(--ink);color:var(--paper)}
@@ -859,6 +863,13 @@ tbody tr:hover{background:var(--paper-2)}
   .mobile-nav{display:none}
   .view{padding-bottom:40px}
   .store-tabs{top:0}
+  .catalog-searchbar .hd-search{display:block;max-width:none !important;width:100%}
+  .catalog-searchbar .btn{width:100%;justify-content:center}
+  .catalog-filters{display:grid;grid-template-columns:1fr 1fr}
+  .catalog-filters .filter-select{grid-column:1/-1;max-width:none}
+  .mobile-filter-select{display:block}
+  .catalog-searchbar + .catalog-filters{margin-top:10px}
+  .desktop-sort{display:none}
 }
 @media(max-width:640px){
   .desktop-description{display:none}

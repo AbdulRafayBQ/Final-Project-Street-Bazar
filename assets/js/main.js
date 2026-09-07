@@ -37,7 +37,7 @@ function renderHeader() {
 
       <nav class="nav" data-nav>
         <a href="#/" data-path="/">Home</a>
-        <a href="#/explore" data-path="/explore">Explore</a>
+        <a href="#/explore" data-path="/explore">Bazaar Products</a>
         <a href="#/dukanien" data-path="/dukanien">Explore Dukanien</a>
         <a href="#/foryou" data-path="/foryou">For You</a>
         ${u && (hasStore || u.role === 'admin') ? `<a href="#/dashboard" data-path="/dashboard">Dashboard</a>` : ''}
@@ -282,6 +282,7 @@ function renderFloatingAIWidget() {
   const sendBtn = $('#floating-ai-send')
   const input = $('#floating-ai-input')
   const msgs = $('#floating-ai-msgs')
+  const conversation = []
 
   toggleBtn.addEventListener('click', () => {
     const isVis = panel.style.display !== 'none'
@@ -309,7 +310,9 @@ function renderFloatingAIWidget() {
     msgs.scrollTop = msgs.scrollHeight
 
     try {
-      const res = await assistantReply({ question: text })
+      conversation.push({ role: 'user', text })
+      const res = await assistantReply({ question: text, history: conversation.slice(-6) })
+      conversation.push({ role: 'assistant', text: res.text })
       typing.remove()
       const aiMsg = document.createElement('div')
       aiMsg.className = 'msg ai'

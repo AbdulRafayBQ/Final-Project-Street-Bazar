@@ -14,12 +14,17 @@ export async function explore(params = {}, query = {}) {
       <span class="kicker">Explore</span>
       <h1 class="h1" style="margin-top:12px">Poora <span class="grad-text">bazaar</span> ek jagah.</h1>
       <p class="lead" style="margin-top:12px">Search karo, category filter karo — ya AI se scan karwa lo ki kya dhoondna hai.</p>
-      <div class="row" style="margin-top:24px;gap:10px;flex-wrap:wrap">
+      <div class="catalog-searchbar" style="margin-top:24px">
         <div class="hd-search" style="max-width:520px;flex:1;position:relative">
           ${icon('search', '', 17)}
           <input class="input" id="ex-q" value="${esc(q)}" placeholder="Product ya category search karein…" style="padding-left:42px;border-radius:99px">
         </div>
         <button class="btn btn-grad" id="ex-ai">${icon('sparkles', '', 16)} <span>AI scan</span></button>
+      </div>
+      <div class="catalog-filters" style="margin-top:12px">
+        <input class="input price-input" id="ex-min" type="number" min="0" placeholder="Min price">
+        <input class="input price-input" id="ex-max" type="number" min="0" placeholder="Max price">
+        <select class="input filter-select" id="ex-sort-select" aria-label="Sort products"><option value="popular">Popular</option><option value="new">Newest</option><option value="low">Price low to high</option><option value="high">Price high to low</option></select>
       </div>
       <div class="chip-row" style="margin-top:20px" id="ex-cats">
         <button class="chip ${!activeCat ? 'active' : ''}" data-cat="">${icon('grid', '', 14)} All</button>
@@ -27,7 +32,7 @@ export async function explore(params = {}, query = {}) {
       </div>
       <div class="row-between" style="margin-top:18px;flex-wrap:wrap;gap:10px">
         <div class="small muted" id="ex-count"></div>
-        <div class="seg" id="ex-sort">
+        <div class="seg desktop-sort" id="ex-sort">
           <button data-sort="popular" class="active">Popular</button>
           <button data-sort="new">Newest</button>
           <button data-sort="low">Price ↑</button>
@@ -48,12 +53,15 @@ explore.mount = (params, query, root) => {
   let cat = query.cat || ''
   let sort = 'popular'
   let term = query.q || ''
+  let minPrice = 0
+  let maxPrice = 0
 
   const paint = () => {
     const { products } = searchAll(term)
     const catalog = term ? products : liveStores().flatMap((store) => storeProducts(store.id))
     const normalizedCat = cat.trim().toLowerCase()
     let list = catalog.filter((p) => !normalizedCat || (p.categories || []).some((value) => String(value).trim().toLowerCase() === normalizedCat))
+    list = list.filter((p) => (!minPrice || p.price >= minPrice) && (!maxPrice || p.price <= maxPrice))
     list = [...list].sort((a, b) => {
       if (sort === 'popular') return b.sales - a.sales
       if (sort === 'new') return new Date(b.createdAt) - new Date(a.createdAt)
@@ -68,6 +76,9 @@ explore.mount = (params, query, root) => {
   paint()
 
   root.querySelector('#ex-q').addEventListener('input', (e) => { term = e.target.value; paint() })
+  root.querySelector('#ex-min').addEventListener('input', (e) => { minPrice = Number(e.target.value) || 0; paint() })
+  root.querySelector('#ex-max').addEventListener('input', (e) => { maxPrice = Number(e.target.value) || 0; paint() })
+  root.querySelector('#ex-sort-select').addEventListener('change', (e) => { sort = e.target.value; root.querySelectorAll('#ex-sort button').forEach((x) => x.classList.toggle('active', x.dataset.sort === sort)); paint() })
   root.querySelector('#ex-ai').addEventListener('click', openAIScan)
   root.querySelectorAll('#ex-cats .chip').forEach((b) => b.addEventListener('click', () => {
     cat = b.dataset.cat

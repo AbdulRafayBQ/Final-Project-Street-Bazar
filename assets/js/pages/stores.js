@@ -16,7 +16,7 @@ export async function storesPage(params = {}, query = {}) {
       <h1 class="h1" style="margin-top:12px">Marketplace ke <span class="grad-text">Sab Stores</span></h1>
       <p class="lead" style="margin-top:12px">Explore verified sellers, official brand outlets, and local artisanal dukanien across Pakistan.</p>
       
-      <div class="row" style="margin-top:24px;gap:12px;flex-wrap:wrap">
+      <div class="catalog-searchbar" style="margin-top:24px">
         <div class="hd-search" style="max-width:520px;flex:1;position:relative">
           ${icon('search', '', 17)}
           <input class="input" id="st-search-q" value="${esc(q)}" placeholder="Dukan ka naam, category ya city search karein…" style="padding-left:42px;border-radius:99px">
@@ -28,6 +28,7 @@ export async function storesPage(params = {}, query = {}) {
         <button class="chip ${!activeCat ? 'active' : ''}" data-cat="">${icon('grid', '', 14)} All Stores</button>
         ${allCategories().map((c) => `<button class="chip ${activeCat === c ? 'active' : ''}" data-cat="${esc(c)}">${esc(c)}</button>`).join('')}
       </div>
+      <select class="input mobile-filter-select" id="st-cat-select" aria-label="Store category"><option value="">All stores</option>${allCategories().map((c) => `<option value="${esc(c)}">${esc(c)}</option>`).join('')}</select>
 
       <div class="row-between" style="margin-top:20px;flex-wrap:wrap;gap:10px">
         <div class="small muted" id="st-count">${num(stores.length)} stores live</div>
@@ -99,6 +100,11 @@ storesPage.mount = (params, query, root) => {
     term = e.target.value
     render()
   })
+  root.querySelector('#st-cat-select')?.addEventListener('change', (e) => {
+    cat = e.target.value
+    root.querySelectorAll('#st-cats .chip').forEach((x) => x.classList.toggle('active', x.dataset.cat === cat))
+    render()
+  })
 
   root.querySelectorAll('#st-cats .chip').forEach((btn) => {
     btn.addEventListener('click', () => {
@@ -108,4 +114,3 @@ storesPage.mount = (params, query, root) => {
     })
   })
 }
-

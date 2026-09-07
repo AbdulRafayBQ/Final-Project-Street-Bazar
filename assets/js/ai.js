@@ -222,14 +222,15 @@ export async function genCategorySuggestion({ rough, storeName }) {
   return list.length ? list : ['Fashion']
 }
 
-export async function assistantReply({ question }) {
+export async function assistantReply({ question, history = [] }) {
   const catalogProducts = state.products.filter((p) => p.status === 'active' && storeById(p.store)?.status === 'live' && !p.demo && !storeById(p.store)?.demo)
   const catalog = catalogProducts.map((p) => {
     const store = storeById(p.store)
     return `${p.title} | ${store?.name || 'Store'} | Rs ${p.price} | ${p.stock > 0 ? 'in stock' : 'out of stock'} | ${[...(p.categories || []), ...(p.tags || [])].join(', ')}`
   }).join('\n')
   const liveStores = state.stores.filter((store) => !store.demo && store.status !== 'hidden').map((store) => `${store.name} | ${store.type || 'Store'} | ${store.city || ''} | ${store.description || ''}`).join('\n')
-  const r = await think('assistant', { prompt: `You are Street Bazar's concise shopping assistant. Reply like a normal helpful human in Roman Urdu/English. Answer ONLY what the customer asked; do not add greetings unless the customer greeted first, do not repeat the question, do not list unrelated stores/products, and do not make unsolicited recommendations. Keep replies to 1-3 short sentences (maximum 55 words). For a budget/category request, say how many matching live products/stores were found and let the app show clickable results. Use only the catalog below and never invent data. Catalog:\n${catalog || '(empty live catalog)'}\nStores:\n${liveStores || '(empty live stores)'}`, user: question }, async () => {
+  const memory = history.slice(-6).map((item) => `${item.role === 'user' ? 'Customer' : 'You'}: ${item.text}`).join('\n')
+  const r = await think('assistant', { prompt: `You are Street Bazar's concise, friendly shopping assistant. Reply naturally in Roman Urdu/English with a light helpful suggestion only when it directly helps. Remember the recent conversation below so follow-up questions make sense, but do not repeat old greetings or old answers. Answer ONLY what the customer asked, do not list unrelated stores/products, and keep replies to 1-3 short sentences (maximum 55 words). For budget/category requests, say how many matching live results were found; the app will show clickable cards. Use only the catalog below and never invent data. Recent conversation:\n${memory || '(first message)'}\nCatalog:\n${catalog || '(empty live catalog)'}\nStores:\n${liveStores || '(empty live stores)'}`, user: question }, async () => {
     const q = T(question).toLowerCase()
     if (q.includes('sale') || q.includes('offer')) {
       const list = state.stores.filter((s) => !s.demo && s.sale && s.sale.until > Date.now())
@@ -254,7 +255,7 @@ export async function assistantReply({ question }) {
     const hit = candidates[0]?.p || searchAll(question).products.find((p) => !p.demo && !storeById(p.store)?.demo)
     if (hit) return chatReply({ question, productId: hit.id, storeId: hit.store })
     return catalogProducts.length ? 'Main live catalog search kar sakta hoon — product ka naam, category ya budget batayein.' : 'Abhi live store catalog mein koi product listed nahi. Owner ke publish karne ke baad main real product suggest karunga.'
-  }, question, 220)
+  }, question, question, 220)
   const q = T(question).toLowerCase()
   const maxPrice = Number(q.match(/(?:under|below|less than|se kam|tak)\s*(?:rs\.?\s*)?(\d[\d,]*)/)?.[1]?.replace(/,/g, '') || 0)
   const words = q.split(/\s+/).filter((word) => word.length > 2 && !['under', 'below', 'less', 'than', 'se', 'kam', 'tak', 'price', 'chahiye', 'mujhe', 'please', 'hai', 'koi'].includes(word))
