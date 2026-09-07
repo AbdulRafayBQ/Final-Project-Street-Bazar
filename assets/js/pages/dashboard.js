@@ -4,7 +4,7 @@ import { icon, esc, money, num, toast, modal, closeModal, timeAgo, spinner, conf
 import { statCard, emptyLogin } from '../components.js'
 import { myStores, storeById, storeProducts, storeOrders, storeRevenue, storeSales, currentUser, lowStock, productById, updateProduct, updateStore, deleteStore, advanceOrder, cancelOrder, addStock, storeThreads, threadById, markThreadRead, userById, save, ownerWarehouse, addWarehouseItem, updateWarehouseItem, deleteWarehouseItem } from '../store.js'
 import { genStockPlan } from '../ai.js'
-import { authRequest, syncThread } from '../db.js'
+import { authRequest, syncThread, syncPull } from '../db.js'
 import { navigate } from '../router.js'
 
 export async function dashboardPage() {
@@ -142,6 +142,22 @@ export async function dashboardPage() {
 }
 
 dashboardPage.mount = (params, query, root) => {
+  let threadSignature = JSON.stringify(state.threads.map((thread) => `${thread.id}:${thread.messages?.length || 0}:${thread.messages?.at(-1)?.at || 0}`).sort())
+  const refreshInbox = async () => {
+    try {
+      await syncPull()
+      const next = JSON.stringify(state.threads.map((thread) => `${thread.id}:${thread.messages?.length || 0}:${thread.messages?.at(-1)?.at || 0}`).sort())
+      if (next !== threadSignature) {
+        threadSignature = next
+        await renderRoute()
+      }
+    } catch (error) {
+      console.error('Owner inbox refresh failed:', error)
+    }
+  }
+  refreshInbox()
+  root._dashboardRefreshTimer = setInterval(refreshInbox, 5000)
+
   const tabs = root.querySelectorAll('[data-tabs] button')
   tabs.forEach((b) => b.addEventListener('click', () => {
     tabs.forEach((x) => x.classList.toggle('active', x === b))

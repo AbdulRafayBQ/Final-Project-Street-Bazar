@@ -470,11 +470,16 @@ async function restoreGoogleSession() {
       })
       sessionStorage.removeItem('street-bazar-google-verifier')
       await syncPull()
-      state.users.push(result.user)
+      const existing = state.users.find((user) => user.id === result.user.id)
+      if (existing) Object.assign(existing, result.user)
+      else state.users.push(result.user)
       state.session = result.user.id
       setRole(result.user.role)
       save()
-      window.history.replaceState({}, document.title, `${location.pathname}#/`)
+      const next = sessionStorage.getItem('street-bazar-google-next') || '#/'
+      sessionStorage.removeItem('street-bazar-google-next')
+      window.history.replaceState({}, document.title, `${location.pathname}${next}`)
+      await renderRoute()
     } catch (error) {
       sessionStorage.removeItem('street-bazar-google-verifier')
       sessionStorage.setItem('street-bazar-google-error', error.message)
@@ -492,11 +497,16 @@ async function restoreGoogleSession() {
   try {
     const result = await authRequest('oauth', { access_token: accessToken })
     await syncPull()
-    state.users.push(result.user)
+    const existing = state.users.find((user) => user.id === result.user.id)
+    if (existing) Object.assign(existing, result.user)
+    else state.users.push(result.user)
     state.session = result.user.id
     setRole(result.user.role)
     save()
-    window.history.replaceState({}, document.title, `${location.pathname}#/`)
+    const next = sessionStorage.getItem('street-bazar-google-next') || '#/'
+    sessionStorage.removeItem('street-bazar-google-next')
+    window.history.replaceState({}, document.title, `${location.pathname}${next}`)
+    await renderRoute()
   } catch (error) {
     console.error('Google session restore failed:', error)
   }

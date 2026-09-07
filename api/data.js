@@ -87,10 +87,11 @@ const cleanPayload = (payload) => {
 export default async function handler(req, res) {
   try {
     if (req.method === 'GET') {
-      const [stateRows, storeRows, productRows] = await Promise.all([
+      const [stateRows, storeRows, productRows, threadRows] = await Promise.all([
         request('/rest/v1/app_state?select=payload&key=eq.global&limit=1'),
         request('/rest/v1/stores?select=*'),
         request('/rest/v1/products?select=*'),
+        request('/rest/v1/threads?select=*'),
       ])
       const payload = cleanPayload(stateRows[0]?.payload || {})
       const stores = (storeRows || []).map((s) => ({
@@ -110,8 +111,12 @@ export default async function handler(req, res) {
         homeDeliveryCharge: p.home_delivery_charge, outsideDeliveryCharge: p.outside_delivery_charge,
         sales: p.sales, status: p.status, createdAt: p.created_at,
       }))
+      const threads = (threadRows || []).map((t) => ({
+        id: t.id, product: t.product_id, store: t.store_id, customer: t.customer_id,
+        messages: t.messages || [], updatedAt: t.updated_at,
+      }))
       const merge = (local, remote) => [...remote, ...(local || []).filter((item) => !remote.some((row) => row.id === item.id))]
-      return json(res, 200, { ...payload, stores: merge(payload.stores, stores), products: merge(payload.products, products) })
+      return json(res, 200, { ...payload, stores: merge(payload.stores, stores), products: merge(payload.products, products), threads: merge(payload.threads, threads) })
     }
     if (req.method === 'DELETE') {
       const { table, id } = req.body || {}

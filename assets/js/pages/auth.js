@@ -143,10 +143,11 @@ authPage.mount = (params, query, root) => {
       const button = event.currentTarget
       button.disabled = true
       try {
-        const redirect = `${location.origin}${location.pathname}`
+        const oauthRedirect = `${location.origin}${location.pathname}`
         const { verifier, challenge } = await createCodeChallenge()
         sessionStorage.setItem('street-bazar-google-verifier', verifier)
-        const response = await fetch(`/api/auth?action=google&redirect=${encodeURIComponent(redirect)}&code_challenge=${encodeURIComponent(challenge)}`)
+        sessionStorage.setItem('street-bazar-google-next', redirect)
+        const response = await fetch(`/api/auth?action=google&redirect=${encodeURIComponent(oauthRedirect)}&code_challenge=${encodeURIComponent(challenge)}`)
         const data = await response.json().catch(() => ({}))
         if (!response.ok || !data.url) throw new Error(data.error || 'Google sign in unavailable')
         window.location.assign(data.url)

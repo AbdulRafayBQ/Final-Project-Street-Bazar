@@ -53,6 +53,10 @@ export async function renderRoute() {
     clearInterval(view._adminRefreshTimer)
     view._adminRefreshTimer = null
   }
+  if (view._dashboardRefreshTimer) {
+    clearInterval(view._dashboardRefreshTimer)
+    view._dashboardRefreshTimer = null
+  }
 
   try {
     view.innerHTML = await page(params, query)
