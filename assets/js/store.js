@@ -571,9 +571,11 @@ export function recommendations(limit = 8) {
 /* ---------------- mutations ---------------- */
 const moneyPlain = (n) => 'Rs ' + Number(n).toLocaleString('en-PK')
 
-export function notify(to, title, body, link = '#/') {
-  state.notifications.unshift({ id: uid('n'), to, title, body, link, at: Date.now(), read: false })
+export function notify(to, title, body, link = '#/', meta = {}) {
+  const notification = { id: uid('n'), to, title, body, link, at: Date.now(), read: false, ...meta }
+  state.notifications.unshift(notification)
   save()
+  return notification
 }
 
 export function login(email, pass) {
@@ -592,7 +594,7 @@ export function googleAuth() {
   if (!u) { u = { id: uid('u'), name: 'Google User', email: 'you@gmail.com', role: 'customer', pass: '', avatar: '', createdAt: Date.now() }; state.users.push(u) }
   state.session = u.id; save(); return u
 }
-export function logout() { state.session = null; save() }
+export function logout() { state.session = null; sessionStorage.removeItem('street-bazar-access-token'); save() }
 export function setRole(role) {
   const u = currentUser(); if (!u) return
   u.role = role; save()
@@ -742,7 +744,7 @@ export function toggleFollow(sid) {
   if (i >= 0) { const removed = state.follows.splice(i, 1)[0]; if (s) s.followers = Math.max(0, (s.followers || 0) - 1); save(); return { on: false, follow: removed } }
   const follow = { id: uid('f'), user: u.id, store: sid, at: Date.now() }
   state.follows.push(follow)
-  if (s) { s.followers = (s.followers || 0) + 1; notify(s.owner, 'New follower 🎉', (u.name || 'Someone') + ' followed ' + s.name, '#/store/' + s.slug) }
+  if (s) { s.followers = (s.followers || 0) + 1; notify(s.owner, 'New follower 🎉', (u.name || 'Someone') + ' followed ' + s.name, '#/store/' + s.slug, { storeId: s.id, followerId: u.id }) }
   save(); return { on: true, follow }
 }
 

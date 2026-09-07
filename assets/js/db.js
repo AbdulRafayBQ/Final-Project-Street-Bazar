@@ -89,7 +89,8 @@ const controller = new AbortController()
 const timeout = setTimeout(() => controller.abort(), 30000)
 let res
 try {
-  res = await fetch(path, { ...options, signal: controller.signal, headers: { 'Content-Type': 'application/json', ...(options.headers || {}) } })
+  const token = sessionStorage.getItem('street-bazar-access-token')
+  res = await fetch(path, { ...options, signal: controller.signal, headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}), ...(options.headers || {}) } })
 } catch (error) {
   if (error.name === 'AbortError') throw new Error('Server response timed out. Please try again.')
   throw error
@@ -102,7 +103,9 @@ return data
 }
 
 export async function authRequest(action, payload) {
-return api('/api/auth', { method: 'POST', body: JSON.stringify({ action, ...payload }) })
+const result = await api('/api/auth', { method: 'POST', body: JSON.stringify({ action, ...payload }) })
+if (result.access_token) sessionStorage.setItem('street-bazar-access-token', result.access_token)
+return result
 }
 
 export async function syncPush() {

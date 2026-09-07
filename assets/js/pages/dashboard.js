@@ -245,7 +245,7 @@ function openReply(threadId) {
           th.readByCustomer = false
           save()
           syncThread(th).catch((error) => console.error('Owner reply sync failed:', error))
-          const notification = { id: 'n-' + Date.now(), to: th.customer, title: 'New reply from ' + (storeById(th.store)?.name || 'store'), body: v.slice(0, 80), at: Date.now(), read: false, link: '#/messages' }
+          const notification = { id: 'n-' + Date.now(), to: th.customer, title: 'New reply from ' + (storeById(th.store)?.name || 'store'), body: v.slice(0, 80), at: Date.now(), read: false, link: '#/messages', storeId: th.store, threadId: th.id }
           state.notifications.unshift(notification)
           syncNotification(notification).catch((error) => console.error('Reply notification sync failed:', error))
           el.querySelector('[data-in]').value = ''

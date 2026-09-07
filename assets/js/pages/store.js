@@ -211,7 +211,7 @@ function storeByIdSafe(id) { return state.stores.find((s) => s.id === id) || nul
 function notifyOwner(store, question) {
   const existing = state.threads.find((t) => t.store === store.id && t.customer === currentUser()?.id)
   if (existing) { existing.read = false; }
-  const notification = { id: 'n-' + Date.now(), to: store.owner, title: 'New question in ' + store.name, body: question.slice(0, 80), at: Date.now(), read: false, link: '#/dashboard' }
+  const notification = { id: 'n-' + Date.now(), to: store.owner, title: 'New question in ' + store.name, body: question.slice(0, 80), at: Date.now(), read: false, link: '#/dashboard', storeId: store.id, customerId: currentUser()?.id }
   state.notifications.unshift(notification)
   try { localStorage.setItem('street-bazar-v1', JSON.stringify(state)) } catch { /* ignore */ }
   return notification
