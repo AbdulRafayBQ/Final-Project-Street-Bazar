@@ -228,7 +228,7 @@ h1,h2,h3,h4,.dsp{font-family:var(--font-d);font-weight:700;letter-spacing:-.02em
 .hd-search{flex:1;max-width:340px;margin-left:auto;position:relative}
 .hd-search .input{padding-left:42px;border-radius:99px;background:#fff}
 .hd-search svg{position:absolute;left:15px;top:50%;transform:translateY(-50%);width:17px;height:17px;color:var(--muted)}
-.hd-actions{display:flex;align-items:center;gap:9px}
+.hd-actions{display:flex;align-items:center;gap:9px;margin-left:auto}
 .password-wrap{position:relative}
 .password-wrap .input{padding-right:68px}
 .password-toggle{position:absolute;right:10px;top:50%;transform:translateY(-50%);font-size:12px;font-weight:700;color:var(--accent)}
