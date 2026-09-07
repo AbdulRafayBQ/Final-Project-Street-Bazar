@@ -134,8 +134,8 @@ createStorePage.mount = (params, query, root) => {
           <div class="field"><span class="label">CNIC *</span><input class="input" data-f="cnic" value="${esc(draft.cnic)}" inputmode="numeric" maxlength="15" placeholder="42123-4356789-4"></div>
         </div>
         <div class="grid grid-2" style="gap:12px">
-          <div class="field"><span class="label">CNIC front photo *</span><input class="input" type="file" id="cnic-front-in" accept="image/*"><div class="tiny muted">${draft.cnicFront ? 'Front photo uploaded' : 'Upload front side'}</div></div>
-          <div class="field"><span class="label">CNIC back photo *</span><input class="input" type="file" id="cnic-back-in" accept="image/*"><div class="tiny muted">${draft.cnicBack ? 'Back photo uploaded' : 'Upload back side'}</div></div>
+          <div class="field"><span class="label">CNIC front photo *</span><input class="input" type="file" id="cnic-front-in" accept="image/*"><div class="tiny muted">${draft.cnicFront ? 'Front photo uploaded' : 'Upload front side'}</div>${draft.cnicFront ? `<img src="${esc(draft.cnicFront)}" alt="CNIC front preview" style="display:block;width:180px;height:110px;object-fit:contain;background:#f5f5f5;border-radius:8px;margin-top:8px">` : ''}</div>
+          <div class="field"><span class="label">CNIC back photo *</span><input class="input" type="file" id="cnic-back-in" accept="image/*"><div class="tiny muted">${draft.cnicBack ? 'Back photo uploaded' : 'Upload back side'}</div>${draft.cnicBack ? `<img src="${esc(draft.cnicBack)}" alt="CNIC back preview" style="display:block;width:180px;height:110px;object-fit:contain;background:#f5f5f5;border-radius:8px;margin-top:8px">` : ''}</div>
         </div>
         <div class="field"><span class="label">Personal address *</span><textarea class="textarea" data-f="personalAddress" placeholder="Owner ka verification address">${esc(draft.personalAddress)}</textarea></div>
         <div class="pill-note">${icon('info', '', 14)} Home business ho toh bhi store bilkul normal dikhega — sirf type badge alag hoga.</div>
@@ -300,8 +300,8 @@ createStorePage.mount = (params, query, root) => {
         }
       })
     }
-    bindUpload('logo-in', 'logo')
-    bindUpload('banner-in', 'banner')
+    bindUpload('logo-in', 'logo', readImage)
+    bindUpload('banner-in', 'banner', readImage)
     bindUpload('cnic-front-in', 'cnicFront', readImage)
     bindUpload('cnic-back-in', 'cnicBack', readImage)
     form.querySelector('[data-f="cnic"]')?.addEventListener('input', (e) => {
@@ -369,15 +369,15 @@ createStorePage.mount = (params, query, root) => {
     }
     if (params.id) {
       updateStore(params.id, data)
-      try { await syncStore(storeById(params.id)) } catch (error) { done(); toast('Store local save ho gaya, lekin server par save nahi ho saka: ' + error.message, 'err'); return }
+      try { await syncStore(storeById(params.id)) } catch (error) { done(); toast('Store update submit nahi ho saka: ' + error.message, 'err'); return }
       done()
       toast('Store update ho gaya', 'ok')
       navigate('#/store/' + storeById(params.id).slug)
     } else {
       const s = createStore(data)
-      try { await syncStore(s) } catch (error) { done(); toast('Store local save ho gaya, lekin admin ko request nahi mili: ' + error.message, 'err'); return }
+      try { await syncStore(s) } catch (error) { done(); toast('Store request submit nahi ho saki: ' + error.message, 'err'); return }
       done()
-      toast('Store ban gaya! Admin approval ke baad live ho jayega 🎉', 'ok')
+      toast('Store created. Wait for approval from Street Bazar, then your store will go live.', 'ok')
       navigate('#/store/' + s.slug)
     }
   }

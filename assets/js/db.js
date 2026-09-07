@@ -86,7 +86,7 @@ let syncingPromise = null
 
 async function api(path, options = {}) {
 const controller = new AbortController()
-const timeout = setTimeout(() => controller.abort(), 20000)
+const timeout = setTimeout(() => controller.abort(), 30000)
 let res
 try {
   res = await fetch(path, { ...options, signal: controller.signal, headers: { 'Content-Type': 'application/json', ...(options.headers || {}) } })
