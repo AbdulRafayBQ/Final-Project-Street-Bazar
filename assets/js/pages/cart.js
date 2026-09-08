@@ -3,6 +3,7 @@
 import { icon, esc, money, num, toast, spinner } from '../ui.js'
 import { state, setCart, cartTotal, cartCount, productById, storeById, currentUser, placeOrder, addToCart, isPakistanPhone, deliveryChargeFor } from '../store.js'
 import { navigate, renderRoute } from '../router.js'
+import { syncPush } from '../db.js'
 
 const DELIVERY = 250
 const FREE_OVER = 5000
@@ -124,6 +125,7 @@ cartPage.mount = (params, query, root) => {
     const btn = spinner(e.currentTarget)
     await new Promise((r) => setTimeout(r, 800))
     const order = placeOrder({ address: { name, phone, city, line }, etaDays: 4 })
+    try { await syncPush() } catch (error) { toast('Order local save ho gaya, server sync nahi hua: ' + error.message, 'err') }
     btn()
     toast('Order place ho gaya! ID: ' + order.id, 'ok')
     navigate('#/order-success/' + order.id)

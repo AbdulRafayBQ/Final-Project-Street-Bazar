@@ -135,13 +135,14 @@ export default async function handler(req, res) {
   try {
     if (req.method === 'GET') {
       const actor = await authenticate(req)
-      const [stateRows, storeRows, productRows, threadRows, followRows, deletionRows] = await Promise.all([
+      const [stateRows, storeRows, productRows, threadRows, followRows, deletionRows, orderRows] = await Promise.all([
         request('/rest/v1/app_state?select=payload&key=eq.global&limit=1'),
         request('/rest/v1/stores?select=*'),
         request('/rest/v1/products?select=*'),
         request('/rest/v1/threads?select=*'),
         request('/rest/v1/follows?select=*'),
         request('/rest/v1/deletion_logs?select=item_type,item_id'),
+        request('/rest/v1/orders?select=*'),
       ])
       const deletedStoreIds = new Set((deletionRows || []).filter((row) => row.item_type === 'store').map((row) => row.item_id))
       const deletedProductIds = new Set((deletionRows || []).filter((row) => row.item_type === 'product').map((row) => row.item_id))
@@ -185,7 +186,20 @@ export default async function handler(req, res) {
       const visibleNotifications = (payload.notifications || []).filter((notification) => notification.to === actor.id)
       if (isAdmin(actor)) return json(res, 200, { ...payload, stores: visibleStores, products: visibleProducts, threads, follows })
       const ownedStoreIds = new Set(visibleStores.filter((store) => store.owner === actor.id).map((store) => store.id))
-      const visibleOrders = (payload.orders || []).filter((order) => (
+      const normalizedOrders = (orderRows || []).map((order) => ({
+        id: order.id,
+        user: order.user_id,
+        items: order.items || [],
+        total: order.total,
+        status: order.status,
+        timeline: order.timeline || [],
+        etaDays: order.eta,
+        address: order.address,
+        stores: order.store_ids || [],
+        createdAt: order.created_at,
+      }))
+      const allOrders = mergeById(payload.orders || [], normalizedOrders)
+      const visibleOrders = allOrders.filter((order) => (
         order.user === actor.id
         || order.user_id === actor.id
         || (order.stores || order.store_ids || []).some((storeId) => ownedStoreIds.has(storeId))

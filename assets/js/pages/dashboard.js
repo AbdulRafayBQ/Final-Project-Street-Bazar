@@ -107,7 +107,7 @@ export async function dashboardPage() {
               <tr>
                 <td><a href="#/track/${o.id}"><b>${o.id}</b></a></td>
                 <td>${esc(userById(o.user)?.name || 'Customer')}</td>
-                <td><div class="row" style="gap:6px">${o.items.map((i) => `<img src="${esc(i.customizedImage || i.image)}" alt="" title="${esc(i.title)}${i.customizedImage ? ' · AI customized' : ''}" style="width:34px;height:34px;border-radius:8px;object-fit:cover">`).join('')}<span>${num(o.items.reduce((a, i) => a + i.qty, 0))}</span></div></td>
+                <td><div class="stack" style="gap:6px">${o.items.map((i) => `<div class="row" style="gap:7px"><img src="${esc(i.customizedImage || i.image)}" alt="" title="${esc(i.title)}${i.customizedImage ? ' · AI customized' : ''}" style="width:34px;height:34px;border-radius:8px;object-fit:cover"><span class="small">${esc(i.title)} <b>× ${num(i.qty)}</b></span></div>`).join('')}<span class="tiny muted">Total quantity: ${num(o.items.reduce((a, i) => a + i.qty, 0))}</span></div></td>
                 <td><b>${money(o.total)}</b></td>
                 <td><span class="badge ${o.status === 4 ? 'badge-live' : o.status === 5 ? 'badge-rejected' : 'badge-pending'}">${o.status === 5 ? 'Cancelled' : ['Placed', 'Packed', 'Shipped', 'Out for delivery', 'Delivered'][o.status]}</span></td>
                 <td class="muted tiny">${timeAgo(o.createdAt)}</td>
