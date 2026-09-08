@@ -463,7 +463,9 @@ function titleFor(path) {
 let syncTimer
 window.addEventListener('street-bazar-state-changed', () => {
   clearTimeout(syncTimer)
-  syncTimer = setTimeout(() => syncPush().catch((error) => console.error('Automatic Supabase sync failed:', error)), 700)
+  syncTimer = setTimeout(() => syncPush().catch((error) => {
+    if (!/Session expire ho gayi|Authentication required/i.test(error.message)) console.error('Automatic Supabase sync failed:', error)
+  }), 700)
 })
 
 async function restoreGoogleSession() {
