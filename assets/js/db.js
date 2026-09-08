@@ -127,6 +127,8 @@ return result
 
 export async function syncPush() {
 if (syncingPromise) return syncingPromise
+const token = sessionStorage.getItem('street-bazar-access-token') || localStorage.getItem('street-bazar-access-token')
+if (!state.session || !token) return
 syncing = true
 syncingPromise = (async () => {
  try {
