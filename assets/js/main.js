@@ -567,7 +567,7 @@ async function boot() {
 }
 
 restoreGoogleSession()
-boot()
+boot();
 /* =========================================================
    STREET BAZAR — GLOBAL SCROLL & MOTION EFFECTS
    ========================================================= */
