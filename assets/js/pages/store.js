@@ -64,8 +64,8 @@ export async function storePage(params) {
       <div style="padding:clamp(16px,3vw,26px)">
         <div data-panel="products">
           ${s.categories?.length ? `<div class="chip-row" style="margin-bottom:18px" data-store-cats>
-            <button class="chip active" data-scat="">All</button>
-            ${s.categories.map((c) => `<button class="chip" data-scat="${esc(c)}" style="background:${esc(s.theme?.categoryColor || s.theme?.primary || '#16110D')};border-color:${esc(s.theme?.categoryColor || s.theme?.primary || '#16110D')};color:#fff">${esc(c)}</button>`).join('')}
+            <button class="chip active" data-scat="" aria-pressed="true">All <span class="cat-check">${icon('check', '', 12)}</span></button>
+            ${s.categories.map((c) => `<button class="chip" data-scat="${esc(c)}" aria-pressed="false" style="background:${esc(s.theme?.categoryColor || s.theme?.primary || '#16110D')};border-color:${esc(s.theme?.categoryColor || s.theme?.primary || '#16110D')};color:#fff">${esc(c)} <span class="cat-check">${icon('check', '', 12)}</span></button>`).join('')}
           </div>` : ''}
           <div class="grid grid-auto" data-product-grid>
             ${products.length ? products.map(productCard).join('') : `<div class="empty" style="grid-column:1/-1"><div class="ic">${icon('box', '', 28)}</div><h3 class="h3">Abhi koi product nahi</h3><p class="muted">${isOwner ? 'Pehla product add karein — AI se description bhi likhwa sakte hain.' : 'Jaldi hi kuch naya aayega. Follow kar lein!'}</p>${isOwner ? `<div style="margin-top:16px"><a class="btn btn-primary" href="#/add-product/${s.id}"><span>Add product</span></a></div>` : ''}</div>`}
@@ -154,7 +154,11 @@ storePage.mount = (params, query, root) => {
   }
   reveal(grid)
   root.querySelectorAll('[data-store-cats] .chip').forEach((b) => b.addEventListener('click', () => {
-    root.querySelectorAll('[data-store-cats] .chip').forEach((x) => x.classList.toggle('active', x === b))
+    root.querySelectorAll('[data-store-cats] .chip').forEach((x) => {
+      const selected = x === b
+      x.classList.toggle('active', selected)
+      x.setAttribute('aria-pressed', String(selected))
+    })
     const cat = String(b.dataset.scat || '').trim().toLowerCase()
     const list = storeProducts(s.id).filter((p) => !cat || (p.categories || []).some((value) => String(value).trim().toLowerCase() === cat))
     renderProducts(list)

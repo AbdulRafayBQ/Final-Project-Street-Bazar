@@ -144,6 +144,11 @@ h1,h2,h3,h4,.dsp{font-family:var(--font-d);font-weight:700;letter-spacing:-.02em
   font-size:13px;font-weight:600;transition:.22s var(--ease);cursor:pointer;color:var(--ink-3)}
 .chip:hover{border-color:var(--ink);transform:translateY(-2px)}
 .chip.active{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+.store-page [data-store-cats] .chip{position:relative;min-height:36px;box-shadow:0 2px 6px rgba(22,17,13,.08)}
+.store-page [data-store-cats] .chip:hover{filter:brightness(.94);box-shadow:0 4px 12px rgba(22,17,13,.16)}
+.store-page [data-store-cats] .chip.active{background:var(--st-primary)!important;color:#fff!important;border-color:var(--st-primary)!important;box-shadow:0 0 0 3px color-mix(in srgb,var(--st-primary) 22%,transparent),0 5px 14px rgba(22,17,13,.2);transform:translateY(-1px)}
+.store-page [data-store-cats] .cat-check{display:none;align-items:center}
+.store-page [data-store-cats] .chip.active .cat-check{display:inline-flex}
 .chip.static{cursor:default}
 .chip.static:hover{transform:none;border-color:var(--line)}
 .chip-row{display:flex;gap:9px;flex-wrap:wrap}
