@@ -241,6 +241,82 @@ export default async function handler(req, res) {
     const actor = await requireAuth(req, res)
     if (!actor) return
     const payload = cleanPayload(req.body || {})
+    if (payload.action === 'admin-status') {
+      if (!isAdmin(actor)) return json(res, 403, { error: 'Admin access required' })
+      const table = payload.itemType === 'store' ? 'stores' : payload.itemType === 'product' ? 'products' : null
+      const validStatuses = payload.itemType === 'store' ? ['live', 'pending', 'hidden', 'rejected'] : ['active', 'pending', 'hidden', 'rejected']
+      if (!table || !payload.id || !validStatuses.includes(payload.status)) return json(res, 400, { error: 'Invalid status update' })
+      await request(`/rest/v1/${table}?id=eq.${encodeURIComponent(payload.id)}`, {
+        method: 'PATCH',
+        headers: { Prefer: 'return=minimal' },
+        body: JSON.stringify({ status: payload.status }),
+      })
+      return json(res, 200, { ok: true, status: payload.status })
+    }
+    if (payload.action === 'admin-delete') {
+      if (!isAdmin(actor)) return json(res, 403, { error: 'Admin access required' })
+      const itemType = payload.itemType
+      const id = String(payload.id || '')
+      const reason = String(payload.reason || '').trim()
+      if (!['store', 'product'].includes(itemType) || !id || reason.length < 3 || reason.length > 1000) return json(res, 400, { error: 'A valid delete reason is required' })
+      let ownerId = null
+      let itemName = ''
+      if (itemType === 'store') {
+        const stores = await request(`/rest/v1/stores?select=id,name,owner_id&id=eq.${encodeURIComponent(id)}&limit=1`)
+        if (!stores[0]) return json(res, 404, { error: 'Store not found' })
+        ownerId = stores[0].owner_id
+        itemName = stores[0].name || id
+        const products = await request(`/rest/v1/products?select=id&store_id=eq.${encodeURIComponent(id)}`)
+        const productIds = products.map((product) => product.id)
+        await request(`/rest/v1/follows?store_id=eq.${encodeURIComponent(id)}`, { method: 'DELETE' })
+        await request(`/rest/v1/threads?store_id=eq.${encodeURIComponent(id)}`, { method: 'DELETE' })
+        await request(`/rest/v1/reviews?store_id=eq.${encodeURIComponent(id)}`, { method: 'DELETE' })
+        await Promise.all(productIds.flatMap((productId) => [
+          request(`/rest/v1/threads?product_id=eq.${encodeURIComponent(productId)}`, { method: 'DELETE' }),
+          request(`/rest/v1/reviews?product_id=eq.${encodeURIComponent(productId)}`, { method: 'DELETE' }),
+          request(`/rest/v1/cart_items?product_id=eq.${encodeURIComponent(productId)}`, { method: 'DELETE' }),
+          request(`/rest/v1/saved_products?product_id=eq.${encodeURIComponent(productId)}`, { method: 'DELETE' }),
+        ]))
+        await request(`/rest/v1/products?store_id=eq.${encodeURIComponent(id)}`, { method: 'DELETE' })
+        await request(`/rest/v1/stores?id=eq.${encodeURIComponent(id)}`, { method: 'DELETE' })
+      } else {
+        const products = await request(`/rest/v1/products?select=id,title,store_id&id=eq.${encodeURIComponent(id)}&limit=1`)
+        if (!products[0]) return json(res, 404, { error: 'Product not found' })
+        itemName = products[0].title || id
+        ownerId = await storeOwner(products[0].store_id)
+        await Promise.all([
+          request(`/rest/v1/reviews?product_id=eq.${encodeURIComponent(id)}`, { method: 'DELETE' }),
+          request(`/rest/v1/threads?product_id=eq.${encodeURIComponent(id)}`, { method: 'DELETE' }),
+          request(`/rest/v1/cart_items?product_id=eq.${encodeURIComponent(id)}`, { method: 'DELETE' }),
+          request(`/rest/v1/saved_products?product_id=eq.${encodeURIComponent(id)}`, { method: 'DELETE' }),
+        ])
+        await request(`/rest/v1/products?id=eq.${encodeURIComponent(id)}`, { method: 'DELETE' })
+      }
+      await request('/rest/v1/deletion_logs', {
+        method: 'POST',
+        headers: { Prefer: 'return=minimal' },
+        body: JSON.stringify({ item_type: itemType, item_id: id, item_name: itemName, owner_id: ownerId, reason, deleted_by: actor.id }),
+      })
+      const stateRows = await request('/rest/v1/app_state?select=payload&key=eq.global&limit=1')
+      const appPayload = stateRows[0]?.payload || {}
+      const notification = {
+        id: `n-delete-${itemType}-${id}-${Date.now()}`,
+        to: ownerId,
+        title: `${itemType === 'store' ? 'Store' : 'Product'} removed by admin`,
+        body: `Your ${itemType} "${itemName}" was removed by Admin. Reason: ${reason}`,
+        link: '#/dashboard',
+        at: Date.now(),
+        read: false,
+        meta: { type: 'admin-deletion', itemType, itemId: id, reason },
+      }
+      appPayload.notifications = [notification, ...(appPayload.notifications || [])]
+      await request('/rest/v1/app_state?on_conflict=key', {
+        method: 'POST',
+        headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
+        body: JSON.stringify({ key: 'global', payload: appPayload }),
+      })
+      return json(res, 200, { ok: true, notification })
+    }
     if (payload.action === 'store') {
       const store = payload.store
       if (!store?.id || !store.name) return json(res, 400, { error: 'Store data is required' })

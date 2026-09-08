@@ -868,8 +868,9 @@ tbody tr:hover{background:var(--paper-2)}
   .desktop-description{display:block}
   .mobile-description{display:none}
   .admin-shell{grid-template-columns:1fr}
-  .admin-side{position:static;display:flex;gap:6px;overflow-x:auto}
+  .admin-side{position:static;display:flex;gap:6px;overflow-x:auto;scrollbar-width:thin;padding:10px}
   .admin-side button{width:auto;white-space:nowrap}
+  .admin-side .divider,.admin-side a{flex:0 0 auto}
   .footer-grid{grid-template-columns:1fr 1fr}
   .auth-wrap{grid-template-columns:1fr}
   .auth-art{min-height:230px}

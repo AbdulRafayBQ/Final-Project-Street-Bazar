@@ -2,8 +2,8 @@
 
 import { icon, esc, money, num, timeAgo, toast, confirmBox, modal, closeModal } from '../ui.js'
 import { statCard } from '../components.js'
-import { state, currentUser, setRole, storeById, storeProducts, productById, userById, updateStore, deleteStore, updateProduct, deleteProduct, deleteOrder, notify, liveStores, pendingStores, lowStock } from '../store.js'
-import { isAIConnected, isConnected, deleteRemote, syncProduct, syncStore, syncPull } from '../db.js'
+import { state, save, currentUser, setRole, storeById, storeProducts, productById, userById, updateStore, deleteStore, updateProduct, deleteProduct, deleteOrder, notify, liveStores, pendingStores, lowStock } from '../store.js'
+import { isAIConnected, isConnected, deleteRemote, syncProduct, syncStore, syncPull, adminStatus, adminDelete } from '../db.js'
 import { navigate, renderRoute } from '../router.js'
 
 const TABS = [
@@ -181,7 +181,7 @@ const views = {
           <td>${num(s.followers)}</td>
           <td><span class="badge ${s.status === 'live' ? 'badge-live' : s.status === 'pending' ? 'badge-pending' : 'badge-rejected'}">${s.status}</span></td>
           <td><div class="row" style="gap:6px">
-            <button class="btn btn-sm btn-ghost" data-toggle-store="${s.id}">${s.status === 'live' ? 'Unpublish' : 'Publish'}</button>
+            <button class="btn btn-sm btn-ghost" data-toggle-store="${s.id}">${s.status === 'live' ? 'Hide store' : 'Unhide store'}</button>
             <button class="btn btn-sm btn-danger" data-del-store="${s.id}">Delete</button>
           </div></td>
         </tr>`).join('')}</tbody>
@@ -202,7 +202,7 @@ const views = {
           <td>${p.rating ? '★ ' + Number(p.rating).toFixed(1) : '—'}</td>
           <td><div class="row" style="gap:6px">
             ${p.status === 'pending' ? `<button class="btn btn-sm btn-teal" data-approve-prod="${p.id}">${icon('check', '', 14)} Approve</button>` : ''}
-            <button class="btn btn-sm btn-ghost" data-toggle-prod="${p.id}">${p.status === 'hidden' ? 'Show' : 'Hide'}</button>
+            <button class="btn btn-sm btn-ghost" data-toggle-prod="${p.id}">${p.status === 'active' ? 'Unpublish' : 'Publish'}</button>
             <button class="btn btn-sm btn-danger" data-del-prod="${p.id}">Delete</button>
           </div></td>
         </tr>`).join('')}</tbody>
@@ -291,6 +291,31 @@ adminPage.mount = (params, query, root) => {
 
   root.querySelectorAll('[data-at]').forEach((b) => b.addEventListener('click', () => navigate('#/admin?tab=' + b.dataset.at)))
 
+  const setBusy = (button, busy) => {
+    if (!button) return
+    button.disabled = busy
+    button.dataset.originalText ||= button.textContent
+    button.textContent = busy ? 'Saving…' : button.dataset.originalText
+  }
+  const addServerNotification = (notification) => {
+    if (!notification) return
+    state.notifications = [notification, ...(state.notifications || []).filter((item) => item.id !== notification.id)]
+    save()
+  }
+  const askDeleteReason = (title, description, onConfirm) => {
+    modal({
+      title,
+      body: `<p class="muted small">${description}</p><label class="field" style="margin-top:14px"><span>Delete reason <b style="color:var(--red)">*</b></span><textarea class="input" id="admin-delete-reason" rows="4" placeholder="Explain why this item is being deleted…" required></textarea></label>`,
+      foot: '<button class="btn btn-ghost" data-close>Cancel</button><button class="btn btn-danger" data-delete-confirm>Delete permanently</button>',
+      onOpen: (el) => el.querySelector('[data-delete-confirm]').addEventListener('click', () => {
+        const reason = el.querySelector('#admin-delete-reason').value.trim()
+        if (reason.length < 3) return toast('Delete reason is required', 'err')
+        closeModal()
+        onConfirm(reason)
+      }),
+    })
+  }
+
   root.querySelectorAll('[data-approve]').forEach((b) => b.addEventListener('click', async () => {
     const s = storeById(b.dataset.approve)
     updateStore(s.id, { status: 'live' })
@@ -333,38 +358,68 @@ adminPage.mount = (params, query, root) => {
     }, 'Reject product')
   }))
 
-  root.querySelectorAll('[data-toggle-store]').forEach((b) => b.addEventListener('click', () => {
+  root.querySelectorAll('[data-toggle-store]').forEach((b) => b.addEventListener('click', async () => {
     const s = storeById(b.dataset.toggleStore)
-    updateStore(s.id, { status: s.status === 'live' ? 'pending' : 'live' })
-    toast(s.name + ' is now ' + (s.status === 'live' ? 'pending' : 'live'))
-    navigate('#/admin?tab=stores')
+    const nextStatus = s.status === 'live' ? 'hidden' : 'live'
+    setBusy(b, true)
+    try {
+      await adminStatus('store', s.id, nextStatus)
+      updateStore(s.id, { status: nextStatus })
+      toast(s.name + ' is now ' + nextStatus, 'ok')
+      await renderRoute()
+    } catch (error) {
+      toast('Store status update failed: ' + error.message, 'err')
+      setBusy(b, false)
+    }
   }))
 
   root.querySelectorAll('[data-del-store]').forEach((b) => b.addEventListener('click', () => {
     const s = storeById(b.dataset.delStore)
-    confirmBox('Delete ' + s.name + '?', 'Store aur uske products hata diye jayenge. Ye action wapas nahi hota.', () => {
-      deleteStore(s.id)
-      toast('Store delete ho gaya')
-      navigate('#/admin?tab=stores')
-    }, 'Delete permanently')
+    askDeleteReason('Delete ' + s.name + '?', 'Store aur uske products permanently remove honge. Vendor ko reason notification milegi.', async (reason) => {
+      setBusy(b, true)
+      try {
+        const result = await adminDelete('store', s.id, reason)
+        deleteStore(s.id)
+        addServerNotification(result.notification)
+        toast('Store deleted and vendor notified', 'ok')
+        await renderRoute()
+      } catch (error) {
+        toast('Store delete failed: ' + error.message, 'err')
+        setBusy(b, false)
+      }
+    })
   }))
 
-  root.querySelectorAll('[data-toggle-prod]').forEach((b) => b.addEventListener('click', () => {
+  root.querySelectorAll('[data-toggle-prod]').forEach((b) => b.addEventListener('click', async () => {
     const p = productById(b.dataset.toggleProd)
-    updateProduct(p.id, { status: p.status === 'hidden' ? 'active' : 'hidden' })
-    b.textContent = p.status === 'hidden' ? 'Show' : 'Hide'
-    toast('Product ' + (p.status === 'hidden' ? 'visible' : 'hidden'))
-    navigate('#/admin?tab=products')
+    const nextStatus = p.status === 'hidden' ? 'active' : 'hidden'
+    setBusy(b, true)
+    try {
+      await adminStatus('product', p.id, nextStatus)
+      updateProduct(p.id, { status: nextStatus })
+      toast('Product ' + (nextStatus === 'active' ? 'visible' : 'hidden'), 'ok')
+      await renderRoute()
+    } catch (error) {
+      toast('Product status update failed: ' + error.message, 'err')
+      setBusy(b, false)
+    }
   }))
 
   root.querySelectorAll('[data-del-prod]').forEach((b) => b.addEventListener('click', () => {
     const p = productById(b.dataset.delProd)
-    confirmBox('Delete ' + p.title + '?', 'Product aur uska warehouse record permanently delete hoga.', async () => {
-      deleteProduct(p.id)
-      try { await deleteRemote('products', p.id) } catch (error) { toast('Remote delete failed: ' + error.message, 'err'); return }
-      toast('Product delete ho gaya', 'ok')
-      navigate('#/admin?tab=products')
-    }, 'Delete permanently')
+    askDeleteReason('Delete ' + p.title + '?', 'Product permanently remove hoga. Vendor ko reason notification milegi.', async (reason) => {
+      setBusy(b, true)
+      try {
+        const result = await adminDelete('product', p.id, reason)
+        deleteProduct(p.id)
+        addServerNotification(result.notification)
+        toast('Product deleted and vendor notified', 'ok')
+        await renderRoute()
+      } catch (error) {
+        toast('Product delete failed: ' + error.message, 'err')
+        setBusy(b, false)
+      }
+    })
   }))
 
   root.querySelectorAll('[data-del-order]').forEach((b) => b.addEventListener('click', () => {

@@ -114,6 +114,17 @@ create table if not exists app_state (
   updated_at timestamptz default now()
 );
 
+create table if not exists deletion_logs (
+  id uuid primary key default gen_random_uuid(),
+  item_type text not null,
+  item_id text not null,
+  item_name text not null,
+  owner_id uuid references users(id),
+  reason text not null,
+  deleted_by uuid references users(id),
+  deleted_at timestamptz default now()
+);
+
 alter table users enable row level security;
 alter table profiles enable row level security;
 alter table stores enable row level security;
@@ -126,6 +137,7 @@ alter table cart_items enable row level security;
 alter table saved_products enable row level security;
 alter table warehouse_items enable row level security;
 alter table app_state enable row level security;
+alter table deletion_logs enable row level security;
 
 -- Optional one-time fresh-start reset. Run manually in Supabase SQL Editor.
 -- This removes marketplace data but keeps authentication accounts.

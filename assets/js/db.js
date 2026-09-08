@@ -61,6 +61,11 @@ create table if not exists app_state (
   payload jsonb not null,
   updated_at timestamptz default now()
 );
+create table if not exists deletion_logs (
+  id uuid primary key default gen_random_uuid(), item_type text not null, item_id text not null,
+  item_name text not null, owner_id uuid, reason text not null, deleted_by uuid,
+  deleted_at timestamptz default now()
+);
 
 alter table users enable row level security;
 alter table stores enable row level security;
@@ -188,6 +193,14 @@ export async function deleteRemote(table, id) {
   await api('/api/data', { method: 'DELETE', body: JSON.stringify({ table, id }) })
 }
 
+export async function adminStatus(itemType, id, status) {
+  return api('/api/data', { method: 'POST', body: JSON.stringify({ action: 'admin-status', itemType, id, status }) })
+}
+
+export async function adminDelete(itemType, id, reason) {
+  return api('/api/data', { method: 'POST', body: JSON.stringify({ action: 'admin-delete', itemType, id, reason }) })
+}
+
 export async function syncPull() {
 const remote = await api('/api/data')
 if (!remote) return
@@ -199,8 +212,8 @@ const mergeById = (remoteItems, localItems) => {
 }
 Object.assign(state, remote, {
   users: mergeById(remote.users, state.users),
-  stores: mergeById(remote.stores, state.stores),
-  products: mergeById(remote.products, state.products),
+  stores: Array.isArray(remote.stores) ? remote.stores : state.stores,
+  products: Array.isArray(remote.products) ? remote.products : state.products,
   threads: mergeById(remote.threads, state.threads),
   follows: mergeById(remote.follows, state.follows),
   session,

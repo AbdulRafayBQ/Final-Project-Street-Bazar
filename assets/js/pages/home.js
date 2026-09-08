@@ -6,7 +6,7 @@ import { assistantReply } from '../ai.js'
 export async function home() {
   const stores = liveStores()
   const sales = saleStores()
-  const saleProducts = state.products.filter((p) => p.status !== 'hidden' && p.compareAt && p.compareAt > p.price && storeById(p.store)?.status === 'live').slice(0, 6)
+  const saleProducts = state.products.filter((p) => p.status === 'active' && p.compareAt && p.compareAt > p.price && storeById(p.store)?.status === 'live').slice(0, 6)
 
   const actionCards = [
     { title: 'Start Your Store', desc: 'Create your online store in just 5 minutes', icon: 'store', color: '#EF4444', bg: '#FEE2E2', href: '#/create-store' },
@@ -133,7 +133,7 @@ home.mount = (p, q, root) => {
   if (!carousel) return
   const storeSlides = saleStores().map((store) => ({ kind: 'store', store }))
   const productSlides = state.products
-    .filter((product) => product.status !== 'hidden' && product.compareAt && product.compareAt > product.price && storeById(product.store)?.status === 'live')
+    .filter((product) => product.status === 'active' && product.compareAt && product.compareAt > product.price && storeById(product.store)?.status === 'live')
     .map((product) => ({ kind: 'product', product, store: storeById(product.store) }))
   const slides = [...storeSlides, ...productSlides]
   if (!slides.length) return
