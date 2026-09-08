@@ -183,6 +183,10 @@ export async function syncProduct(product) {
   save()
 }
 
+export async function syncOrder(order) {
+  return api('/api/data', { method: 'POST', body: JSON.stringify({ action: 'order', order }) })
+}
+
 export async function syncStore(store) {
   await api('/api/data', { method: 'POST', body: JSON.stringify({ action: 'store', store }) })
   state.settings.lastSync = Date.now()

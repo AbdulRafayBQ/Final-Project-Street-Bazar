@@ -409,6 +409,27 @@ export default async function handler(req, res) {
       await upsert('products', [{ id: product.id, store_id: product.store || product.store_id, title: product.title, description: product.description, price: product.price, compare_at: product.compareAt || product.compare_at, media: product.media, categories: product.categories, tags: product.tags, stock: product.stock, sku: product.sku, customizable: product.customizable, wholesale: product.wholesale, delivery_charge: product.deliveryCharge || 0, home_delivery_charge: product.homeDeliveryCharge ?? product.deliveryCharge ?? 0, outside_delivery_charge: product.outsideDeliveryCharge ?? product.deliveryCharge ?? 0, sales: product.sales, status: product.status, created_at: timestamp(product.createdAt || product.created_at) }])
       return json(res, 200, { ok: true })
     }
+    if (payload.action === 'order') {
+      const order = payload.order
+      if (!order?.id || !Array.isArray(order.items) || !order.items.length) return json(res, 400, { error: 'Order data is required' })
+      const productIds = order.items.map((item) => item.product).filter(Boolean)
+      const productRows = await request(`/rest/v1/products?select=id,store_id&id=in.(${productIds.map(encodeURIComponent).join(',')})`)
+      const storeIds = [...new Set(productRows.map((product) => product.store_id))]
+      if (!productRows.length || productRows.length !== productIds.length) return json(res, 400, { error: 'Order contains an unavailable product' })
+      await upsert('orders', [{
+        id: order.id,
+        user_id: actor.id,
+        items: order.items,
+        total: order.total,
+        status: order.status,
+        timeline: order.timeline,
+        eta: order.etaDays || order.eta,
+        address: order.address,
+        store_ids: order.stores || order.storeIds || storeIds,
+        created_at: timestamp(order.createdAt || order.created_at || Date.now()),
+      }])
+      return json(res, 200, { ok: true })
+    }
     if (payload.action === 'thread') {
       const thread = payload.thread
       if (!thread?.id) return json(res, 400, { error: 'Thread data is required' })
