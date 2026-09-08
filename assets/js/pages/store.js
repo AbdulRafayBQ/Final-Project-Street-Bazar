@@ -25,7 +25,7 @@ export async function storePage(params) {
   return `
   <div class="wrap">
     <div class="store-page ${s.theme?.dark ? 'dark' : ''}" style="${themeStyle(s.theme)}${fontCSS}">
-      <div class="store-hero">
+      <div class="store-hero" style="min-height:${Number(s.theme?.coverHeight || 230)}px">
         <img class="bg" src="${esc(s.banner || './images/banner-fashion.png')}" alt="${esc(s.name)}" onerror="this.src='./images/banner-fashion.png'">
         <div class="store-hero-in">
           <span class="store-logo">${s.logo ? `<img src="${esc(s.logo)}" alt="">` : esc(s.name.slice(0, 2).toUpperCase())}</span>

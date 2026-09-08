@@ -48,7 +48,6 @@ export async function createStorePage(params) {
     <div class="steps" style="margin-top:26px" data-steps>
       ${STEPS.map((s, i) => `<div class="step ${i === 0 ? 'active' : ''}" data-step="${i}"><span class="num">${i + 1}</span>${s}</div>${i < STEPS.length - 1 ? '<span class="step-line"></span>' : ''}`).join('')}
     </div>
-
     <div style="display:grid;grid-template-columns:1.05fr .95fr;gap:26px;align-items:start" class="cs-grid">
       <div class="panel" data-form></div>
       <div style="position:sticky;top:calc(var(--header-h) + 16px)">
@@ -74,7 +73,7 @@ createStorePage.mount = (params, query, root) => {
     const pair = FONT_PAIRS.find((f) => f.id === t.fontPair) || FONT_PAIRS[0]
     preview.innerHTML = `
       <div class="store-page ${t.dark ? 'dark' : ''}" style="margin:0;border-radius:0;border:0;box-shadow:none;${themeStyle(t)};--st-d:${pair.d};--st-b:${pair.b}">
-        <div class="store-hero" style="min-height:150px">
+        <div class="store-hero" style="min-height:${Number(t.coverHeight || 230)}px">
           <img class="bg" src="${esc(draft.banner || './images/banner-fashion.png')}" alt="" onerror="this.src='./images/banner-fashion.png'">
           <div class="store-hero-in" style="padding:16px">
             <span class="store-logo" style="width:60px;height:60px;font-size:20px">${draft.logo ? `<img src="${esc(draft.logo)}" alt="">` : esc((draft.name || 'SB').slice(0, 2).toUpperCase())}</span>
@@ -179,6 +178,9 @@ createStorePage.mount = (params, query, root) => {
         <div class="field"><span class="label">Corner style — <span data-radius-val>${draft.theme.radius}px</span></span>
           <input type="range" min="4" max="28" value="${draft.theme.radius}" data-radius style="width:100%;accent-color:var(--marigold)">
         </div>
+        <div class="field"><span class="label">Cover height — <span data-cover-height-val>${draft.theme.coverHeight || 230}px</span></span>
+          <input type="range" min="180" max="380" value="${draft.theme.coverHeight || 230}" data-cover-height style="width:100%;accent-color:var(--marigold)">
+        </div>
       </div>
       <label class="switch" style="margin-top:16px"><input type="checkbox" data-dark ${draft.theme.dark ? 'checked' : ''}><span class="track"></span><span><b>Dark store theme</b><br><span class="tiny muted">Raat ke vibe ke liye — text automatically adjust hota hai.</span></span></label>`,
     branding: () => `
@@ -243,6 +245,11 @@ createStorePage.mount = (params, query, root) => {
     stepEls.forEach((el, i) => {
       el.classList.toggle('active', i === step)
       el.classList.toggle('done', i < step)
+    })
+    form.querySelector('[data-cover-height]')?.addEventListener('input', (e) => {
+      draft.theme.coverHeight = Number(e.target.value)
+      form.querySelector('[data-cover-height-val]').textContent = e.target.value + 'px'
+      renderPreview()
     })
     bindForm()
     form.scrollIntoView({ block: 'nearest', behavior: 'smooth' })

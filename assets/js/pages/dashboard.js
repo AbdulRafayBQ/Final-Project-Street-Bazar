@@ -4,7 +4,7 @@ import { icon, esc, money, num, toast, modal, closeModal, timeAgo, spinner, conf
 import { statCard, emptyLogin } from '../components.js'
 import { state, myStores, storeById, storeProducts, storeOrders, storeRevenue, storeSales, currentUser, lowStock, productById, updateProduct, updateStore, deleteStore, advanceOrder, cancelOrder, addStock, storeThreads, threadById, markThreadRead, userById, save, ownerWarehouse, addWarehouseItem, updateWarehouseItem, deleteWarehouseItem } from '../store.js'
 import { genStockPlan } from '../ai.js'
-import { syncThread, syncPull, syncNotification, ownerDelete } from '../db.js'
+import { syncThread, syncPull, syncNotification, syncOrder, ownerDelete } from '../db.js'
 import { navigate, renderRoute } from '../router.js'
 
 export async function dashboardPage() {
@@ -16,7 +16,7 @@ export async function dashboardPage() {
   const totalProducts = stores.reduce((a, s) => a + storeProducts(s.id).length, 0)
   const revenue = stores.reduce((a, s) => a + storeRevenue(s.id), 0)
   const sales = stores.reduce((a, s) => a + storeSales(s.id), 0)
-  const orders = stores.flatMap((s) => storeOrders(s.id))
+  const orders = [...new Map(stores.flatMap((s) => storeOrders(s.id)).map((order) => [order.id, order])).values()]
   const threads = stores.flatMap((s) => storeThreads(s.id))
   const pending = stores.filter((s) => s.status === 'pending').length
 
@@ -106,9 +106,9 @@ export async function dashboardPage() {
             <tbody>${orders.map((o) => `
               <tr>
                 <td><a href="#/track/${o.id}"><b>${o.id}</b></a></td>
-                <td>${esc(userById(o.user)?.name || 'Customer')}</td>
+                <td><div><b>${esc(userById(o.user)?.name || o.address?.name || 'Customer')}</b><div class="tiny muted">${esc(o.address?.phone || 'Phone unavailable')}</div><div class="tiny muted">${esc(o.address?.city || '')}</div></div></td>
                 <td><div class="stack" style="gap:6px">${o.items.map((i) => `<div class="row" style="gap:7px"><img src="${esc(i.customizedImage || i.image)}" alt="" title="${esc(i.title)}${i.customizedImage ? ' · AI customized' : ''}" style="width:34px;height:34px;border-radius:8px;object-fit:cover"><span class="small">${esc(i.title)} <b>× ${num(i.qty)}</b></span></div>`).join('')}<span class="tiny muted">Total quantity: ${num(o.items.reduce((a, i) => a + i.qty, 0))}</span></div></td>
-                <td><b>${money(o.total)}</b></td>
+                <td><div><b>${money(o.total)}</b><div class="tiny muted">${esc(o.address?.line || 'Address unavailable')}</div></div></td>
                 <td><span class="badge ${o.status === 4 ? 'badge-live' : o.status === 5 ? 'badge-rejected' : 'badge-pending'}">${o.status === 5 ? 'Cancelled' : ['Placed', 'Packed', 'Shipped', 'Out for delivery', 'Delivered'][o.status]}</span></td>
                 <td class="muted tiny">${timeAgo(o.createdAt)}</td>
                 <td><button class="btn btn-sm btn-ghost" data-advance="${o.id}" ${o.status >= 4 ? 'disabled' : ''}>Advance ${icon('arrow', '', 13)}</button> ${o.status < 2 ? `<button class="btn btn-sm btn-danger" data-cancel-order="${o.id}">Cancel</button>` : ''}</td>
@@ -177,12 +177,26 @@ dashboardPage.mount = (params, query, root) => {
   }))
 
   root.querySelectorAll('[data-advance]').forEach((b) => b.addEventListener('click', () => {
-    advanceOrder(b.dataset.advance)
+    const order = advanceOrder(b.dataset.advance)
+    if (order) syncOrder(order).catch((error) => console.error('Order status sync failed:', error))
     toast('Order status update ho gaya', 'ok')
     navigate('#/dashboard')
   }))
   root.querySelectorAll('[data-cancel-order]').forEach((b) => b.addEventListener('click', () => {
-    modal({ title: 'Cancel order', body: '<textarea class="textarea" id="cancel-reason" placeholder="Customer ko reason batayein"></textarea>', foot: '<button class="btn btn-ghost" data-close>Back</button><button class="btn btn-danger" id="cancel-go">Cancel order</button>', onOpen: (el) => el.querySelector('#cancel-go').addEventListener('click', () => { const reason = el.querySelector('#cancel-reason').value.trim(); if (!reason) return toast('Reason likhna zaroori hai', 'err'); cancelOrder(b.dataset.cancelOrder, reason); closeModal(); toast('Customer ko cancellation notification bhej di', 'ok'); navigate('#/dashboard') }) })
+    modal({ title: 'Cancel order', body: '<textarea class="textarea" id="cancel-reason" placeholder="Customer ko reason batayein"></textarea>', foot: '<button class="btn btn-ghost" data-close>Back</button><button class="btn btn-danger" id="cancel-go">Cancel order</button>', onOpen: (el) => el.querySelector('#cancel-go').addEventListener('click', async () => {
+      const reason = el.querySelector('#cancel-reason').value.trim()
+      if (!reason) return toast('Reason likhna zaroori hai', 'err')
+      const order = cancelOrder(b.dataset.cancelOrder, reason)
+      if (!order) return toast('Order cancel nahi ho saka', 'err')
+      const notification = state.notifications.find((item) => item.to === order.user && item.title === 'Order ' + order.id + ' cancelled')
+      try {
+        await syncOrder(order)
+        if (notification) await syncNotification(notification)
+        closeModal(); toast('Order cancel ho gaya aur customer ko notification bhej di', 'ok'); navigate('#/dashboard')
+      } catch (error) {
+        toast('Cancellation server par save nahi hui: ' + error.message, 'err')
+      }
+    }) })
   }))
 
   root.querySelectorAll('[data-reply]').forEach((b) => b.addEventListener('click', () => openReply(b.dataset.reply)))

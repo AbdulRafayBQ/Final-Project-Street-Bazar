@@ -36,6 +36,7 @@ export const THEME_PRESETS = [
 ]
 
 export const ORDER_STEPS = ['Order placed', 'Packed by store', 'Shipped', 'Out for delivery', 'Delivered']
+export const ORDER_CANCELLED_STEP = 5
 
 const IMG = (n) => './images/' + n
 
@@ -529,8 +530,11 @@ export const storeRevenue = (sid) => storeProducts(sid).reduce((a, p) => a + (p.
 export const myOrders = () => { const u = currentUser(); return u ? state.orders.filter((o) => o.user === u.id).sort((a, b) => b.createdAt - a.createdAt) : [] }
 export const orderById = (id) => state.orders.find((o) => o.id.toUpperCase() === String(id || '').toUpperCase()) || null
 export const storeOrders = (sid) => state.orders.filter((o) => (
+  o.status !== 5
+  && (
   (o.stores || o.storeIds || o.store_ids || []).includes(sid)
   || (o.items || []).some((item) => item.store === sid)
+  )
 )).sort((a, b) => b.createdAt - a.createdAt)
 export const cartCount = () => state.cart.reduce((a, i) => a + i.qty, 0)
 export const cartTotal = () => state.cart.reduce((a, i) => a + i.unitPrice * i.qty, 0)
@@ -586,6 +590,12 @@ const moneyPlain = (n) => 'Rs ' + Number(n).toLocaleString('en-PK')
 
 export function notify(to, title, body, link = '#/', meta = {}) {
   const notification = { id: uid('n'), to, title, body, link, at: Date.now(), read: false, ...meta }
+  const existing = state.notifications.find((item) => item.id === notification.id)
+  if (existing) {
+    Object.assign(existing, notification, { read: existing.read })
+    save()
+    return existing
+  }
   state.notifications.unshift(notification)
   save()
   return notification
@@ -816,7 +826,7 @@ export function placeOrder({ address, etaDays = 4 }) {
       if (linked) { linked.qty = p.stock; linked.updatedAt = Date.now() }
     }
   })
-  stores.forEach((sid) => { const s = storeById(sid); if (s) notify(s.owner, 'New order ' + id, u.name + ' ne ' + moneyPlain(total) + ' ka order kiya', '#/dashboard') })
+  stores.forEach((sid) => { const s = storeById(sid); if (s) notify(s.owner, 'New order ' + id, u.name + ' ne ' + moneyPlain(total) + ' ka order kiya', '#/dashboard', { id: 'order-' + id + '-owner-' + sid }) })
   state.cart = []; save(); return order
 }
 
@@ -826,16 +836,17 @@ export function advanceOrder(id) {
   o.status += 1
   o.timeline.push({ step: o.status, at: Date.now(), note: ORDER_STEPS[o.status] })
   if (o.status === 4) o.etaDays = 0
-  notify(o.user, 'Order ' + o.id + ' · ' + ORDER_STEPS[o.status], 'Aapka order aage barh gaya hai.', '#/track/' + o.id)
+  notify(o.user, 'Order ' + o.id + ' · ' + ORDER_STEPS[o.status], 'Aapka order aage barh gaya hai.', '#/track/' + o.id, { id: 'order-' + o.id + '-status-' + o.status })
   save()
+  return o
 }
 export function cancelOrder(id, reason) {
   const order = orderById(id)
   if (!order || order.status >= 2 || order.status === 5) return null
-  order.status = 5
+  order.status = ORDER_CANCELLED_STEP
   order.cancelReason = String(reason || 'Store could not fulfil this customized order').trim()
   order.timeline.push({ step: 5, at: Date.now(), note: 'Cancelled by store: ' + order.cancelReason })
-  notify(order.user, 'Order ' + order.id + ' cancelled', order.cancelReason, '#/track/' + order.id)
+  notify(order.user, 'Order ' + order.id + ' cancelled', order.cancelReason, '#/track/' + order.id, { id: 'order-' + order.id + '-cancelled' })
   save()
   return order
 }

@@ -230,12 +230,20 @@ const mergeById = (remoteItems, localItems) => {
   const localOnly = (Array.isArray(localItems) ? localItems : []).filter((item) => !incoming.some((row) => row.id === item.id))
   return [...incoming, ...localOnly]
 }
+const mergeNotifications = (remoteItems, localItems) => {
+  const local = new Map((Array.isArray(localItems) ? localItems : []).map((item) => [item.id, item]))
+  return (Array.isArray(remoteItems) ? remoteItems : []).map((item) => {
+    const previous = local.get(item.id)
+    return previous?.read ? { ...item, read: true } : item
+  }).concat((Array.isArray(localItems) ? localItems : []).filter((item) => !remoteItems?.some((row) => row.id === item.id)))
+}
 Object.assign(state, remote, {
   users: mergeById(remote.users, state.users),
   stores: Array.isArray(remote.stores) ? remote.stores : state.stores,
   products: Array.isArray(remote.products) ? remote.products : state.products,
   threads: mergeById(remote.threads, state.threads),
   follows: mergeById(remote.follows, state.follows),
+  notifications: mergeNotifications(remote.notifications, state.notifications),
   session,
 })
 save()

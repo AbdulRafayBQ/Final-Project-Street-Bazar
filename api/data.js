@@ -60,6 +60,7 @@ const mergeById = (existing, incoming, allowed = () => true) => {
   ;(incoming || []).filter(allowed).forEach((item) => next.set(item.id, item))
   return [...next.values()]
 }
+const withoutDeleted = (items, deletedIds) => (items || []).filter((item) => !deletedIds.has(item.id))
 
 const upsert = async (table, rows) => {
   if (!Array.isArray(rows) || !rows.length) return
@@ -128,7 +129,6 @@ const cleanPayload = (payload) => {
     threads: (payload.threads || []).filter((t) => !demoUsers.has(t.customer || t.customer_id) && keepRelated(t)),
     likes: (payload.likes || []).filter((l) => !demoUsers.has(l.user || l.user_id) && productIds.has(l.product || l.product_id)),
   }
-  const withoutDeleted = (items, deletedIds) => (items || []).filter((item) => !deletedIds.has(item.id))
 }
 
 export default async function handler(req, res) {
@@ -184,8 +184,6 @@ export default async function handler(req, res) {
       const visibleStores = isAdmin(actor) ? stores : stores.filter((store) => store.status === 'live' || store.owner === actor.id)
       const visibleProducts = products.filter((product) => visibleStores.some((store) => store.id === product.store) && (product.status === 'active' || isAdmin(actor) || visibleStores.some((store) => store.id === product.store && store.owner === actor.id)))
       const visibleNotifications = (payload.notifications || []).filter((notification) => notification.to === actor.id)
-      if (isAdmin(actor)) return json(res, 200, { ...payload, stores: visibleStores, products: visibleProducts, threads, follows })
-      const ownedStoreIds = new Set(visibleStores.filter((store) => store.owner === actor.id).map((store) => store.id))
       const normalizedOrders = (orderRows || []).map((order) => ({
         id: order.id,
         user: order.user_id,
@@ -197,8 +195,11 @@ export default async function handler(req, res) {
         address: order.address,
         stores: order.store_ids || [],
         createdAt: order.created_at,
+        cancelReason: order.status === 5 ? (order.timeline || []).find((entry) => entry.step === 5)?.note?.replace(/^Cancelled by store:\s*/, '') || '' : '',
       }))
       const allOrders = mergeById(payload.orders || [], normalizedOrders)
+      if (isAdmin(actor)) return json(res, 200, { ...payload, stores: visibleStores, products: visibleProducts, threads, follows, orders: allOrders })
+      const ownedStoreIds = new Set(visibleStores.filter((store) => store.owner === actor.id).map((store) => store.id))
       const visibleOrders = allOrders.filter((order) => (
         order.user === actor.id
         || order.user_id === actor.id
@@ -412,20 +413,26 @@ export default async function handler(req, res) {
     if (payload.action === 'order') {
       const order = payload.order
       if (!order?.id || !Array.isArray(order.items) || !order.items.length) return json(res, 400, { error: 'Order data is required' })
-      const productIds = order.items.map((item) => item.product).filter(Boolean)
+      const existingRows = await request(`/rest/v1/orders?select=user_id,store_ids&id=eq.${encodeURIComponent(order.id)}&limit=1`)
+      const existing = existingRows[0]
+      const productIds = [...new Set(order.items.map((item) => item.product).filter(Boolean))]
       const productRows = await request(`/rest/v1/products?select=id,store_id&id=in.(${productIds.map(encodeURIComponent).join(',')})`)
-      const storeIds = [...new Set(productRows.map((product) => product.store_id))]
-      if (!productRows.length || productRows.length !== productIds.length) return json(res, 400, { error: 'Order contains an unavailable product' })
+      const storeIds = order.stores || order.storeIds || existing?.store_ids || [...new Set(productRows.map((product) => product.store_id))]
+      const ownedStores = storeIds.length
+        ? await request(`/rest/v1/stores?select=id&owner_id=eq.${encodeURIComponent(actor.id)}&id=in.(${storeIds.map(encodeURIComponent).join(',')})`)
+        : []
+      if (existing && !isAdmin(actor) && existing.user_id !== actor.id && !ownedStores.length) return json(res, 403, { error: 'You cannot update this order' })
+      if (!existing && (!productRows.length || productRows.length !== productIds.length)) return json(res, 400, { error: 'Order contains an unavailable product' })
       await upsert('orders', [{
         id: order.id,
-        user_id: actor.id,
+        user_id: existing?.user_id || actor.id,
         items: order.items,
         total: order.total,
         status: order.status,
         timeline: order.timeline,
         eta: order.etaDays || order.eta,
         address: order.address,
-        store_ids: order.stores || order.storeIds || storeIds,
+        store_ids: storeIds,
         created_at: timestamp(order.createdAt || order.created_at || Date.now()),
       }])
       return json(res, 200, { ok: true })

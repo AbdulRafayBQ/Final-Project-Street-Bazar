@@ -111,12 +111,12 @@ function openNotifications() {
   $('#btn-bell').insertAdjacentElement('afterend', wrap)
   wrap.style.top = '54px'
   wrap.querySelector('#read-all')?.addEventListener('click', () => {
-    list.forEach((n) => { n.read = true })
+    list.forEach((n) => { n.read = true; syncNotification(n).catch((error) => console.error('Notification read sync failed:', error)) })
     save(); wrap.remove(); renderHeader(); toast('Notifications cleared')
   })
   wrap.querySelectorAll('[data-noti]').forEach((a) => a.addEventListener('click', () => {
     const n = myNotifications().find((x) => x.id === a.dataset.noti)
-    if (n) { n.read = true; save(); renderHeader() }
+    if (n) { n.read = true; save(); syncNotification(n).catch((error) => console.error('Notification read sync failed:', error)); renderHeader() }
     wrap.remove()
   }))
 }
