@@ -128,21 +128,25 @@ const cleanPayload = (payload) => {
     threads: (payload.threads || []).filter((t) => !demoUsers.has(t.customer || t.customer_id) && keepRelated(t)),
     likes: (payload.likes || []).filter((l) => !demoUsers.has(l.user || l.user_id) && productIds.has(l.product || l.product_id)),
   }
+  const withoutDeleted = (items, deletedIds) => (items || []).filter((item) => !deletedIds.has(item.id))
 }
 
 export default async function handler(req, res) {
   try {
     if (req.method === 'GET') {
       const actor = await authenticate(req)
-      const [stateRows, storeRows, productRows, threadRows, followRows] = await Promise.all([
+      const [stateRows, storeRows, productRows, threadRows, followRows, deletionRows] = await Promise.all([
         request('/rest/v1/app_state?select=payload&key=eq.global&limit=1'),
         request('/rest/v1/stores?select=*'),
         request('/rest/v1/products?select=*'),
         request('/rest/v1/threads?select=*'),
         request('/rest/v1/follows?select=*'),
+        request('/rest/v1/deletion_logs?select=item_type,item_id'),
       ])
+      const deletedStoreIds = new Set((deletionRows || []).filter((row) => row.item_type === 'store').map((row) => row.item_id))
+      const deletedProductIds = new Set((deletionRows || []).filter((row) => row.item_type === 'product').map((row) => row.item_id))
       const payload = cleanPayload(stateRows[0]?.payload || {})
-      const stores = (storeRows || []).map((s) => ({
+      const stores = (storeRows || []).filter((s) => s.status !== 'deleted' && !deletedStoreIds.has(s.id)).map((s) => ({
         id: s.id, owner: s.owner_id, name: s.name, slug: s.slug, tagline: s.tagline,
         type: s.type, description: s.description, logo: s.logo, banner: s.banner,
         theme: s.theme, categories: s.categories || [], socials: s.socials || {},
@@ -154,7 +158,7 @@ export default async function handler(req, res) {
           cnicBack: s.cnic_back, personalAddress: s.personal_address,
         } : {}),
       }))
-      const products = (productRows || []).map((p) => ({
+      const products = (productRows || []).filter((p) => p.status !== 'deleted' && !deletedProductIds.has(p.id) && !deletedStoreIds.has(p.store_id)).map((p) => ({
         id: p.id, store: p.store_id, title: p.title, description: p.description,
         price: p.price, compareAt: p.compare_at, media: p.media || [], categories: p.categories || [],
         tags: p.tags || [], stock: p.stock, sku: p.sku, customizable: p.customizable,
@@ -253,19 +257,54 @@ export default async function handler(req, res) {
       })
       return json(res, 200, { ok: true, status: payload.status })
     }
-    if (payload.action === 'admin-delete') {
-      if (!isAdmin(actor)) return json(res, 403, { error: 'Admin access required' })
+    if (payload.action === 'admin-delete' || payload.action === 'owner-delete') {
+      const ownerDelete = payload.action === 'owner-delete'
+      if (!ownerDelete && !isAdmin(actor)) return json(res, 403, { error: 'Admin access required' })
       const itemType = payload.itemType
       const id = String(payload.id || '')
-      const reason = String(payload.reason || '').trim()
+      const reason = ownerDelete ? 'Deleted by store owner' : String(payload.reason || '').trim()
       if (!['store', 'product'].includes(itemType) || !id || reason.length < 3 || reason.length > 1000) return json(res, 400, { error: 'A valid delete reason is required' })
+      const existingLogs = await request(`/rest/v1/deletion_logs?select=id,item_type,item_id&item_type=eq.${encodeURIComponent(itemType)}&item_id=eq.${encodeURIComponent(id)}&limit=1`)
+      if (existingLogs[0]) {
+        const table = itemType === 'store' ? 'stores' : 'products'
+        await request(`/rest/v1/${table}?id=eq.${encodeURIComponent(id)}`, {
+          method: 'PATCH',
+          headers: { Prefer: 'return=minimal' },
+          body: JSON.stringify({ status: 'deleted' }),
+        })
+        if (itemType === 'store') {
+          await request(`/rest/v1/products?store_id=eq.${encodeURIComponent(id)}`, {
+            method: 'PATCH',
+            headers: { Prefer: 'return=minimal' },
+            body: JSON.stringify({ status: 'deleted' }),
+          })
+        }
+        const stateRows = await request('/rest/v1/app_state?select=payload&key=eq.global&limit=1')
+        const appPayload = stateRows[0]?.payload || {}
+        appPayload.stores = (appPayload.stores || []).filter((store) => store.id !== id)
+        appPayload.products = (appPayload.products || []).filter((product) => (
+          itemType === 'store' ? product.store !== id && product.store_id !== id : product.id !== id
+        ))
+        await request('/rest/v1/app_state?on_conflict=key', {
+          method: 'POST',
+          headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
+          body: JSON.stringify({ key: 'global', payload: appPayload }),
+        })
+        return json(res, 200, { ok: true, alreadyDeleted: true })
+      }
       let ownerId = null
       let itemName = ''
       if (itemType === 'store') {
         const stores = await request(`/rest/v1/stores?select=id,name,owner_id&id=eq.${encodeURIComponent(id)}&limit=1`)
         if (!stores[0]) return json(res, 404, { error: 'Store not found' })
         ownerId = stores[0].owner_id
+        if (ownerDelete && ownerId !== actor.id) return json(res, 403, { error: 'You can only delete your own store' })
         itemName = stores[0].name || id
+        await request(`/rest/v1/stores?id=eq.${encodeURIComponent(id)}`, {
+          method: 'PATCH',
+          headers: { Prefer: 'return=minimal' },
+          body: JSON.stringify({ status: 'deleted' }),
+        })
         const products = await request(`/rest/v1/products?select=id&store_id=eq.${encodeURIComponent(id)}`)
         const productIds = products.map((product) => product.id)
         await request(`/rest/v1/follows?store_id=eq.${encodeURIComponent(id)}`, { method: 'DELETE' })
@@ -277,20 +316,29 @@ export default async function handler(req, res) {
           request(`/rest/v1/cart_items?product_id=eq.${encodeURIComponent(productId)}`, { method: 'DELETE' }),
           request(`/rest/v1/saved_products?product_id=eq.${encodeURIComponent(productId)}`, { method: 'DELETE' }),
         ]))
-        await request(`/rest/v1/products?store_id=eq.${encodeURIComponent(id)}`, { method: 'DELETE' })
-        await request(`/rest/v1/stores?id=eq.${encodeURIComponent(id)}`, { method: 'DELETE' })
+        await request(`/rest/v1/products?store_id=eq.${encodeURIComponent(id)}`, {
+          method: 'PATCH',
+          headers: { Prefer: 'return=minimal' },
+          body: JSON.stringify({ status: 'deleted' }),
+        })
       } else {
         const products = await request(`/rest/v1/products?select=id,title,store_id&id=eq.${encodeURIComponent(id)}&limit=1`)
         if (!products[0]) return json(res, 404, { error: 'Product not found' })
         itemName = products[0].title || id
         ownerId = await storeOwner(products[0].store_id)
+        if (ownerDelete && ownerId !== actor.id) return json(res, 403, { error: 'You can only delete products from your own store' })
+        await request(`/rest/v1/products?id=eq.${encodeURIComponent(id)}`, {
+          method: 'PATCH',
+          headers: { Prefer: 'return=minimal' },
+          body: JSON.stringify({ status: 'deleted' }),
+        })
         await Promise.all([
           request(`/rest/v1/reviews?product_id=eq.${encodeURIComponent(id)}`, { method: 'DELETE' }),
           request(`/rest/v1/threads?product_id=eq.${encodeURIComponent(id)}`, { method: 'DELETE' }),
           request(`/rest/v1/cart_items?product_id=eq.${encodeURIComponent(id)}`, { method: 'DELETE' }),
           request(`/rest/v1/saved_products?product_id=eq.${encodeURIComponent(id)}`, { method: 'DELETE' }),
         ])
-        await request(`/rest/v1/products?id=eq.${encodeURIComponent(id)}`, { method: 'DELETE' })
+        // Keep a deleted tombstone so stale clients cannot recreate the product.
       }
       await request('/rest/v1/deletion_logs', {
         method: 'POST',
@@ -299,6 +347,12 @@ export default async function handler(req, res) {
       })
       const stateRows = await request('/rest/v1/app_state?select=payload&key=eq.global&limit=1')
       const appPayload = stateRows[0]?.payload || {}
+      appPayload.stores = (appPayload.stores || []).filter((store) => store.id !== id)
+      appPayload.products = (appPayload.products || []).filter((product) => (
+        itemType === 'store'
+          ? product.store !== id && product.store_id !== id
+          : product.id !== id
+      ))
       const notification = {
         id: `n-delete-${itemType}-${id}-${Date.now()}`,
         to: ownerId,
@@ -309,13 +363,15 @@ export default async function handler(req, res) {
         read: false,
         meta: { type: 'admin-deletion', itemType, itemId: id, reason },
       }
-      appPayload.notifications = [notification, ...(appPayload.notifications || [])]
-      await request('/rest/v1/app_state?on_conflict=key', {
-        method: 'POST',
-        headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
-        body: JSON.stringify({ key: 'global', payload: appPayload }),
-      })
-      return json(res, 200, { ok: true, notification })
+      if (!ownerDelete) {
+        appPayload.notifications = [notification, ...(appPayload.notifications || [])]
+        await request('/rest/v1/app_state?on_conflict=key', {
+          method: 'POST',
+          headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
+          body: JSON.stringify({ key: 'global', payload: appPayload }),
+        })
+      }
+      return json(res, 200, { ok: true, notification: ownerDelete ? null : notification })
     }
     if (payload.action === 'store') {
       const store = payload.store
@@ -382,6 +438,12 @@ export default async function handler(req, res) {
     }
     const currentRows = await request('/rest/v1/app_state?select=payload&key=eq.global&limit=1')
     const currentPayload = cleanPayload(currentRows[0]?.payload || {})
+    const deletionRows = await request('/rest/v1/deletion_logs?select=item_type,item_id')
+    const deletedStoreIds = new Set((deletionRows || []).filter((row) => row.item_type === 'store').map((row) => row.item_id))
+    const deletedProductIds = new Set((deletionRows || []).filter((row) => row.item_type === 'product').map((row) => row.item_id))
+    payload.stores = withoutDeleted(payload.stores, deletedStoreIds)
+    payload.products = withoutDeleted(payload.products, new Set([...deletedProductIds, ...deletedStoreIds]))
+    payload.products = payload.products.filter((product) => !deletedStoreIds.has(product.store || product.store_id))
     if (!isAdmin(actor)) {
       const ownedStores = (await request(`/rest/v1/stores?select=id&owner_id=eq.${encodeURIComponent(actor.id)}`)).map((store) => store.id)
       const ownedStoreIds = new Set(ownedStores)
@@ -405,7 +467,7 @@ export default async function handler(req, res) {
     const usersToSync = isAdmin(actor) ? (payload.users || []) : (payload.users || []).filter((user) => user.id === actor.id).map((user) => ({ ...user, role: actor.role }))
     await safeUpsert('users', usersToSync.map((u) => ({ id: u.id, name: u.name, email: u.email, role: u.role, avatar: u.avatar, created_at: u.createdAt || u.created_at })))
     await safeUpsert('profiles', usersToSync.map((u) => ({ id: u.id, full_name: u.name, email: u.email, role: u.role, avatar_url: u.avatar, created_at: u.createdAt || u.created_at })))
-    await safeUpsert('stores', (payload.stores || []).map((s) => ({ id: s.id, owner_id: s.owner || s.owner_id, name: s.name, slug: s.slug, tagline: s.tagline, type: s.type, description: s.description, logo: s.logo, banner: s.banner, theme: s.theme, categories: s.categories, socials: s.socials, address: s.address, city: s.city, sale: s.sale, status: s.status, rating: s.rating, owner_phone: s.ownerPhone, cnic: s.cnic, cnic_front: s.cnicFront, cnic_back: s.cnicBack, personal_address: s.personalAddress, created_at: s.createdAt || s.created_at })))
+    await safeUpsert('stores', (payload.stores || []).filter((store) => !deletedStoreIds.has(store.id)).map((s) => ({ id: s.id, owner_id: s.owner || s.owner_id, name: s.name, slug: s.slug, tagline: s.tagline, type: s.type, description: s.description, logo: s.logo, banner: s.banner, theme: s.theme, categories: s.categories, socials: s.socials, address: s.address, city: s.city, sale: s.sale, status: s.status, rating: s.rating, owner_phone: s.ownerPhone, cnic: s.cnic, cnic_front: s.cnicFront, cnic_back: s.cnicBack, personal_address: s.personalAddress, created_at: s.createdAt || s.created_at })))
     await safeUpsert('products', (payload.products || []).map((p) => ({ id: p.id, store_id: p.store || p.store_id, title: p.title, description: p.description, price: p.price, compare_at: p.compareAt || p.compare_at, media: p.media, categories: p.categories, tags: p.tags, stock: p.stock, sku: p.sku, customizable: p.customizable, wholesale: p.wholesale, delivery_charge: p.deliveryCharge || 0, home_delivery_charge: p.homeDeliveryCharge ?? p.deliveryCharge ?? 0, outside_delivery_charge: p.outsideDeliveryCharge ?? p.deliveryCharge ?? 0, sales: p.sales, status: p.status, created_at: p.createdAt || p.created_at })))
     await safeUpsert('reviews', (payload.reviews || []).map((r) => ({ id: r.id, product_id: r.product || r.product_id, store_id: r.store || r.store_id, user_id: r.user || r.user_id, rating: r.rating, text: r.text, created_at: r.at || r.created_at })))
     await safeUpsert('orders', (payload.orders || []).map((o) => ({ id: o.id, user_id: o.user || o.user_id, items: o.items, total: o.total, status: o.status, timeline: o.timeline, eta: o.eta, address: o.address, store_ids: o.storeIds || o.store_ids, created_at: o.createdAt || o.created_at })))

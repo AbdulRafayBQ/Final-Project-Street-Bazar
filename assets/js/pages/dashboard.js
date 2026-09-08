@@ -4,7 +4,7 @@ import { icon, esc, money, num, toast, modal, closeModal, timeAgo, spinner, conf
 import { statCard, emptyLogin } from '../components.js'
 import { state, myStores, storeById, storeProducts, storeOrders, storeRevenue, storeSales, currentUser, lowStock, productById, updateProduct, updateStore, deleteStore, advanceOrder, cancelOrder, addStock, storeThreads, threadById, markThreadRead, userById, save, ownerWarehouse, addWarehouseItem, updateWarehouseItem, deleteWarehouseItem } from '../store.js'
 import { genStockPlan } from '../ai.js'
-import { authRequest, syncThread, syncPull, syncNotification } from '../db.js'
+import { syncThread, syncPull, syncNotification, ownerDelete } from '../db.js'
 import { navigate, renderRoute } from '../router.js'
 
 export async function dashboardPage() {
@@ -184,21 +184,14 @@ dashboardPage.mount = (params, query, root) => {
   root.querySelectorAll('[data-sale]').forEach((b) => b.addEventListener('click', () => openSaleEditor(b.dataset.sale)))
   root.querySelectorAll('[data-delete-store]').forEach((b) => b.addEventListener('click', () => {
     const store = storeById(b.dataset.deleteStore)
-    const user = currentUser()
     modal({
       title: `Delete ${store?.name || 'store'}?`,
-      body: '<p class="small muted">Permanent delete hai. Confirm karne ke liye apna account password enter karein.</p><input class="input" id="delete-store-password" type="password" placeholder="Account password" style="margin-top:12px">',
+      body: '<p class="small muted">Ye store aur iske products permanently delete ho jayenge. Kya aap continue karna chahte hain?</p>',
       foot: '<button class="btn btn-ghost" data-close>Cancel</button><button class="btn btn-danger" id="delete-store-confirm">Delete permanently</button>',
       onOpen: (el) => el.querySelector('#delete-store-confirm').addEventListener('click', async () => {
-        const password = el.querySelector('#delete-store-password').value
-        if (!password) return toast('Password zaroori hai', 'err')
         const button = spinner(el.querySelector('#delete-store-confirm'))
         try {
-          if (user?.pass) {
-            if (user.pass !== password) throw new Error('Password match nahi karta')
-          } else {
-            await authRequest('login', { email: user.email, password })
-          }
+          await ownerDelete('store', store.id)
           deleteStore(store.id)
           button(); closeModal(); toast('Store permanently delete ho gaya', 'ok'); navigate('#/dashboard')
         } catch (error) {

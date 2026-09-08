@@ -94,7 +94,7 @@ const controller = new AbortController()
 const timeout = setTimeout(() => controller.abort(), 30000)
 let res
 try {
-  const token = sessionStorage.getItem('street-bazar-access-token')
+  const token = sessionStorage.getItem('street-bazar-access-token') || localStorage.getItem('street-bazar-access-token')
   res = await fetch(path, { ...options, signal: controller.signal, headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}), ...(options.headers || {}) } })
 } catch (error) {
   if (error.name === 'AbortError') throw new Error('Server response timed out. Please try again.')
@@ -103,13 +103,25 @@ try {
   clearTimeout(timeout)
 }
 const data = await res.json().catch(() => ({}))
-if (!res.ok) throw new Error(data.error || `API ${res.status}`)
+if (!res.ok) {
+  if (res.status === 401) {
+    sessionStorage.removeItem('street-bazar-access-token')
+    localStorage.removeItem('street-bazar-access-token')
+    state.session = null
+    save()
+    throw new Error('Session expire ho gayi. Dobara login karein.')
+  }
+  throw new Error(data.error || `API ${res.status}`)
+}
 return data
 }
 
 export async function authRequest(action, payload) {
 const result = await api('/api/auth', { method: 'POST', body: JSON.stringify({ action, ...payload }) })
-if (result.access_token) sessionStorage.setItem('street-bazar-access-token', result.access_token)
+if (result.access_token) {
+  sessionStorage.setItem('street-bazar-access-token', result.access_token)
+  localStorage.setItem('street-bazar-access-token', result.access_token)
+}
 return result
 }
 
@@ -199,6 +211,10 @@ export async function adminStatus(itemType, id, status) {
 
 export async function adminDelete(itemType, id, reason) {
   return api('/api/data', { method: 'POST', body: JSON.stringify({ action: 'admin-delete', itemType, id, reason }) })
+}
+
+export async function ownerDelete(itemType, id) {
+  return api('/api/data', { method: 'POST', body: JSON.stringify({ action: 'owner-delete', itemType, id }) })
 }
 
 export async function syncPull() {

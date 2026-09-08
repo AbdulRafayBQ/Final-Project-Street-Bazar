@@ -6,7 +6,8 @@ import { storeBySlug, storeProducts, storeReviews, currentUser, myStores, isFoll
 import { syncThread, syncNotification } from '../db.js'
 
 export async function storePage(params) {
-  const s = storeBySlug(params.slug) || null
+  const s = storeBySlug(params.slug)
+  if (s?.status === 'deleted') return `<section class="sec"><div class="wrap"><div class="empty"><h3 class="h3">Store nahi mila</h3><p class="muted">Ye store ab available nahi.</p><div style="margin-top:16px"><a class="btn btn-primary" href="#/dukanien"><span>Explore stores</span></a></div></div></div></section>`
   if (!s) return `<section class="sec"><div class="wrap"><div class="empty"><h3 class="h3">Store nahi mila</h3><p class="muted">Ye store exist nahi karta ya hata diya gaya hai.</p><div style="margin-top:16px"><a class="btn btn-primary" href="#/explore"><span>Explore stores</span></a></div></div></div></section>`
 
   const u = currentUser()

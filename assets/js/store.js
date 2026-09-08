@@ -604,7 +604,12 @@ export function googleAuth() {
   if (!u) { u = { id: uid('u'), name: 'Google User', email: 'you@gmail.com', role: 'customer', pass: '', avatar: '', createdAt: Date.now() }; state.users.push(u) }
   state.session = u.id; save(); return u
 }
-export function logout() { state.session = null; sessionStorage.removeItem('street-bazar-access-token'); save() }
+export function logout() {
+  state.session = null
+  sessionStorage.removeItem('street-bazar-access-token')
+  localStorage.removeItem('street-bazar-access-token')
+  save()
+}
 export function setRole(role) {
   const u = currentUser(); if (!u) return
   u.role = role; save()

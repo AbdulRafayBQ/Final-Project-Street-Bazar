@@ -1,7 +1,7 @@
 /* Street Bazar — Create / Edit Store wizard with live interface preview */
 
 import { icon, esc, money, toast, modal, closeModal, readFile, readImage, themeStyle, spinner } from '../ui.js'
-import { THEME_PRESETS, FONT_PAIRS, STORE_TYPES, CATEGORIES, createStore, updateStore, storeById, currentUser, allCategories, isPakistanPhone } from '../store.js'
+import { THEME_PRESETS, FONT_PAIRS, STORE_TYPES, CATEGORIES, createStore, updateStore, deleteStore, storeById, currentUser, allCategories, isPakistanPhone } from '../store.js'
 import { navigate } from '../router.js'
 import { syncStore } from '../db.js'
 
@@ -375,7 +375,13 @@ createStorePage.mount = (params, query, root) => {
       navigate('#/store/' + storeById(params.id).slug)
     } else {
       const s = createStore(data)
-      try { await syncStore(s) } catch (error) { done(); toast('Store request submit nahi ho saki: ' + error.message, 'err'); return }
+      try { await syncStore(s) } catch (error) {
+        deleteStore(s.id)
+        done()
+        toast('Store request submit nahi ho saki: ' + error.message, 'err')
+        if (/Session expire|Authentication required/i.test(error.message)) navigate('#/auth?redirect=%23%2Fcreate-store')
+        return
+      }
       done()
       toast('Store created. Wait for approval from Street Bazar, then your store will go live.', 'ok')
       navigate('#/store/' + s.slug)

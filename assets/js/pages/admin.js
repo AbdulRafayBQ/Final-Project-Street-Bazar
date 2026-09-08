@@ -169,10 +169,10 @@ const views = {
 
   stores: () => `
     <h3 class="h3">All stores</h3>
-    <p class="muted small" style="margin:8px 0 18px">${state.stores.length} stores — live, pending aur rejected.</p>
+    <p class="muted small" style="margin:8px 0 18px">${state.stores.filter((store) => store.status !== 'deleted').length} stores — live, pending aur rejected.</p>
     <div class="table-wrap"><table>
       <thead><tr><th>Store</th><th>Owner</th><th>Type</th><th>Products</th><th>Followers</th><th>Status</th><th></th></tr></thead>
-      <tbody>${state.stores.map((s) => `
+      <tbody>${state.stores.filter((store) => store.status !== 'deleted').map((s) => `
         <tr>
           <td><a href="#/store/${s.slug}"><b>${esc(s.name)}</b></a><div class="tiny muted">${esc(s.city || '')}</div></td>
           <td class="muted">${esc(userById(s.owner)?.name || '—')}</td>
@@ -189,10 +189,10 @@ const views = {
 
   products: () => `
     <h3 class="h3">All products</h3>
-    <p class="muted small" style="margin:8px 0 18px">${state.products.length} listings across ${liveStores().length} live stores.</p>
+    <p class="muted small" style="margin:8px 0 18px">${state.products.filter((product) => product.status !== 'deleted').length} listings across ${liveStores().length} live stores.</p>
     <div class="table-wrap"><table>
       <thead><tr><th>Product</th><th>Store</th><th>Price</th><th>Stock</th><th>Sales</th><th>Rating</th><th></th></tr></thead>
-      <tbody>${state.products.map((p) => `
+      <tbody>${state.products.filter((product) => product.status !== 'deleted').map((p) => `
         <tr>
           <td><div class="row"><img src="${esc(p.media[0].url)}" alt="" style="width:38px;height:38px;border-radius:11px;object-fit:cover"><div><a href="#/product/${p.id}"><b>${esc(p.title)}</b></a><div class="tiny muted">${esc((p.categories || []).join(', '))}</div></div></div></td>
           <td class="muted">${esc(storeById(p.store)?.name || '—')}</td>
