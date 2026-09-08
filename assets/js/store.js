@@ -528,7 +528,10 @@ export const storeSales = (sid) => storeProducts(sid).reduce((a, p) => a + (p.sa
 export const storeRevenue = (sid) => storeProducts(sid).reduce((a, p) => a + (p.sales || 0) * (p.price || 0), 0)
 export const myOrders = () => { const u = currentUser(); return u ? state.orders.filter((o) => o.user === u.id).sort((a, b) => b.createdAt - a.createdAt) : [] }
 export const orderById = (id) => state.orders.find((o) => o.id.toUpperCase() === String(id || '').toUpperCase()) || null
-export const storeOrders = (sid) => state.orders.filter((o) => o.stores?.includes(sid)).sort((a, b) => b.createdAt - a.createdAt)
+export const storeOrders = (sid) => state.orders.filter((o) => (
+  (o.stores || o.storeIds || o.store_ids || []).includes(sid)
+  || (o.items || []).some((item) => item.store === sid)
+)).sort((a, b) => b.createdAt - a.createdAt)
 export const cartCount = () => state.cart.reduce((a, i) => a + i.qty, 0)
 export const cartTotal = () => state.cart.reduce((a, i) => a + i.unitPrice * i.qty, 0)
 export const myNotifications = () => { const u = currentUser(); return u ? state.notifications.filter((n) => n.to === u.id).sort((a, b) => b.at - a.at) : [] }

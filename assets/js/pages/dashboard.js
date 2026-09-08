@@ -138,13 +138,19 @@ function ownerChatPanel(threads, panel, title, subtitle) {
 }
 
 dashboardPage.mount = (params, query, root) => {
-  let threadSignature = JSON.stringify(state.threads.map((thread) => `${thread.id}:${thread.messages?.length || 0}:${thread.messages?.at(-1)?.at || 0}`).sort())
+  let dashboardSignature = JSON.stringify({
+    threads: state.threads.map((thread) => `${thread.id}:${thread.messages?.length || 0}:${thread.messages?.at(-1)?.at || 0}`).sort(),
+    orders: state.orders.map((order) => `${order.id}:${order.status}`).sort(),
+  })
   const refreshInbox = async () => {
     try {
       await syncPull()
-      const next = JSON.stringify(state.threads.map((thread) => `${thread.id}:${thread.messages?.length || 0}:${thread.messages?.at(-1)?.at || 0}`).sort())
-      if (next !== threadSignature) {
-        threadSignature = next
+      const next = JSON.stringify({
+        threads: state.threads.map((thread) => `${thread.id}:${thread.messages?.length || 0}:${thread.messages?.at(-1)?.at || 0}`).sort(),
+        orders: state.orders.map((order) => `${order.id}:${order.status}`).sort(),
+      })
+      if (next !== dashboardSignature) {
+        dashboardSignature = next
         await renderRoute()
       }
     } catch (error) {

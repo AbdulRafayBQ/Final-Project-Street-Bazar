@@ -184,12 +184,19 @@ export default async function handler(req, res) {
       const visibleProducts = products.filter((product) => visibleStores.some((store) => store.id === product.store) && (product.status === 'active' || isAdmin(actor) || visibleStores.some((store) => store.id === product.store && store.owner === actor.id)))
       const visibleNotifications = (payload.notifications || []).filter((notification) => notification.to === actor.id)
       if (isAdmin(actor)) return json(res, 200, { ...payload, stores: visibleStores, products: visibleProducts, threads, follows })
+      const ownedStoreIds = new Set(visibleStores.filter((store) => store.owner === actor.id).map((store) => store.id))
+      const visibleOrders = (payload.orders || []).filter((order) => (
+        order.user === actor.id
+        || order.user_id === actor.id
+        || (order.stores || order.store_ids || []).some((storeId) => ownedStoreIds.has(storeId))
+        || (order.items || []).some((item) => visibleProducts.some((product) => product.id === item.product && ownedStoreIds.has(product.store)))
+      ))
       return json(res, 200, {
         version: payload.version, isDemo: false,
         users: [actor.profile], notifications: visibleNotifications,
         stores: visibleStores, products: visibleProducts, threads, follows,
         reviews: (payload.reviews || []).filter((review) => visibleProducts.some((product) => product.id === (review.product || review.product_id))),
-        orders: (payload.orders || []).filter((order) => order.user === actor.id || order.user_id === actor.id),
+        orders: visibleOrders,
         cart: (payload.cart || []).filter((item) => item.user === actor.id || item.user_id === actor.id),
         likes: (payload.likes || []).filter((like) => like.user === actor.id || like.user_id === actor.id),
         warehouse: (payload.warehouse || []).filter((item) => item.owner === actor.id || item.owner_id === actor.id),
