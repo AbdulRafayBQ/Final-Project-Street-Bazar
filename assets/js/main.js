@@ -1,6 +1,6 @@
 /* Street Bazar — app shell, routing & global interactions (vanilla JS) */
 
-import { $, $$, icon, esc, num, toast, modal, closeModal, avatar, timeAgo } from './ui.js'
+import { $, $$, icon, esc, num, money, toast, modal, closeModal, avatar, timeAgo } from './ui.js'
 import { state, currentUser, myStores, cartCount, logout, myNotifications, unreadNotis, toggleLike, toggleFollow, productById, addToCart, save, unreadThreadCount, setRole } from './store.js'
 import { route, setNotFound, startRouter, onRender, navigate, renderRoute } from './router.js'
 import { authRequest, syncPull, syncPush, syncFollow, syncNotification } from './db.js'
@@ -44,6 +44,11 @@ function renderHeader() {
         ${u && u.role === 'admin' ? `<a href="#/admin" data-path="/admin">Admin</a>` : ''}
       </nav>
 
+      <div class="hd-search">
+        <span>${icon('search', '', 17)}</span>
+        <input class="input" id="header-product-search" type="search" placeholder="Search products..." autocomplete="off" aria-label="Search products">
+        <div class="search-results" id="header-product-results" hidden></div>
+      </div>
       <div class="hd-actions">
         <button class="icon-btn desktop-only" id="btn-bell" title="Notifications">${icon('bell', '', 18)}${unreadNotis() ? '<span class="dot"></span>' : ''}</button>
         <a class="icon-btn" href="#/cart" title="Cart">${icon('cart', '', 18)}<span class="cart-count" data-cart-count style="display:${cartCount() ? 'grid' : 'none'}">${cartCount()}</span></a>
@@ -58,6 +63,21 @@ function renderHeader() {
     </div>`
 
   $('#btn-ai')?.addEventListener('click', () => import('./pages/home.js').then((m) => m.openAIScan()))
+  const searchInput = $('#header-product-search')
+  const searchResults = $('#header-product-results')
+  searchInput?.addEventListener('input', () => {
+    const query = searchInput.value.trim().toLowerCase()
+    if (!query) { searchResults.hidden = true; searchResults.innerHTML = ''; return }
+    const matches = state.products
+      .filter((product) => product.status === 'active' && product.title.toLowerCase().includes(query) && liveStores().some((store) => store.id === product.store))
+      .slice(0, 6)
+    searchResults.innerHTML = matches.length
+      ? matches.map((product) => `<a href="#/product/${product.id}" class="search-result"><span>${esc(product.title)}</span><b>${money(product.price)}</b></a>`).join('')
+      : '<div class="search-empty">No products found</div>'
+    searchResults.hidden = false
+  })
+  searchInput?.addEventListener('focus', () => { if (searchInput.value.trim()) searchInput.dispatchEvent(new Event('input')) })
+  searchResults?.addEventListener('click', () => { searchResults.hidden = true })
 
   $('#btn-bell')?.addEventListener('click', openNotifications)
   $('#btn-user')?.addEventListener('click', openUserMenu)
@@ -96,7 +116,7 @@ function openNotifications() {
   })
   wrap.querySelectorAll('[data-noti]').forEach((a) => a.addEventListener('click', () => {
     const n = myNotifications().find((x) => x.id === a.dataset.noti)
-    if (n) { n.read = true; save() }
+    if (n) { n.read = true; save(); renderHeader() }
     wrap.remove()
   }))
 }
