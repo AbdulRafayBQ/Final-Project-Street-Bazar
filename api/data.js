@@ -377,7 +377,7 @@ export default async function handler(req, res) {
       const store = payload.store
       if (!store?.id || !store.name) return json(res, 400, { error: 'Store data is required' })
       if (!isAdmin(actor) && store.owner !== actor.id && store.owner_id !== actor.id) return json(res, 403, { error: 'You can only submit your own store' })
-      store.owner = actor.id
+      if (!store.owner && !store.owner_id) store.owner = actor.id
       await saveStore(store)
       return json(res, 200, { ok: true })
     }

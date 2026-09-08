@@ -14,7 +14,7 @@ function blank() {
     name: '', tagline: '', type: 'home', city: '', address: '', description: '',
     ownerPhone: '', cnic: '', cnicFront: '', cnicBack: '', personalAddress: '',
     logo: '', banner: '', themeId: 'bazaar',
-    theme: { ...THEME_PRESETS[0] },
+    theme: { ...THEME_PRESETS[0], categoryColor: THEME_PRESETS[0].primary, followColor: THEME_PRESETS[0].primary, followTextColor: '#FFFFFF' },
     categories: [], socials: { instagram: '', whatsapp: '', tiktok: '', facebook: '', youtube: '' },
     sale: { text: '', until: '' },
   }
@@ -26,7 +26,7 @@ export async function createStorePage(params) {
     name: editing.name, tagline: editing.tagline, type: editing.type, city: editing.city, address: editing.address,
     description: editing.description, logo: editing.logo, banner: editing.banner,
     ownerPhone: editing.ownerPhone || '', cnic: editing.cnic || '', cnicFront: editing.cnicFront || '', cnicBack: editing.cnicBack || '', personalAddress: editing.personalAddress || '',
-    themeId: editing.theme?.id || 'bazaar', theme: { ...editing.theme },
+    themeId: editing.theme?.id || 'bazaar', theme: { categoryColor: editing.theme?.categoryColor || editing.theme?.primary || '#16110D', followColor: editing.theme?.followColor || editing.theme?.primary || '#16110D', followTextColor: editing.theme?.followTextColor || '#FFFFFF', ...editing.theme },
     categories: [...(editing.categories || [])], socials: { instagram: '', whatsapp: '', tiktok: '', facebook: '', youtube: '', ...(editing.socials || {}) },
     sale: editing.sale ? { text: editing.sale.text, until: new Date(editing.sale.until).toISOString().slice(0, 10) } : { text: '', until: '' },
   } : blank()
@@ -89,7 +89,7 @@ createStorePage.mount = (params, query, root) => {
         </div>
         <div style="padding:14px">
           <div class="wrap-flex" style="margin-bottom:12px">
-            ${(draft.categories.length ? draft.categories : ['Your category']).slice(0, 4).map((c) => `<span class="chip static tiny">${esc(c)}</span>`).join('')}
+            ${(draft.categories.length ? draft.categories : ['Your category']).slice(0, 4).map((c) => `<span class="chip static tiny" style="background:${esc(t.categoryColor || t.primary)};border-color:${esc(t.categoryColor || t.primary)};color:#fff">${esc(c)}</span>`).join('')}
           </div>
           <div class="grid grid-auto-sm">
             ${['./images/p-kurta.png', './images/p-cover.png', './images/p-chai.png'].map((img, i) => `
@@ -159,6 +159,9 @@ createStorePage.mount = (params, query, root) => {
         <div class="field"><span class="label">Primary colour</span><input type="color" data-color="primary" value="${draft.theme.primary}" style="width:100%;height:46px;border-radius:12px;border:1px solid var(--line);background:#fff"></div>
         <div class="field"><span class="label">Accent colour</span><input type="color" data-color="accent" value="${draft.theme.accent}" style="width:100%;height:46px;border-radius:12px;border:1px solid var(--line);background:#fff"></div>
         <div class="field"><span class="label">Background</span><input type="color" data-color="bg" value="${draft.theme.bg}" style="width:100%;height:46px;border-radius:12px;border:1px solid var(--line);background:#fff"></div>
+        <div class="field"><span class="label">Category colour</span><input type="color" data-color="categoryColor" value="${draft.theme.categoryColor || draft.theme.primary}" style="width:100%;height:46px;border-radius:12px;border:1px solid var(--line);background:#fff"></div>
+        <div class="field"><span class="label">Follow button</span><input type="color" data-color="followColor" value="${draft.theme.followColor || draft.theme.primary}" style="width:100%;height:46px;border-radius:12px;border:1px solid var(--line);background:#fff"></div>
+        <div class="field"><span class="label">Follow text</span><input type="color" data-color="followTextColor" value="${draft.theme.followTextColor || '#FFFFFF'}" style="width:100%;height:46px;border-radius:12px;border:1px solid var(--line);background:#fff"></div>
       </div>
        <div class="field" style="margin-top:16px"><span class="label">Font pair</span>
         <div class="grid grid-2" style="gap:10px;margin-top:8px">

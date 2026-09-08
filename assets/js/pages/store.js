@@ -45,7 +45,7 @@ export async function storePage(params) {
             </div>
           </div>
           <div class="row" style="gap:9px;flex-wrap:wrap">
-            <button class="btn ${following ? 'btn-ghost' : 'btn-grad'} follow-btn ${following ? 'on' : ''}" data-follow="${s.id}">${following ? icon('check', '', 16) + ' Following' : icon('plus', '', 16) + ' <span>Follow store</span>'}</button>
+            <button class="btn ${following ? 'btn-ghost' : 'follow-btn'} follow-btn ${following ? 'on' : ''}" data-follow="${s.id}" style="${following ? '' : `background:${esc(s.theme?.followColor || s.theme?.primary || '#16110D')};color:${esc(s.theme?.followTextColor || '#fff')};border-color:${esc(s.theme?.followColor || s.theme?.primary || '#16110D')}`}">${following ? icon('check', '', 16) + ' Following' : icon('plus', '', 16) + ' <span>Follow store</span>'}</button>
             ${isOwner ? `
               <a class="btn btn-ghost" href="#/edit-store/${s.id}">${icon('edit', '', 15)} Edit</a>
               <a class="btn btn-ghost" href="#/add-product/${s.id}">${icon('plus', '', 15)} Product</a>
@@ -65,7 +65,7 @@ export async function storePage(params) {
         <div data-panel="products">
           ${s.categories?.length ? `<div class="chip-row" style="margin-bottom:18px" data-store-cats>
             <button class="chip active" data-scat="">All</button>
-            ${s.categories.map((c) => `<button class="chip" data-scat="${esc(c)}">${esc(c)}</button>`).join('')}
+            ${s.categories.map((c) => `<button class="chip" data-scat="${esc(c)}" style="background:${esc(s.theme?.categoryColor || s.theme?.primary || '#16110D')};border-color:${esc(s.theme?.categoryColor || s.theme?.primary || '#16110D')};color:#fff">${esc(c)}</button>`).join('')}
           </div>` : ''}
           <div class="grid grid-auto" data-product-grid>
             ${products.length ? products.map(productCard).join('') : `<div class="empty" style="grid-column:1/-1"><div class="ic">${icon('box', '', 28)}</div><h3 class="h3">Abhi koi product nahi</h3><p class="muted">${isOwner ? 'Pehla product add karein — AI se description bhi likhwa sakte hain.' : 'Jaldi hi kuch naya aayega. Follow kar lein!'}</p>${isOwner ? `<div style="margin-top:16px"><a class="btn btn-primary" href="#/add-product/${s.id}"><span>Add product</span></a></div>` : ''}</div>`}
