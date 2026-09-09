@@ -59,6 +59,15 @@ export async function addProductPage(params) {
               <div class="field"><span class="label">Compare-at</span><input class="input" id="p-compare" type="number" min="0" value="${editing?.compareAt || ''}" placeholder="1999"></div>
               <div class="field"><span class="label">Stock *</span><input class="input" id="p-stock" type="number" min="0" value="${editing?.stock ?? ''}" placeholder="50"></div>
             </div>
+            <div class="field" id="sale-options" ${editing?.compareAt > editing?.price ? '' : 'hidden'}>
+              <span class="label">Sale visibility</span>
+              <div class="seg" style="width:100%;margin-top:8px">
+                <button type="button" class="${editing?.sale?.temporary !== false ? 'active' : ''}" data-sale-mode="temporary">Temporary sale (ends)</button>
+                <button type="button" class="${editing?.sale?.temporary === false ? 'active' : ''}" data-sale-mode="permanent">Permanent sale</button>
+              </div>
+              <div class="field" style="margin-top:10px" data-sale-until-wrap ${editing?.sale?.temporary === false ? 'hidden' : ''}><span class="label">Sale ends on</span><input class="input" id="p-sale-until" type="date" value="${editing?.sale?.until ? new Date(editing.sale.until).toISOString().slice(0, 10) : ''}"></div>
+              <span class="hint">Temporary sale homepage banner mein ayegi. Permanent sale sirf product listings mein rahegi.</span>
+            </div>
             <div class="grid grid-3" style="gap:12px">
               <div class="field"><span class="label">Home city delivery (Rs)</span><input class="input" id="p-home-delivery" type="number" min="0" value="${editing?.homeDeliveryCharge ?? editing?.deliveryCharge ?? ''}" placeholder="150"></div>
               <div class="field"><span class="label">Other cities delivery (Rs)</span><input class="input" id="p-outside-delivery" type="number" min="0" value="${editing?.outsideDeliveryCharge ?? editing?.deliveryCharge ?? ''}" placeholder="300"></div>
@@ -124,6 +133,7 @@ addProductPage.mount = (params, query, root) => {
   const editing = params.pid ? productById(params.pid) : null
   const warehouseDraft = query.warehouseId ? state.warehouse?.find((item) => item.id === query.warehouseId) : null
   let media = editing?.media ? [...editing.media.map((m) => ({ ...m }))] : warehouseDraft?.image ? [{ type: 'image', url: warehouseDraft.image }] : []
+  let saleTemporary = editing?.sale?.temporary !== false
   let options = editing?.customizable?.options ? JSON.parse(JSON.stringify(editing.customizable.options)) : [{ name: 'Size', choices: [{ label: 'M', delta: 0 }, { label: 'L', delta: 0 }] }]
   let tiers = editing?.wholesale?.tiers ? [...editing.wholesale.tiers] : [{ qty: 12, price: 0 }]
   if (warehouseDraft) {
@@ -133,6 +143,14 @@ addProductPage.mount = (params, query, root) => {
   }
 
   bindMediaPicker(root.querySelector('#p-media'), media, (m) => { media = m; paintPreview() })
+  const compareInput = root.querySelector('#p-compare')
+  const saleOptions = root.querySelector('#sale-options')
+  compareInput?.addEventListener('input', () => { saleOptions.hidden = !(Number(compareInput.value) > Number(root.querySelector('#p-price').value)) })
+  root.querySelectorAll('[data-sale-mode]').forEach((button) => button.addEventListener('click', () => {
+    saleTemporary = button.dataset.saleMode === 'temporary'
+    root.querySelectorAll('[data-sale-mode]').forEach((item) => item.classList.toggle('active', item === button))
+    saleOptions.querySelector('[data-sale-until-wrap]').hidden = !saleTemporary
+  }))
 
   /* ---- AI ---- */
   const aiOut = root.querySelector('#ai-out')
@@ -256,10 +274,13 @@ addProductPage.mount = (params, query, root) => {
   root.querySelector('#p-publish').addEventListener('click', async (e) => {
     const title = root.querySelector('#p-title').value.trim()
     const price = Number(root.querySelector('#p-price').value)
+    const compareAt = Number(root.querySelector('#p-compare').value) || null
     const stock = Number(root.querySelector('#p-stock').value)
     if (!title) return toast('Title zaroori hai', 'err')
     if (!price) return toast('Price dalna zaroori hai', 'err')
+    if (compareAt && compareAt <= price) return toast('Compare-at price retail price se zyada honi chahiye', 'err')
     if (root.querySelector('#p-stock').value === '') return toast('Stock likhein (0 bhi chalega)', 'err')
+    if (compareAt > price && saleTemporary && root.querySelector('#p-sale-until').value && new Date(root.querySelector('#p-sale-until').value).getTime() <= Date.now()) return toast('Sale end date future mein honi chahiye', 'err')
     if (wsOn.checked) {
       const validTiers = tiers.filter((tier) => tier.qty > 0 && tier.price > 0)
       if (!validTiers.length) return toast('Wholesale ke liye quantity aur price set karein', 'err')
@@ -277,6 +298,7 @@ addProductPage.mount = (params, query, root) => {
       categories: [root.querySelector('#p-cat').value],
       tags: root.querySelector('#p-tags').value.split(',').map((t) => t.trim()).filter(Boolean),
       media: media.length ? media : [{ type: 'image', url: './images/p-kurta.png' }],
+      sale: compareAt > price ? { temporary: saleTemporary, until: saleTemporary ? (root.querySelector('#p-sale-until').value ? new Date(root.querySelector('#p-sale-until').value).getTime() : Date.now() + 7 * 86400000) : null } : null,
       wholesale: { on: wsOn.checked, tiers: wsOn.checked ? tiers : [] },
       deliveryCharge: Number(root.querySelector('#p-outside-delivery').value) || 0,
       homeDeliveryCharge: Number(root.querySelector('#p-home-delivery').value) || 0,

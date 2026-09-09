@@ -28,7 +28,7 @@ alter table stores add column if not exists cnic_back text;
 create table if not exists products (
   id text primary key, store_id text references stores(id), title text, description text,
   price numeric, compare_at numeric, media jsonb, categories text[], tags text[],
-  stock int default 0, sku text, customizable jsonb, wholesale jsonb,
+  stock int default 0, sku text, sale jsonb, customizable jsonb, wholesale jsonb,
   delivery_charge numeric default 0, home_delivery_charge numeric default 0, outside_delivery_charge numeric default 0,
   sales int default 0, status text default 'active', created_at timestamptz default now()
 );
@@ -56,6 +56,7 @@ create table if not exists warehouse_items (
  updated_at timestamptz default now()
 );
 alter table warehouse_items add column if not exists image_url text;
+alter table products add column if not exists sale jsonb;
 create table if not exists app_state (
   key text primary key,
   payload jsonb not null,

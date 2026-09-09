@@ -280,16 +280,23 @@ function openSaleEditor(storeId) {
     body: `
       <div class="stack">
         <div class="field"><span class="label">Sale text</span><input class="input" id="sale-text" value="${esc(s.sale?.text || '')}" placeholder="e.g. Eid Sale — 30% OFF"></div>
-        <div class="field"><span class="label">Ends on</span><input class="input" type="date" id="sale-until" value="${s.sale?.until ? new Date(s.sale.until).toISOString().slice(0, 10) : ''}"></div>
+        <div class="field"><span class="label">Sale type</span><div class="seg" style="width:100%;margin-top:8px"><button type="button" class="${s.sale?.temporary !== false ? 'active' : ''}" data-sale-mode="temporary">Temporary</button><button type="button" class="${s.sale?.temporary === false ? 'active' : ''}" data-sale-mode="permanent">Permanent</button></div></div>
+        <div class="field" data-sale-until-wrap ${s.sale?.temporary === false ? 'hidden' : ''}><span class="label">Ends on</span><input class="input" type="date" id="sale-until" value="${s.sale?.until ? new Date(s.sale.until).toISOString().slice(0, 10) : ''}"></div>
         <p class="tiny muted">Sale on rakhne par aapka ad homepage aur customers ki For You feed mein dikhega.</p>
         ${s.sale ? `<button class="btn btn-danger btn-sm" id="sale-off">Turn sale off</button>` : ''}
       </div>`,
     foot: `<button class="btn btn-ghost" data-close>Cancel</button><button class="btn btn-primary" id="sale-save"><span>Save sale</span></button>`,
     onOpen: (el) => {
+      let temporary = s.sale?.temporary !== false
+      el.querySelectorAll('[data-sale-mode]').forEach((button) => button.addEventListener('click', () => {
+        temporary = button.dataset.saleMode === 'temporary'
+        el.querySelectorAll('[data-sale-mode]').forEach((item) => item.classList.toggle('active', item === button))
+        el.querySelector('[data-sale-until-wrap]').hidden = !temporary
+      }))
       el.querySelector('#sale-save').addEventListener('click', () => {
         const text = el.querySelector('#sale-text').value.trim()
         const until = el.querySelector('#sale-until').value
-        updateStore(storeId, { sale: text ? { text, until: until ? new Date(until).getTime() : Date.now() + 7 * 86400000 } : null })
+        updateStore(storeId, { sale: text ? { text, temporary, until: temporary ? (until ? new Date(until).getTime() : Date.now() + 7 * 86400000) : null } : null })
         closeModal(); toast('Sale update ho gaya', 'ok'); navigate('#/dashboard')
       })
       el.querySelector('#sale-off')?.addEventListener('click', () => {

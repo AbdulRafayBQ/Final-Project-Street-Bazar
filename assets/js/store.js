@@ -547,7 +547,7 @@ export const newProductsFor = () => {
   const ids = followedStores().map((s) => s.id)
   return state.products.filter((p) => ids.includes(p.store) && p.status === 'active' && storeById(p.store)?.status === 'live').sort((a, b) => b.createdAt - a.createdAt)
 }
-export const saleStores = () => liveStores().filter((s) => s.sale && s.sale.until > Date.now())
+export const saleStores = () => liveStores().filter((s) => s.sale?.temporary && s.sale.until > Date.now())
 export const pendingStores = () => state.stores.filter((s) => s.status === 'pending')
 export const allCategories = () => {
   const custom = state.stores.flatMap((s) => s.categories || []).filter((c) => !CATEGORIES.includes(c))
