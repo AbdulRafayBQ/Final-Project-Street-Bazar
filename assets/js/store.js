@@ -853,12 +853,14 @@ function updateOrderStatus(id, status) {
   if (status === ORDER_STEPS.length - 1) order.etaDays = 0
   const storeId = order.stores?.[0] || order.items?.[0]?.store
   notify(order.user, 'Order ' + order.id + ' · ' + ORDER_STEPS[status], 'Aapka order status update ho gaya: ' + ORDER_STEPS[status] + '.', '#/track/' + order.id, { id: 'order-' + order.id + '-status-' + status, storeId })
+  const store = storeById(storeId)
+  if (store) notify(store.owner, 'Order ' + order.id + ' · ' + ORDER_STEPS[status], 'Aapne order ' + order.id + ' ka status update kiya: ' + ORDER_STEPS[status] + '.', '#/dashboard', { id: 'order-' + order.id + '-status-owner-' + status, storeId })
   save()
   return order
 }
 export function cancelOrder(id, reason, cancelledBy = 'store') {
   const order = orderById(id)
-  if (!order || order.status >= 2 || order.status === 5) return null
+  if (!order || order.status === ORDER_CANCELLED_STEP) return null
   order.status = ORDER_CANCELLED_STEP
   order.cancelReason = String(reason || 'Store could not fulfil this customized order').trim()
   order.timeline.push({ step: 5, at: Date.now(), note: 'Cancelled by ' + cancelledBy + ': ' + order.cancelReason })
@@ -866,6 +868,7 @@ export function cancelOrder(id, reason, cancelledBy = 'store') {
   notify(order.user, 'Order ' + order.id + ' cancelled', order.cancelReason, '#/track/' + order.id, { id: 'order-' + order.id + '-cancelled-customer', storeId })
   const store = storeById(storeId)
   if (store && cancelledBy === 'customer') notify(store.owner, 'Order ' + order.id + ' cancelled', 'Customer ne order cancel kar diya: ' + order.cancelReason, '#/dashboard', { id: 'order-' + order.id + '-cancelled-owner', storeId })
+  if (store && cancelledBy === 'store') notify(order.user, 'Order ' + order.id + ' cancelled by store', 'Store ne order cancel kar diya: ' + order.cancelReason, '#/track/' + order.id, { id: 'order-' + order.id + '-cancelled-customer-notice', storeId })
   save()
   return order
 }

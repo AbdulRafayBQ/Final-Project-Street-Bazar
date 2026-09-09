@@ -119,8 +119,9 @@ export async function trackPage(params, query) {
         <div class="progress" style="margin:18px 0 26px"><i style="width:${o.status === ORDER_CANCELLED_STEP ? 100 : (o.status / 4) * 100}%"></i></div>
         ${orderTimeline(o)}
         ${o.status === 5 ? `<div class="divider"></div><p class="small" style="color:var(--red)"><b>Cancelled:</b> ${esc(o.cancelReason || '')}</p>` : ''}
-        ${isOwner && o.status < 2 ? `<div class="divider"></div><div class="row-between"><span class="small muted">Store owner: status update karein</span><button class="btn btn-sm btn-danger" data-owner-cancel="${o.id}">Cancel order</button></div>` : ''}
-        ${!isOwner && o.status < 2 ? `<div class="divider"></div><div class="row-between"><span class="small muted">Order abhi cancel ho sakta hai</span><button class="btn btn-sm btn-danger" data-customer-cancel="${o.id}">Cancel order</button></div>` : ''}
+        ${isOwner && o.status !== 5 && o.status < 4 ? `<div class="divider"></div><div class="row-between"><span class="small muted">Store owner: status update karein</span><button class="btn btn-sm btn-danger" data-owner-cancel="${o.id}">Cancel order</button></div>` : ''}
+        ${!isOwner && o.status !== 5 && o.status < 4 ? `<div class="divider"></div><div class="row-between"><span class="small muted">Order cancel kar sakte hain</span><button class="btn btn-sm btn-danger" data-customer-cancel="${o.id}">Cancel order</button></div>` : ''}
+        ${o.status === 5 ? `<div class="divider"></div><p class="small" style="color:var(--red)"><b>Order cancelled — status update locked</b></p>` : ''}
       </div>
 
       <div class="stack">

@@ -46,7 +46,7 @@ const registeredConflict = (res) => json(res, 409, {
   error: 'This email is already registered. Please sign in or use Forgot password.',
 })
 const existingProfileFor = async (email) => {
-  const rows = await supabaseRequest(`/rest/v1/users?select=id,email&id=not.is.null&email=eq.${encodeURIComponent(email)}&limit=1`)
+  const rows = await supabaseRequest(`/rest/v1/users?select=id,email&email=eq.${encodeURIComponent(email)}&limit=1`)
   return rows[0] || null
 }
 const removeAuthUser = async (id) => {
@@ -176,24 +176,40 @@ export default async function handler(req, res) {
     }
     const adminEmails = (process.env.ADMIN_EMAILS || '').split(',').map((item) => item.trim().toLowerCase()).filter(Boolean)
     const assignedRole = adminEmails.includes(String(user.email || normalizedEmail).toLowerCase()) ? 'admin' : 'customer'
+    const existingProfileRows = await supabaseRequest(`/rest/v1/users?select=id,name,email,role,avatar&email=eq.${encodeURIComponent(user.email || normalizedEmail)}&limit=1`)
+    const existingProfile = existingProfileRows[0]
     const profile = {
-      id: user.id,
-      name: name || user.user_metadata?.name || normalizedEmail.split('@')[0],
+      id: existingProfile?.id || user.id,
+      name: existingProfile?.name || name || user.user_metadata?.name || normalizedEmail.split('@')[0],
       email: user.email,
-      role: assignedRole,
-      avatar: user.user_metadata?.avatar || '',
+      role: existingProfile?.role || assignedRole,
+      avatar: existingProfile?.avatar || user.user_metadata?.avatar || '',
       created_at: user.created_at,
     }
     let profileSaved = false
-    try {
-      await supabaseRequest('/rest/v1/users?on_conflict=id', {
-        method: 'POST',
-        headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
-        body: JSON.stringify(profile),
-      })
+    if (existingProfile) {
       profileSaved = true
-    } catch (profileError) {
-      console.error('Supabase profile write failed after successful auth:', profileError.message)
+    } else {
+      try {
+        await supabaseRequest('/rest/v1/users?on_conflict=email', {
+          method: 'POST',
+          headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
+          body: JSON.stringify(profile),
+        })
+        profileSaved = true
+      } catch (profileError) {
+        // If the unique constraint still fires (e.g. a race), try an upsert via PATCH on the email match.
+        try {
+          await supabaseRequest(`/rest/v1/users?email=eq.${encodeURIComponent(profile.email)}`, {
+            method: 'PATCH',
+            headers: { Prefer: 'return=minimal' },
+            body: JSON.stringify(profile),
+          })
+          profileSaved = true
+        } catch (patchError) {
+          console.error('Supabase profile PATCH fallback failed:', patchError.message)
+        }
+      }
     }
     return json(res, 200, { user: profile, access_token: auth.access_token || null, profile_saved: profileSaved })
   } catch (error) {

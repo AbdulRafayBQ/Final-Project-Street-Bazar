@@ -111,7 +111,7 @@ export async function dashboardPage() {
                 <td><div><b>${money(o.total)}</b><div class="tiny muted">${esc(o.address?.line || 'Address unavailable')}</div></div></td>
                 <td><span class="badge ${o.status === 4 ? 'badge-live' : o.status === 5 ? 'badge-rejected' : 'badge-pending'}">${o.status === 5 ? 'Cancelled' : ['Placed', 'Packed', 'Shipped', 'Out for delivery', 'Delivered'][o.status]}</span></td>
                 <td class="muted tiny">${timeAgo(o.createdAt)}</td>
-                <td>${o.status !== 5 ? `<div class="row" style="gap:6px"><button class="btn btn-sm btn-ghost" data-back="${o.id}" ${o.status <= 0 ? 'disabled' : ''}>Back</button><button class="btn btn-sm btn-ghost" data-advance="${o.id}" ${o.status >= 4 ? 'disabled' : ''}>Next ${icon('arrow', '', 13)}</button>${o.status < 2 ? `<button class="btn btn-sm btn-danger" data-cancel-order="${o.id}">Cancel</button>` : ''}</div>` : '<span class="tiny muted">Cancelled — locked</span>'}</td>
+                <td>${o.status !== 5 ? `<div class="row" style="gap:6px"><button class="btn btn-sm btn-ghost" data-back="${o.id}" ${o.status <= 0 ? 'disabled' : ''}>Back</button><button class="btn btn-sm btn-ghost" data-advance="${o.id}" ${o.status >= 4 ? 'disabled' : ''}>Next ${icon('arrow', '', 13)}</button>${o.status < 4 ? `<button class="btn btn-sm btn-danger" data-cancel-order="${o.id}">Cancel</button>` : ''}</div>` : '<span class="tiny muted">Cancelled — locked</span>'}</td>
               </tr>`).join('')}</tbody>
           </table></div>` : `<div class="empty"><p class="muted">Abhi koi order nahi. Customers order karte hi yahan dikhega.</p></div>`}
         </div>
