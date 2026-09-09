@@ -147,7 +147,7 @@ syncingPromise = (async () => {
       ...(logo && !String(logo).startsWith('data:') ? { logo } : {}),
       ...(banner && !String(banner).startsWith('data:') ? { banner } : {}),
     })),
-    products: products.map((product) => ({
+    products: products.filter((product) => !(product.media || []).some((media) => String(media.url || '').startsWith('data:'))).map((product) => ({
       ...product,
       media: (product.media || []).map(({ url, ...media }) => ({
         ...media,
