@@ -104,16 +104,40 @@ const storeRow = (store) => ({
 })
 
 const saveStore = async (store) => {
-  try {
-    await upsert('stores', [storeRow(store)])
-  } catch (error) {
-    if (!/cnic|schema cache|column/i.test(error.message)) throw error
-    const row = storeRow(store)
-    delete row.cnic
-    delete row.cnic_front
-    delete row.cnic_back
-    await upsert('stores', [row])
+  const full = storeRow(store)
+  const withoutVerificationMedia = { ...full }
+  delete withoutVerificationMedia.cnic_front
+  delete withoutVerificationMedia.cnic_back
+  const core = {
+    id: full.id,
+    owner_id: full.owner_id,
+    name: full.name,
+    slug: full.slug,
+    tagline: full.tagline,
+    type: full.type,
+    description: full.description,
+    logo: full.logo,
+    banner: full.banner,
+    theme: full.theme,
+    categories: full.categories,
+    socials: full.socials,
+    address: full.address,
+    city: full.city,
+    status: full.status,
+    rating: full.rating,
+    created_at: full.created_at,
   }
+  let lastError
+  for (const row of [full, withoutVerificationMedia, core]) {
+    try {
+      await upsert('stores', [row])
+      return
+    } catch (error) {
+      lastError = error
+      console.error('Store persistence attempt failed:', error.message)
+    }
+  }
+  throw lastError
 }
 
 const isDemo = (item) => item?.demo === true
@@ -542,6 +566,6 @@ export default async function handler(req, res) {
     return json(res, 200, { ok: true })
   } catch (error) {
     console.error('Data API request failed:', error.message)
-    return json(res, 500, { error: 'Request could not be completed' })
+    return json(res, 500, { error: `Request could not be completed: ${error.message}` })
   }
 }
