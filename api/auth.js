@@ -6,22 +6,33 @@ const authKey = () => process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPAB
 
 const googleAccountFor = async (email) => {
   if (!email || !process.env.SUPABASE_SERVICE_ROLE_KEY) return false
-  const profiles = await supabaseRequest(`/rest/v1/users?select=id,email&email=eq.${encodeURIComponent(email)}&limit=1`, {}, process.env.SUPABASE_SERVICE_ROLE_KEY)
-  const profileId = profiles[0]?.id
-  if (profileId) {
-    const user = await supabaseRequest(`/auth/v1/admin/users/${encodeURIComponent(profileId)}`, {}, process.env.SUPABASE_SERVICE_ROLE_KEY)
-    const providers = [
-      ...(user.identities || []).map((identity) => identity.provider),
-      user.app_metadata?.provider,
-      ...(user.app_metadata?.providers || []),
-    ].filter(Boolean)
-    if (providers.some((provider) => String(provider).toLowerCase() === 'google')) return true
+  try {
+    const profiles = await supabaseRequest(`/rest/v1/users?select=id,email&email=eq.${encodeURIComponent(email)}&limit=1`, {}, process.env.SUPABASE_SERVICE_ROLE_KEY)
+    const profileId = profiles[0]?.id
+    if (profileId) {
+      const user = await supabaseRequest(`/auth/v1/admin/users/${encodeURIComponent(profileId)}`, {}, process.env.SUPABASE_SERVICE_ROLE_KEY)
+      const providers = [
+        ...(user.identities || []).map((identity) => identity.provider),
+        user.app_metadata?.provider,
+        ...(user.app_metadata?.providers || []),
+      ].filter(Boolean)
+      if (providers.some((provider) => String(provider).toLowerCase() === 'google')) return true
+    }
+  } catch {
+    // Fall through to the paginated Auth admin lookup when a profile is stale.
   }
   for (let page = 1; page <= 20; page += 1) {
     const users = await supabaseRequest(`/auth/v1/admin/users?page=${page}&per_page=1000`, {}, process.env.SUPABASE_SERVICE_ROLE_KEY)
     const list = Array.isArray(users) ? users : users.users || []
     const match = list.find((item) => String(item.email || '').toLowerCase() === email.toLowerCase())
-    if (match) return Boolean(match.identities?.some((identity) => identity.provider === 'google'))
+    if (match) {
+      const providers = [
+        ...(match.identities || []).map((identity) => identity.provider),
+        match.app_metadata?.provider,
+        ...(match.app_metadata?.providers || []),
+      ].filter(Boolean)
+      return providers.some((provider) => String(provider).toLowerCase() === 'google')
+    }
     if (list.length < 1000) break
   }
   return false
