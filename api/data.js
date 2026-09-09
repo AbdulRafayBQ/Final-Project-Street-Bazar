@@ -32,6 +32,13 @@ const authenticate = async (req) => {
   if (!userRows?.id || !userRows.email) return null
   const profiles = await request(`/rest/v1/users?select=id,name,email,role,avatar&id=eq.${encodeURIComponent(userRows.id)}&limit=1`)
   const profile = profiles[0] || { id: userRows.id, name: userRows.user_metadata?.name || userRows.email.split('@')[0], email: userRows.email, role: 'customer' }
+  if (!profiles.length) {
+    await request('/rest/v1/users?on_conflict=id', {
+      method: 'POST',
+      headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
+      body: JSON.stringify(profile),
+    })
+  }
   return { id: userRows.id, email: userRows.email, role: profile.role === 'admin' ? 'admin' : profile.role === 'owner' ? 'owner' : 'customer', profile }
 }
 
@@ -195,7 +202,7 @@ export default async function handler(req, res) {
         address: order.address,
         stores: order.store_ids || [],
         createdAt: order.created_at,
-        cancelReason: order.status === 5 ? (order.timeline || []).find((entry) => entry.step === 5)?.note?.replace(/^Cancelled by store:\s*/, '') || '' : '',
+        cancelReason: order.status === 5 ? (order.timeline || []).find((entry) => entry.step === 5)?.note?.replace(/^Cancelled by (?:store|customer):\s*/, '') || '' : '',
       }))
       const allOrders = mergeById(payload.orders || [], normalizedOrders)
       if (isAdmin(actor)) return json(res, 200, { ...payload, stores: visibleStores, products: visibleProducts, threads, follows, orders: allOrders })
@@ -413,8 +420,11 @@ export default async function handler(req, res) {
     if (payload.action === 'order') {
       const order = payload.order
       if (!order?.id || !Array.isArray(order.items) || !order.items.length) return json(res, 400, { error: 'Order data is required' })
-      const existingRows = await request(`/rest/v1/orders?select=user_id,store_ids&id=eq.${encodeURIComponent(order.id)}&limit=1`)
+      const existingRows = await request(`/rest/v1/orders?select=user_id,store_ids,status&id=eq.${encodeURIComponent(order.id)}&limit=1`)
       const existing = existingRows[0]
+      const nextStatus = Number(order.status)
+      if (!Number.isInteger(nextStatus) || nextStatus < 0 || nextStatus > 5) return json(res, 400, { error: 'Invalid order status' })
+      if (existing?.status === 5) return json(res, 409, { error: 'Cancelled orders cannot be updated' })
       const productIds = [...new Set(order.items.map((item) => item.product).filter(Boolean))]
       const productRows = await request(`/rest/v1/products?select=id,store_id&id=in.(${productIds.map(encodeURIComponent).join(',')})`)
       const storeIds = order.stores || order.storeIds || existing?.store_ids || [...new Set(productRows.map((product) => product.store_id))]
@@ -422,13 +432,17 @@ export default async function handler(req, res) {
         ? await request(`/rest/v1/stores?select=id&owner_id=eq.${encodeURIComponent(actor.id)}&id=in.(${storeIds.map(encodeURIComponent).join(',')})`)
         : []
       if (existing && !isAdmin(actor) && existing.user_id !== actor.id && !ownedStores.length) return json(res, 403, { error: 'You cannot update this order' })
+      const isOwner = Boolean(ownedStores.length) || isAdmin(actor)
+      if (existing && !isOwner && nextStatus !== 5) return json(res, 403, { error: 'Customers can only cancel an active order' })
+      if (existing && !isOwner && (existing.status >= 2 || nextStatus !== 5)) return json(res, 409, { error: 'This order can no longer be cancelled' })
+      if (existing && isOwner && existing.status === 5) return json(res, 409, { error: 'Cancelled orders cannot be updated' })
       if (!existing && (!productRows.length || productRows.length !== productIds.length)) return json(res, 400, { error: 'Order contains an unavailable product' })
       await upsert('orders', [{
         id: order.id,
         user_id: existing?.user_id || actor.id,
         items: order.items,
         total: order.total,
-        status: order.status,
+        status: nextStatus,
         timeline: order.timeline,
         eta: order.etaDays || order.eta,
         address: order.address,

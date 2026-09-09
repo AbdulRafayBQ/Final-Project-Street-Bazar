@@ -82,6 +82,11 @@ body::before{
 /* ---------- layout ---------- */
 .app{position:relative;z-index:1;min-height:100vh;display:flex;flex-direction:column;transition:opacity .5s var(--ease)}
 .app.is-booting{opacity:0}
+.app.auth-initializing{pointer-events:none}
+.auth-header-skeleton{display:flex;align-items:center;gap:8px;padding:8px 2px}
+.auth-header-skeleton span{display:block;width:34px;height:34px;border-radius:50%;background:var(--line);animation:authSkeleton 1.4s ease-in-out infinite}
+.auth-header-skeleton span:last-child{width:74px;height:12px;border-radius:99px;animation-delay:.15s}
+@keyframes authSkeleton{0%,100%{opacity:.45}50%{opacity:.9}}
 .view{flex:1 0 auto;padding-bottom:96px}
 .wrap{width:100%;max-width:var(--wrap);margin-inline:auto;padding-inline:clamp(16px,4vw,32px)}
 .page-enter{animation:pageIn .5s var(--ease-out) both}

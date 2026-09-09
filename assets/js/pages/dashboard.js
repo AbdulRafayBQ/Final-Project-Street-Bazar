@@ -2,7 +2,7 @@
 
 import { icon, esc, money, num, toast, modal, closeModal, timeAgo, spinner, confirmBox, storeAvatar, avatar } from '../ui.js'
 import { statCard, emptyLogin } from '../components.js'
-import { state, myStores, storeById, storeProducts, storeOrders, storeRevenue, storeSales, currentUser, lowStock, productById, updateProduct, updateStore, deleteStore, advanceOrder, cancelOrder, addStock, storeThreads, threadById, markThreadRead, userById, save, ownerWarehouse, addWarehouseItem, updateWarehouseItem, deleteWarehouseItem } from '../store.js'
+import { state, myStores, storeById, storeProducts, storeOrders, storeRevenue, storeSales, currentUser, lowStock, productById, updateProduct, updateStore, deleteStore, advanceOrder, moveOrderStatus, cancelOrder, orderNotifications, addStock, storeThreads, threadById, markThreadRead, userById, save, ownerWarehouse, addWarehouseItem, updateWarehouseItem, deleteWarehouseItem } from '../store.js'
 import { genStockPlan } from '../ai.js'
 import { syncThread, syncPull, syncNotification, syncOrder, ownerDelete } from '../db.js'
 import { navigate, renderRoute } from '../router.js'
@@ -111,7 +111,7 @@ export async function dashboardPage() {
                 <td><div><b>${money(o.total)}</b><div class="tiny muted">${esc(o.address?.line || 'Address unavailable')}</div></div></td>
                 <td><span class="badge ${o.status === 4 ? 'badge-live' : o.status === 5 ? 'badge-rejected' : 'badge-pending'}">${o.status === 5 ? 'Cancelled' : ['Placed', 'Packed', 'Shipped', 'Out for delivery', 'Delivered'][o.status]}</span></td>
                 <td class="muted tiny">${timeAgo(o.createdAt)}</td>
-                <td><button class="btn btn-sm btn-ghost" data-advance="${o.id}" ${o.status >= 4 ? 'disabled' : ''}>Advance ${icon('arrow', '', 13)}</button> ${o.status < 2 ? `<button class="btn btn-sm btn-danger" data-cancel-order="${o.id}">Cancel</button>` : ''}</td>
+                <td>${o.status !== 5 ? `<div class="row" style="gap:6px"><button class="btn btn-sm btn-ghost" data-back="${o.id}" ${o.status <= 0 ? 'disabled' : ''}>Back</button><button class="btn btn-sm btn-ghost" data-advance="${o.id}" ${o.status >= 4 ? 'disabled' : ''}>Next ${icon('arrow', '', 13)}</button>${o.status < 2 ? `<button class="btn btn-sm btn-danger" data-cancel-order="${o.id}">Cancel</button>` : ''}</div>` : '<span class="tiny muted">Cancelled — locked</span>'}</td>
               </tr>`).join('')}</tbody>
           </table></div>` : `<div class="empty"><p class="muted">Abhi koi order nahi. Customers order karte hi yahan dikhega.</p></div>`}
         </div>
@@ -176,23 +176,29 @@ dashboardPage.mount = (params, query, root) => {
     navigate('#/dashboard')
   }))
 
-  root.querySelectorAll('[data-advance]').forEach((b) => b.addEventListener('click', () => {
-    const order = advanceOrder(b.dataset.advance)
-    if (order) syncOrder(order).catch((error) => console.error('Order status sync failed:', error))
-    toast('Order status update ho gaya', 'ok')
-    navigate('#/dashboard')
-  }))
+  const syncOrderChange = async (order, message) => {
+    if (!order) return toast('Order status update nahi ho saka', 'err')
+    try {
+      await syncOrder(order)
+      await Promise.all(orderNotifications(order).map((notification) => syncNotification(notification)))
+      toast(message, 'ok')
+      await renderRoute()
+    } catch (error) {
+      toast('Order update server par save nahi hui: ' + error.message, 'err')
+    }
+  }
+  root.querySelectorAll('[data-advance]').forEach((b) => b.addEventListener('click', () => syncOrderChange(advanceOrder(b.dataset.advance), 'Order status next step par update ho gaya')))
+  root.querySelectorAll('[data-back]').forEach((b) => b.addEventListener('click', () => syncOrderChange(moveOrderStatus(b.dataset.back, (state.orders.find((o) => o.id === b.dataset.back)?.status || 0) - 1), 'Order status ek step piche kar diya gaya')))
   root.querySelectorAll('[data-cancel-order]').forEach((b) => b.addEventListener('click', () => {
     modal({ title: 'Cancel order', body: '<textarea class="textarea" id="cancel-reason" placeholder="Customer ko reason batayein"></textarea>', foot: '<button class="btn btn-ghost" data-close>Back</button><button class="btn btn-danger" id="cancel-go">Cancel order</button>', onOpen: (el) => el.querySelector('#cancel-go').addEventListener('click', async () => {
       const reason = el.querySelector('#cancel-reason').value.trim()
       if (!reason) return toast('Reason likhna zaroori hai', 'err')
       const order = cancelOrder(b.dataset.cancelOrder, reason)
       if (!order) return toast('Order cancel nahi ho saka', 'err')
-      const notification = state.notifications.find((item) => item.to === order.user && item.title === 'Order ' + order.id + ' cancelled')
       try {
         await syncOrder(order)
-        if (notification) await syncNotification(notification)
-        closeModal(); toast('Order cancel ho gaya aur customer ko notification bhej di', 'ok'); navigate('#/dashboard')
+        await Promise.all(orderNotifications(order).map((item) => syncNotification(item)))
+        closeModal(); toast('Order cancel ho gaya aur dono users ko notification bhej di', 'ok'); await renderRoute()
       } catch (error) {
         toast('Cancellation server par save nahi hui: ' + error.message, 'err')
       }

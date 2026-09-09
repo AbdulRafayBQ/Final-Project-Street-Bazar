@@ -2,7 +2,9 @@
 
 import { icon, esc, money, num, timeAgo, toast, copyText } from '../ui.js'
 import { orderTimeline } from '../components.js'
-import { myOrders, orderById, currentUser, userById, storeById, advanceOrder, ORDER_STEPS, ORDER_CANCELLED_STEP, myStores } from '../store.js'
+import { myOrders, orderById, currentUser, userById, storeById, cancelOrder, orderNotifications, ORDER_STEPS, ORDER_CANCELLED_STEP, myStores } from '../store.js'
+import { renderRoute } from '../router.js'
+import { syncOrder, syncNotification, syncPull } from '../db.js'
 import { navigate } from '../router.js'
 
 export async function ordersPage() {
@@ -37,6 +39,28 @@ export async function ordersPage() {
     </div>
   </div>`
 }
+
+const watchOrderChanges = (params, query, root) => {
+  const getSignature = () => JSON.stringify({
+    id: params.id || query.id || '',
+    statuses: myOrders().map((order) => `${order.id}:${order.status}`).join('|'),
+  })
+  let signature = getSignature()
+  root._orderRefreshTimer = setInterval(async () => {
+    try {
+      await syncPull()
+      const next = getSignature()
+      if (next !== signature) {
+        signature = next
+        await renderRoute()
+      }
+    } catch (error) {
+      console.error('Order status refresh failed:', error)
+    }
+  }, 5000)
+}
+
+ordersPage.mount = watchOrderChanges
 
 export async function trackPage(params, query) {
   const id = params.id || query.id || ''
@@ -95,7 +119,8 @@ export async function trackPage(params, query) {
         <div class="progress" style="margin:18px 0 26px"><i style="width:${o.status === ORDER_CANCELLED_STEP ? 100 : (o.status / 4) * 100}%"></i></div>
         ${orderTimeline(o)}
         ${o.status === 5 ? `<div class="divider"></div><p class="small" style="color:var(--red)"><b>Cancelled:</b> ${esc(o.cancelReason || '')}</p>` : ''}
-        ${isOwner && o.status < 2 ? `<div class="divider"></div><div class="row-between"><span class="small muted">Store owner: status update karein</span><button class="btn btn-sm btn-primary" data-owner-advance="${o.id}"><span>Advance status</span> ${icon('arrow', '', 13)}</button></div>` : ''}
+        ${isOwner && o.status < 2 ? `<div class="divider"></div><div class="row-between"><span class="small muted">Store owner: status update karein</span><button class="btn btn-sm btn-danger" data-owner-cancel="${o.id}">Cancel order</button></div>` : ''}
+        ${!isOwner && o.status < 2 ? `<div class="divider"></div><div class="row-between"><span class="small muted">Order abhi cancel ho sakta hai</span><button class="btn btn-sm btn-danger" data-customer-cancel="${o.id}">Cancel order</button></div>` : ''}
       </div>
 
       <div class="stack">
@@ -124,6 +149,7 @@ export async function trackPage(params, query) {
 }
 
 trackPage.mount = (params, query, root) => {
+  watchOrderChanges(params, query, root)
   const go = () => {
     const v = root.querySelector('#track-in')?.value.trim().toUpperCase()
     if (!v) return toast('Order ID likhein', 'err')
@@ -132,10 +158,21 @@ trackPage.mount = (params, query, root) => {
   root.querySelector('#track-go')?.addEventListener('click', go)
   root.querySelector('#track-in')?.addEventListener('keydown', (e) => { if (e.key === 'Enter') go() })
   root.querySelector('[data-copy-id]')?.addEventListener('click', (e) => copyText(e.currentTarget.dataset.copyId, 'Order ID'))
-  root.querySelector('[data-owner-advance]')?.addEventListener('click', (e) => {
-    advanceOrder(e.currentTarget.dataset.ownerAdvance)
-    toast('Status update ho gaya', 'ok')
-    navigate('#/track/' + e.currentTarget.dataset.ownerAdvance)
+  const cancelButton = root.querySelector('[data-owner-cancel], [data-customer-cancel]')
+  cancelButton?.addEventListener('click', async (e) => {
+    const reason = window.prompt('Order cancel karne ki wajah likhein')
+    if (!reason?.trim()) return
+    const isCustomer = Boolean(e.currentTarget.dataset.customerCancel)
+    const order = cancelOrder(e.currentTarget.dataset.ownerCancel || e.currentTarget.dataset.customerCancel, reason, isCustomer ? 'customer' : 'store')
+    if (!order) return toast('Order cancel nahi ho saka', 'err')
+    try {
+      await syncOrder(order)
+      await Promise.all(orderNotifications(order).map((notification) => syncNotification(notification)))
+      toast('Order cancel ho gaya aur notification bhej di', 'ok')
+      await renderRoute()
+    } catch (error) {
+      toast('Cancellation server par save nahi hui: ' + error.message, 'err')
+    }
   })
 }
 

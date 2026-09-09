@@ -1,7 +1,7 @@
 /* Street Bazar — app shell, routing & global interactions (vanilla JS) */
 
 import { $, $$, icon, esc, num, money, toast, modal, closeModal, avatar, timeAgo } from './ui.js'
-import { state, currentUser, myStores, cartCount, logout, myNotifications, unreadNotis, toggleLike, toggleFollow, productById, addToCart, save, unreadThreadCount, setRole } from './store.js'
+import { state, currentUser, myStores, cartCount, logout, myNotifications, unreadNotis, toggleLike, toggleFollow, productById, addToCart, save, unreadThreadCount, setRole, authInitializing, setAuthInitializing } from './store.js'
 import { route, setNotFound, startRouter, onRender, navigate, renderRoute } from './router.js'
 import { authRequest, syncPull, syncPush, syncFollow, syncNotification } from './db.js'
 
@@ -25,6 +25,7 @@ import { assistantReply, aiStatusText } from './ai.js'
 /* ---------------- header ---------------- */
 function renderHeader() {
   const u = currentUser()
+  const initializing = authInitializing
   const hasStore = Boolean(u && myStores().length)
   const head = $('#site-header')
   head.className = 'site-header'
@@ -52,7 +53,9 @@ function renderHeader() {
       <div class="hd-actions">
         <button class="icon-btn desktop-only" id="btn-bell" title="Notifications">${icon('bell', '', 18)}${unreadNotis() ? '<span class="dot"></span>' : ''}</button>
         <a class="icon-btn" href="#/cart" title="Cart">${icon('cart', '', 18)}<span class="cart-count" data-cart-count style="display:${cartCount() ? 'grid' : 'none'}">${cartCount()}</span></a>
-        ${u ? `
+        ${initializing ? `
+          <div class="auth-header-skeleton" aria-label="Authentication loading"><span></span><span></span></div>
+        ` : u ? `
           <button id="btn-user" class="row" style="gap:8px;background:none;border:0;padding:0" title="Account">
             ${avatar(u)}
           </button>` : `
@@ -492,17 +495,10 @@ async function restoreGoogleSession() {
         code_verifier: verifier,
       })
       sessionStorage.removeItem('street-bazar-google-verifier')
-      await syncPull()
-      const existing = state.users.find((user) => user.id === result.user.id)
-      if (existing) Object.assign(existing, result.user)
-      else state.users.push(result.user)
-      state.session = result.user.id
-      setRole(result.user.role)
-      save()
+      applyAuthenticatedUser(result.user)
       const next = sessionStorage.getItem('street-bazar-google-next') || '#/'
       sessionStorage.removeItem('street-bazar-google-next')
       window.history.replaceState({}, document.title, `${location.pathname}${next}`)
-      await renderRoute()
     } catch (error) {
       sessionStorage.removeItem('street-bazar-google-verifier')
       sessionStorage.setItem('street-bazar-google-error', error.message)
@@ -519,35 +515,65 @@ async function restoreGoogleSession() {
   }
   try {
     const result = await authRequest('oauth', { access_token: accessToken })
-    await syncPull()
-    const existing = state.users.find((user) => user.id === result.user.id)
-    if (existing) Object.assign(existing, result.user)
-    else state.users.push(result.user)
-    state.session = result.user.id
-    setRole(result.user.role)
-    save()
+    applyAuthenticatedUser(result.user)
     const next = sessionStorage.getItem('street-bazar-google-next') || '#/'
     sessionStorage.removeItem('street-bazar-google-next')
     window.history.replaceState({}, document.title, `${location.pathname}${next}`)
-    await renderRoute()
   } catch (error) {
-    console.error('Google session restore failed:', error)
+    sessionStorage.setItem('street-bazar-google-error', error.message)
+    window.location.hash = '#/auth'
   }
 }
 
+function applyAuthenticatedUser(user) {
+  const existing = state.users.find((item) => item.id === user.id)
+  if (existing) Object.assign(existing, user)
+  else state.users.push(user)
+  state.session = user.id
+  setRole(user.role)
+  save()
+}
+
+async function restoreStoredSession() {
+  const token = sessionStorage.getItem('street-bazar-access-token') || localStorage.getItem('street-bazar-access-token')
+  if (!token) {
+    state.session = null
+    save()
+    return
+  }
+  const result = await authRequest('oauth', { access_token: token })
+  applyAuthenticatedUser(result.user)
+}
+
 async function boot() {
+  setAuthInitializing(true)
+  $('#loader')?.classList.remove('done')
+  $('#app')?.classList.add('is-booting', 'auth-initializing')
   renderHeader()
   renderFooter()
   renderMobileNav()
   bindGlobals()
   startRouter()
   renderFloatingAIWidget()
-  syncPull().then(() => {
+  try {
+    await restoreGoogleSession()
+    await restoreStoredSession()
+  } catch (error) {
+    console.error('Authentication initialization failed:', error)
+    state.session = null
+    save()
+  }
+  try {
+    await syncPull()
+  } catch (error) {
+    console.error('Initial Supabase data sync failed:', error)
+  } finally {
+    setAuthInitializing(false)
     renderHeader()
     renderFooter()
     renderMobileNav()
-    renderRoute()
-  }).catch((error) => console.error('Initial Supabase sync failed:', error))
+    await renderRoute()
+  }
   const googleError = sessionStorage.getItem('street-bazar-google-error')
   if (googleError) {
     sessionStorage.removeItem('street-bazar-google-error')
@@ -561,12 +587,10 @@ async function boot() {
     app?.classList.remove('is-booting')
     setTimeout(() => loader?.remove(), 400)
   }
-  if (document.readyState === 'complete') setTimeout(hide, 200)
-  else window.addEventListener('load', () => setTimeout(hide, 200))
-  setTimeout(hide, 800)
+  if (document.readyState === 'complete') hide()
+  else window.addEventListener('load', hide, { once: true })
 }
 
-restoreGoogleSession()
 boot();
 /* =========================================================
    STREET BAZAR — GLOBAL SCROLL & MOTION EFFECTS
