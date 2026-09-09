@@ -6,7 +6,7 @@ const authKey = () => process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPAB
 
 const googleAccountFor = async (email) => {
   if (!email || !process.env.SUPABASE_SERVICE_ROLE_KEY) return false
-  const users = await supabaseRequest(`/auth/v1/admin/users?filter=${encodeURIComponent(email)}`, {}, process.env.SUPABASE_SERVICE_ROLE_KEY)
+  const users = await supabaseRequest('/auth/v1/admin/users?per_page=1000', {}, process.env.SUPABASE_SERVICE_ROLE_KEY)
   const list = Array.isArray(users) ? users : users.users || []
   const match = list.find((item) => String(item.email || '').toLowerCase() === email.toLowerCase())
   return Boolean(match?.identities?.some((identity) => identity.provider === 'google'))
@@ -42,7 +42,7 @@ export default async function handler(req, res) {
   try {
     const { action, name, password, token, access_token, code, code_verifier, type = 'signup', role = 'customer' } = req.body || {}
     const normalizedEmail = String(req.body?.email || '').trim().toLowerCase()
-    if (['signup', 'login'].includes(action) && await googleAccountFor(normalizedEmail)) {
+    if (action === 'signup' && await googleAccountFor(normalizedEmail)) {
       return json(res, 409, { error: 'Is email par Google account bana hua hai. Sirf Continue with Google use karein.' })
     }
     if (action === 'oauth' && !access_token) return json(res, 400, { error: 'Google session is missing' })
@@ -90,7 +90,7 @@ export default async function handler(req, res) {
     } else if (action === 'signup') {
       auth = await supabaseRequest('/auth/v1/signup', {
         method: 'POST',
-        body: JSON.stringify({ email: normalizedEmail, password, data: { name, role } }),
+        body: JSON.stringify({ email: normalizedEmail, password, data: { name, role: 'customer' } }),
       }, authKey())
       if (auth.user && Array.isArray(auth.user.identities) && auth.user.identities.length === 0) {
         return json(res, 409, { error: 'Is email par account pehle se registered hai. Sign in ya Forgot password use karein.' })
@@ -113,7 +113,7 @@ export default async function handler(req, res) {
       return json(res, 200, { pending_verification: true, email: normalizedEmail, name, role })
     }
     const adminEmails = (process.env.ADMIN_EMAILS || '').split(',').map((item) => item.trim().toLowerCase()).filter(Boolean)
-    const assignedRole = adminEmails.includes(String(user.email || normalizedEmail).toLowerCase()) ? 'admin' : (role === 'owner' ? 'owner' : 'customer')
+    const assignedRole = adminEmails.includes(String(user.email || normalizedEmail).toLowerCase()) ? 'admin' : 'customer'
     const profile = {
       id: user.id,
       name: name || user.user_metadata?.name || normalizedEmail.split('@')[0],

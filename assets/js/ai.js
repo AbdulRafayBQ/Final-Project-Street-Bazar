@@ -21,7 +21,7 @@ const hideInternalDetails = (text) => {
 }
 
 /* ---------------- real API ---------------- */
-async function api(system, user, maxTokens = 800, image = '') {
+async function api(system, user, maxTokens = 450, image = '') {
   const res = await fetch('/api/ai', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -32,7 +32,7 @@ async function api(system, user, maxTokens = 800, image = '') {
   return data.text || ''
 }
 
-async function think(kind, system, offline, label = '', maxTokens = 800) {
+async function think(kind, system, offline, label = '', maxTokens = 450) {
   logAI(kind, label || kind)
   if (isAIConnected()) {
     try {
@@ -193,7 +193,7 @@ export async function genProductCopy({ rough, category, storeName, tone, price, 
       const tags = genTags({ title, category })
       return `TITLE: ${title}\nDESCRIPTION: ${desc}\nTAGS: ${tags.join(', ')}`
     },
-    rough || image
+    rough || image, 550
   )
   const title = /TITLE:\s*(.+)/i.exec(result.text)?.[1]?.trim() || genTitle({ seed: rough, category })
   const description = /DESCRIPTION:\s*([\s\S]*?)(?=\nTAGS:|$)/i.exec(result.text)?.[1]?.trim() || genDescription({ title, category, storeName, tone, price })
@@ -234,12 +234,12 @@ export async function genCategorySuggestion({ rough, storeName }) {
 
 export async function assistantReply({ question, history = [] }) {
   const catalogProducts = state.products.filter((p) => p.status === 'active' && storeById(p.store)?.status === 'live' && !p.demo && !storeById(p.store)?.demo)
-  const catalog = catalogProducts.map((p) => {
+  const catalog = catalogProducts.slice(0, 30).map((p) => {
     const store = storeById(p.store)
     return `${p.title} | ${store?.name || 'Store'} | Rs ${p.price} | ${p.stock > 0 ? 'in stock' : 'out of stock'} | ${[...(p.categories || []), ...(p.tags || [])].join(', ')}`
   }).join('\n')
-  const liveStores = state.stores.filter((store) => !store.demo && store.status !== 'hidden').map((store) => `${store.name} | ${store.type || 'Store'} | ${store.city || ''} | ${store.description || ''}`).join('\n')
-  const memory = history.slice(-6).map((item) => `${item.role === 'user' ? 'Customer' : 'You'}: ${item.text}`).join('\n')
+  const liveStores = state.stores.filter((store) => !store.demo && store.status !== 'hidden').slice(0, 20).map((store) => `${store.name} | ${store.type || 'Store'} | ${store.city || ''} | ${store.description || ''}`).join('\n')
+  const memory = history.slice(-4).map((item) => `${item.role === 'user' ? 'Customer' : 'You'}: ${item.text}`).join('\n')
   const r = await think('assistant', { prompt: `You are a concise shopping assistant. Reply naturally in Roman Urdu/English. Answer only what the customer asked; do not add suggestions, recommendations, greetings, personal details, or technical/internal project information. Never mention databases, Supabase, APIs, backend systems, catalogs, live systems, or implementation. Keep replies to 1-2 short sentences. If the customer asks about a product and a matching item exists, give the matching item link through the app result cards. Recent conversation:\n${memory || '(first message)'}\nShopping information:\n${catalog || '(no matching shopping information)'}\nStores:\n${liveStores || '(no store information)'}`, user: question }, async () => {
     const q = T(question).toLowerCase()
     if (q.includes('sale') || q.includes('offer')) {
@@ -265,7 +265,7 @@ export async function assistantReply({ question, history = [] }) {
     const hit = candidates[0]?.p || searchAll(question).products.find((p) => !p.demo && !storeById(p.store)?.demo)
     if (hit) return chatReply({ question, productId: hit.id, storeId: hit.store })
     return catalogProducts.length ? 'Product ka naam, category ya budget batayein — main behtar option suggest kar dunga.' : 'Aap apni requirement, style ya budget batayein — main us hisaab se guide kar dunga.'
-  }, question, 220)
+  }, question, 350)
   const q = T(question).toLowerCase()
   const maxPrice = Number(q.match(/(?:under|below|less than|se kam|tak)\s*(?:rs\.?\s*)?(\d[\d,]*)/)?.[1]?.replace(/,/g, '') || 0)
   const words = q.split(/\s+/).filter((word) => word.length > 2 && !['under', 'below', 'less', 'than', 'se', 'kam', 'tak', 'price', 'chahiye', 'mujhe', 'please', 'hai', 'koi'].includes(word))
