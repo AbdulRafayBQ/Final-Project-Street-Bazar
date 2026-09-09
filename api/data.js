@@ -31,15 +31,23 @@ const authenticate = async (req) => {
   }
   if (!userRows?.id || !userRows.email) return null
   const profiles = await request(`/rest/v1/users?select=id,name,email,role,avatar&id=eq.${encodeURIComponent(userRows.id)}&limit=1`)
-  const profile = profiles[0] || { id: userRows.id, name: userRows.user_metadata?.name || userRows.email.split('@')[0], email: userRows.email, role: 'customer' }
-  if (!profiles.length) {
-    await request('/rest/v1/users?on_conflict=id', {
-      method: 'POST',
-      headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
-      body: JSON.stringify(profile),
-    })
+  const emailProfiles = profiles.length ? profiles : await request(`/rest/v1/users?select=id,name,email,role,avatar&email=eq.${encodeURIComponent(userRows.email)}&limit=1`)
+  const profile = emailProfiles[0] || { id: userRows.id, name: userRows.user_metadata?.name || userRows.email.split('@')[0], email: userRows.email, role: 'customer' }
+  if (!emailProfiles.length) {
+    try {
+      await request('/rest/v1/users?on_conflict=id', {
+        method: 'POST',
+        headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
+        body: JSON.stringify(profile),
+      })
+    } catch (error) {
+      if (!/duplicate key|users_email_key/i.test(error.message)) throw error
+      const existing = await request(`/rest/v1/users?select=id,name,email,role,avatar&email=eq.${encodeURIComponent(userRows.email)}&limit=1`)
+      if (!existing[0]) throw error
+      return { id: existing[0].id, email: existing[0].email, role: existing[0].role === 'admin' ? 'admin' : existing[0].role === 'owner' ? 'owner' : 'customer', profile: existing[0] }
+    }
   }
-  return { id: userRows.id, email: userRows.email, role: profile.role === 'admin' ? 'admin' : profile.role === 'owner' ? 'owner' : 'customer', profile }
+  return { id: profile.id, email: userRows.email, role: profile.role === 'admin' ? 'admin' : profile.role === 'owner' ? 'owner' : 'customer', profile }
 }
 
 const requireAuth = async (req, res) => {
