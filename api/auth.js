@@ -19,6 +19,10 @@ const googleConflict = (res) => json(res, 409, {
   code: 'google_email_conflict',
   error: 'This email is already registered with Google. Please continue with Google to log in.',
 })
+const registeredConflict = (res) => json(res, 409, {
+  code: 'email_already_registered',
+  error: 'This email is already registered. Please sign in or use Forgot password.',
+})
 const existingProfileFor = async (email) => {
   const rows = await supabaseRequest(`/rest/v1/users?select=id,email&id=not.is.null&email=eq.${encodeURIComponent(email)}&limit=1`)
   return rows[0] || null
@@ -112,7 +116,10 @@ export default async function handler(req, res) {
         return googleConflict(res)
       }
       if (auth.user && Array.isArray(auth.user.identities) && auth.user.identities.length === 0) {
-        return json(res, 409, { error: 'Is email par account pehle se registered hai. Sign in ya Forgot password use karein.' })
+        return (await googleAccountFor(normalizedEmail)) ? googleConflict(res) : registeredConflict(res)
+      }
+      if (auth.user?.email_confirmed_at && !auth.access_token) {
+        return (await googleAccountFor(normalizedEmail)) ? googleConflict(res) : registeredConflict(res)
       }
     } else if (action === 'login') {
       auth = await supabaseRequest('/auth/v1/token?grant_type=password', {
