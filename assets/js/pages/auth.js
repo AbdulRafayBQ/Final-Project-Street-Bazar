@@ -130,8 +130,7 @@ authPage.mount = (params, query, root) => {
       input.type = input.type === 'password' ? 'text' : 'password'
       e.currentTarget.textContent = input.type === 'password' ? 'Show' : 'Hide'
     })
-    body.querySelector('[data-google-auth], #google-auth')?.addEventListener('click', async (event) => {
-      const button = event.currentTarget
+    const continueWithGoogle = async (button) => {
       button.disabled = true
       try {
         const oauthRedirect = `${location.origin}${location.pathname}`
@@ -146,7 +145,8 @@ authPage.mount = (params, query, root) => {
         button.disabled = false
         toast(error.message, 'err')
       }
-    })
+    }
+    body.querySelector('[data-google-auth], #google-auth')?.addEventListener('click', (event) => continueWithGoogle(event.currentTarget))
     body.querySelector('#au-verify')?.addEventListener('click', async (e) => {
       const btn = spinner(e.currentTarget)
       try {
@@ -231,7 +231,12 @@ authPage.mount = (params, query, root) => {
         }
         navigate(redirect)
       } catch (err) {
-        btn(); toast(err.message, 'err')
+        btn()
+        if (err.code === 'google_email_conflict') {
+          body.insertAdjacentHTML('afterbegin', `<div class="panel" data-google-conflict style="margin-bottom:16px;border-color:var(--accent)"><b>This email is already registered with Google.</b><p class="small muted" style="margin-top:6px">Please continue with Google to log in. No duplicate account was created.</p><button class="btn btn-grad btn-block" data-google-conflict-login style="margin-top:12px">${icon('google', '', 16)} Continue with Google</button></div>`)
+          body.querySelector('[data-google-conflict-login]')?.addEventListener('click', (event) => continueWithGoogle(event.currentTarget))
+        }
+        toast(err.message, 'err')
       }
     })
   }

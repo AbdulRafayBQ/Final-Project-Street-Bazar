@@ -112,7 +112,9 @@ if (!res.ok) {
     save()
     throw new Error('Session expire ho gayi. Dobara login karein.')
   }
-  throw new Error(data.error || `API ${res.status}`)
+  const error = new Error(data.error || `API ${res.status}`)
+  if (data.code) error.code = data.code
+  throw error
 }
 return data
 }
