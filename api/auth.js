@@ -92,6 +92,9 @@ export default async function handler(req, res) {
         method: 'POST',
         body: JSON.stringify({ email: normalizedEmail, password, data: { name, role: 'customer' } }),
       }, authKey())
+      if (auth.user?.identities?.some((identity) => identity.provider === 'google')) {
+        return json(res, 409, { error: 'Is email par Google account bana hua hai. Sirf Continue with Google use karein.' })
+      }
       if (auth.user && Array.isArray(auth.user.identities) && auth.user.identities.length === 0) {
         return json(res, 409, { error: 'Is email par account pehle se registered hai. Sign in ya Forgot password use karein.' })
       }
