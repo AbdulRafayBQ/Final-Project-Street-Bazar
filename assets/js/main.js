@@ -1,7 +1,7 @@
 /* Street Bazar — app shell, routing & global interactions (vanilla JS) */
 
 import { $, $$, icon, esc, num, toast, modal, closeModal, avatar, timeAgo } from './ui.js'
-import { state, currentUser, myStores, cartCount, logout, myNotifications, unreadNotis, toggleLike, toggleFollow, productById, addToCart, save, unreadThreadCount, setRole, likedProducts } from './store.js'
+import { state, currentUser, myStores, cartCount, logout, myNotifications, unreadNotis, toggleLike, toggleFollow, productById, addToCart, save, unreadThreadCount, setRole, likedProducts, authInitializing, setAuthInitializing } from './store.js'
 import { route, setNotFound, startRouter, onRender, navigate, renderRoute } from './router.js'
 import { authRequest, syncPull, syncPush, syncFollow, syncNotification } from './db.js'
 
