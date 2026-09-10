@@ -2,7 +2,7 @@
 
 import { icon, esc, money, num, toast, modal, closeModal, timeAgo, spinner, confirmBox, storeAvatar, avatar } from '../ui.js'
 import { statCard, emptyLogin } from '../components.js'
-import { state, myStores, storeById, storeProducts, storeOrders, storeRevenue, storeSales, currentUser, lowStock, productById, updateProduct, updateStore, deleteStore, advanceOrder, cancelOrder, addStock, storeThreads, threadById, markThreadRead, userById, save, ownerWarehouse, addWarehouseItem, updateWarehouseItem, deleteWarehouseItem } from '../store.js'
+import { state, myStores, storeById, storeProducts, storeOrders, storeRevenue, storeSales, currentUser, lowStock, productById, updateProduct, updateStore, deleteStore, advanceOrder, moveOrderStatus, cancelOrder, orderNotifications, addStock, storeThreads, threadById, markThreadRead, userById, save, ownerWarehouse, addWarehouseItem, updateWarehouseItem, deleteWarehouseItem } from '../store.js'
 import { genStockPlan } from '../ai.js'
 import { authRequest, syncThread, syncPull, syncNotification, syncOrder } from '../db.js'
 import { navigate, renderRoute } from '../router.js'
@@ -16,7 +16,7 @@ export async function dashboardPage() {
   const totalProducts = stores.reduce((a, s) => a + storeProducts(s.id).length, 0)
   const revenue = stores.reduce((a, s) => a + storeRevenue(s.id), 0)
   const sales = stores.reduce((a, s) => a + storeSales(s.id), 0)
-  const orders = stores.flatMap((s) => storeOrders(s.id))
+  const orders = [...new Map(stores.flatMap((s) => storeOrders(s.id)).map((order) => [order.id, order])).values()]
   const threads = stores.flatMap((s) => storeThreads(s.id))
   const pending = stores.filter((s) => s.status === 'pending').length
 
@@ -106,12 +106,12 @@ export async function dashboardPage() {
             <tbody>${orders.map((o) => `
               <tr>
                 <td><a href="#/track/${o.id}"><b>${o.id}</b></a></td>
-                <td>${esc(userById(o.user)?.name || 'Customer')}</td>
-                <td><div class="row" style="gap:6px">${o.items.map((i) => `<img src="${esc(i.customizedImage || i.image)}" alt="" title="${esc(i.title)}${i.customizedImage ? ' · AI customized' : ''}" style="width:34px;height:34px;border-radius:8px;object-fit:cover">`).join('')}<span>${num(o.items.reduce((a, i) => a + i.qty, 0))}</span></div></td>
-                <td><b>${money(o.total)}</b></td>
+                <td><div><b>${esc(userById(o.user)?.name || o.address?.name || 'Customer')}</b><div class="tiny muted">${esc(o.address?.phone || 'Phone unavailable')}</div><div class="tiny muted">${esc(o.address?.city || '')}</div></div></td>
+                <td><div class="stack" style="gap:6px">${o.items.map((i) => `<div class="row" style="gap:7px"><img src="${esc(i.customizedImage || i.image)}" alt="" title="${esc(i.title)}${i.customizedImage ? ' · AI customized' : ''}" style="width:34px;height:34px;border-radius:8px;object-fit:cover"><span class="small">${esc(i.title)} <b>× ${num(i.qty)}</b></span></div>`).join('')}<span class="tiny muted">Total quantity: ${num(o.items.reduce((a, i) => a + i.qty, 0))}</span></div></td>
+                <td><div><b>${money(o.total)}</b><div class="tiny muted">${esc(o.address?.line || 'Address unavailable')}</div></div></td>
                 <td><span class="badge ${o.status === 4 ? 'badge-live' : o.status === 5 ? 'badge-rejected' : 'badge-pending'}">${o.status === 5 ? 'Cancelled' : ['Placed', 'Packed', 'Shipped', 'Out for delivery', 'Delivered'][o.status]}</span></td>
                 <td class="muted tiny">${timeAgo(o.createdAt)}</td>
-                <td><button class="btn btn-sm btn-ghost" data-advance="${o.id}" ${o.status >= 4 ? 'disabled' : ''}>Advance ${icon('arrow', '', 13)}</button> ${o.status < 2 ? `<button class="btn btn-sm btn-danger" data-cancel-order="${o.id}">Cancel</button>` : ''}</td>
+                <td>${o.status !== 5 ? `<div class="row" style="gap:6px"><button class="btn btn-sm btn-ghost" data-back="${o.id}" ${o.status <= 0 ? 'disabled' : ''}>Back</button><button class="btn btn-sm btn-ghost" data-advance="${o.id}" ${o.status >= 4 ? 'disabled' : ''}>Next ${icon('arrow', '', 13)}</button>${o.status < 4 ? `<button class="btn btn-sm btn-danger" data-cancel-order="${o.id}">Cancel</button>` : ''}</div>` : '<span class="tiny muted">Cancelled — locked</span>'}</td>
               </tr>`).join('')}</tbody>
           </table></div>` : `<div class="empty"><p class="muted">Abhi koi order nahi. Customers order karte hi yahan dikhega.</p></div>`}
         </div>
@@ -152,13 +152,19 @@ function ownerChatPanel(threads, panel, title, subtitle) {
 }
 
 dashboardPage.mount = (params, query, root) => {
-  let threadSignature = JSON.stringify(state.threads.map((thread) => `${thread.id}:${thread.messages?.length || 0}:${thread.messages?.at(-1)?.at || 0}`).sort())
+  let dashboardSignature = JSON.stringify({
+    threads: state.threads.map((thread) => `${thread.id}:${thread.messages?.length || 0}:${thread.messages?.at(-1)?.at || 0}`).sort(),
+    orders: state.orders.map((order) => `${order.id}:${order.status}`).sort(),
+  })
   const refreshInbox = async () => {
     try {
       await syncPull()
-      const next = JSON.stringify(state.threads.map((thread) => `${thread.id}:${thread.messages?.length || 0}:${thread.messages?.at(-1)?.at || 0}`).sort())
-      if (next !== threadSignature) {
-        threadSignature = next
+      const next = JSON.stringify({
+        threads: state.threads.map((thread) => `${thread.id}:${thread.messages?.length || 0}:${thread.messages?.at(-1)?.at || 0}`).sort(),
+        orders: state.orders.map((order) => `${order.id}:${order.status}`).sort(),
+      })
+      if (next !== dashboardSignature) {
+        dashboardSignature = next
         await renderRoute()
       }
     } catch (error) {
@@ -229,21 +235,14 @@ dashboardPage.mount = (params, query, root) => {
   root.querySelectorAll('[data-sale]').forEach((b) => b.addEventListener('click', () => openSaleEditor(b.dataset.sale)))
   root.querySelectorAll('[data-delete-store]').forEach((b) => b.addEventListener('click', () => {
     const store = storeById(b.dataset.deleteStore)
-    const user = currentUser()
     modal({
       title: `Delete ${store?.name || 'store'}?`,
-      body: '<p class="small muted">Permanent delete hai. Confirm karne ke liye apna account password enter karein.</p><input class="input" id="delete-store-password" type="password" placeholder="Account password" style="margin-top:12px">',
+      body: '<p class="small muted">Ye store aur iske products permanently delete ho jayenge. Kya aap continue karna chahte hain?</p>',
       foot: '<button class="btn btn-ghost" data-close>Cancel</button><button class="btn btn-danger" id="delete-store-confirm">Delete permanently</button>',
       onOpen: (el) => el.querySelector('#delete-store-confirm').addEventListener('click', async () => {
-        const password = el.querySelector('#delete-store-password').value
-        if (!password) return toast('Password zaroori hai', 'err')
         const button = spinner(el.querySelector('#delete-store-confirm'))
         try {
-          if (user?.pass) {
-            if (user.pass !== password) throw new Error('Password match nahi karta')
-          } else {
-            await authRequest('login', { email: user.email, password })
-          }
+          await ownerDelete('store', store.id)
           deleteStore(store.id)
           button(); closeModal(); toast('Store permanently delete ho gaya', 'ok'); navigate('#/dashboard')
         } catch (error) {
@@ -353,16 +352,23 @@ function openSaleEditor(storeId) {
     body: `
       <div class="stack">
         <div class="field"><span class="label">Sale text</span><input class="input" id="sale-text" value="${esc(s.sale?.text || '')}" placeholder="e.g. Eid Sale — 30% OFF"></div>
-        <div class="field"><span class="label">Ends on</span><input class="input" type="date" id="sale-until" value="${s.sale?.until ? new Date(s.sale.until).toISOString().slice(0, 10) : ''}"></div>
+        <div class="field"><span class="label">Sale type</span><div class="seg" style="width:100%;margin-top:8px"><button type="button" class="${s.sale?.temporary !== false ? 'active' : ''}" data-sale-mode="temporary">Temporary</button><button type="button" class="${s.sale?.temporary === false ? 'active' : ''}" data-sale-mode="permanent">Permanent</button></div></div>
+        <div class="field" data-sale-until-wrap ${s.sale?.temporary === false ? 'hidden' : ''}><span class="label">Ends on</span><input class="input" type="date" id="sale-until" value="${s.sale?.until ? new Date(s.sale.until).toISOString().slice(0, 10) : ''}"></div>
         <p class="tiny muted">Sale on rakhne par aapka ad homepage aur customers ki For You feed mein dikhega.</p>
         ${s.sale ? `<button class="btn btn-danger btn-sm" id="sale-off">Turn sale off</button>` : ''}
       </div>`,
     foot: `<button class="btn btn-ghost" data-close>Cancel</button><button class="btn btn-primary" id="sale-save"><span>Save sale</span></button>`,
     onOpen: (el) => {
+      let temporary = s.sale?.temporary !== false
+      el.querySelectorAll('[data-sale-mode]').forEach((button) => button.addEventListener('click', () => {
+        temporary = button.dataset.saleMode === 'temporary'
+        el.querySelectorAll('[data-sale-mode]').forEach((item) => item.classList.toggle('active', item === button))
+        el.querySelector('[data-sale-until-wrap]').hidden = !temporary
+      }))
       el.querySelector('#sale-save').addEventListener('click', () => {
         const text = el.querySelector('#sale-text').value.trim()
         const until = el.querySelector('#sale-until').value
-        updateStore(storeId, { sale: text ? { text, until: until ? new Date(until).getTime() : Date.now() + 7 * 86400000 } : null })
+        updateStore(storeId, { sale: text ? { text, temporary, until: temporary ? (until ? new Date(until).getTime() : Date.now() + 7 * 86400000) : null } : null })
         closeModal(); toast('Sale update ho gaya', 'ok'); navigate('#/dashboard')
       })
       el.querySelector('#sale-off')?.addEventListener('click', () => {

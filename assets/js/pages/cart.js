@@ -3,6 +3,7 @@
 import { icon, esc, money, num, toast, spinner } from '../ui.js'
 import { state, setCart, cartTotal, cartCount, productById, storeById, currentUser, placeOrder, addToCart, isPakistanPhone, deliveryChargeFor } from '../store.js'
 import { navigate, renderRoute } from '../router.js'
+import { syncOrder } from '../db.js'
 
 const DELIVERY = 250
 const FREE_OVER = 5000

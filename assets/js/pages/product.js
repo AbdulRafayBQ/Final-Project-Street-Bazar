@@ -8,7 +8,7 @@ import { bindChat } from './store.js'
 
 export async function productPage(params) {
   const p = productById(params.id)
-  if (!p) return `<section class="sec"><div class="wrap"><div class="empty"><h3 class="h3">Product nahi mila</h3><p class="muted">Ye product abhi available nahi.</p><div style="margin-top:16px"><a class="btn btn-primary" href="#/explore"><span>Explore</span></a></div></div></div></section>`
+  if (!p || p.status === 'deleted') return `<section class="sec"><div class="wrap"><div class="empty"><h3 class="h3">Product nahi mila</h3><p class="muted">Ye product abhi available nahi.</p><div style="margin-top:16px"><a class="btn btn-primary" href="#/explore"><span>Explore</span></a></div></div></div></section>`
 
   const s = storeOf(p)
   const u = currentUser()

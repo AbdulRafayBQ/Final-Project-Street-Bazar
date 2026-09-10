@@ -36,6 +36,7 @@ export const THEME_PRESETS = [
 ]
 
 export const ORDER_STEPS = ['Order placed', 'Packed by store', 'Shipped', 'Out for delivery', 'Delivered']
+export const ORDER_CANCELLED_STEP = 5
 
 const IMG = (n) => './images/' + n
 
@@ -444,6 +445,12 @@ function seed() {
 
 /* ---------------- persistence ---------------- */
 export let state = load()
+export let authInitializing = true
+
+export function setAuthInitializing(value) {
+  authInitializing = Boolean(value)
+  document.querySelector('#app')?.classList.toggle('auth-initializing', authInitializing)
+}
 
 function emptyState() {
   return {
@@ -528,7 +535,12 @@ export const storeSales = (sid) => storeProducts(sid).reduce((a, p) => a + (p.sa
 export const storeRevenue = (sid) => storeProducts(sid).reduce((a, p) => a + (p.sales || 0) * (p.price || 0), 0)
 export const myOrders = () => { const u = currentUser(); return u ? state.orders.filter((o) => o.user === u.id).sort((a, b) => b.createdAt - a.createdAt) : [] }
 export const orderById = (id) => state.orders.find((o) => o.id.toUpperCase() === String(id || '').toUpperCase()) || null
-export const storeOrders = (sid) => state.orders.filter((o) => o.stores?.includes(sid)).sort((a, b) => b.createdAt - a.createdAt)
+export const storeOrders = (sid) => state.orders.filter((o) => (
+  (
+  (o.stores || o.storeIds || o.store_ids || []).includes(sid)
+  || (o.items || []).some((item) => item.store === sid)
+  )
+)).sort((a, b) => b.createdAt - a.createdAt)
 export const cartCount = () => state.cart.reduce((a, i) => a + i.qty, 0)
 export const cartTotal = () => state.cart.reduce((a, i) => a + i.unitPrice * i.qty, 0)
 export const myNotifications = () => { const u = currentUser(); return u ? state.notifications.filter((n) => n.to === u.id).sort((a, b) => b.at - a.at) : [] }
@@ -538,15 +550,15 @@ export const myThreads = () => { const u = currentUser(); return u ? state.threa
 export const threadById = (id) => state.threads.find((t) => t.id === id) || null
 export const newProductsFor = () => {
   const ids = followedStores().map((s) => s.id)
-  return state.products.filter((p) => ids.includes(p.store) && p.status !== 'hidden').sort((a, b) => b.createdAt - a.createdAt)
+  return state.products.filter((p) => ids.includes(p.store) && p.status === 'active' && storeById(p.store)?.status === 'live').sort((a, b) => b.createdAt - a.createdAt)
 }
-export const saleStores = () => liveStores().filter((s) => s.sale && s.sale.until > Date.now())
+export const saleStores = () => liveStores().filter((s) => s.sale?.temporary && s.sale.until > Date.now())
 export const pendingStores = () => state.stores.filter((s) => s.status === 'pending')
 export const allCategories = () => {
   const custom = state.stores.flatMap((s) => s.categories || []).filter((c) => !CATEGORIES.includes(c))
   return [...CATEGORIES, ...[...new Set(custom)]]
 }
-export const lowStock = () => state.products.filter((p) => p.stock <= 8 && p.status !== 'hidden')
+export const lowStock = () => state.products.filter((p) => p.stock <= 8 && p.status === 'active' && storeById(p.store)?.status === 'live')
 
 export function searchAll(q = '') {
   const s = q.toLowerCase().trim()
@@ -598,6 +610,12 @@ const moneyPlain = (n) => 'Rs ' + Number(n).toLocaleString('en-PK')
 
 export function notify(to, title, body, link = '#/', meta = {}) {
   const notification = { id: uid('n'), to, title, body, link, at: Date.now(), read: false, ...meta }
+  const existing = state.notifications.find((item) => item.id === notification.id)
+  if (existing) {
+    Object.assign(existing, notification, { read: existing.read })
+    save()
+    return existing
+  }
   state.notifications.unshift(notification)
   save()
   return notification
@@ -619,7 +637,13 @@ export function googleAuth() {
   if (!u) { u = { id: uid('u'), name: 'Google User', email: 'you@gmail.com', role: 'customer', pass: '', avatar: '', createdAt: Date.now() }; state.users.push(u) }
   state.session = u.id; save(); return u
 }
-export function logout() { state.session = null; sessionStorage.removeItem('street-bazar-access-token'); save() }
+export function logout() {
+  state.session = null
+  sessionStorage.removeItem('street-bazar-access-token')
+  localStorage.removeItem('street-bazar-access-token')
+  save()
+  setAuthInitializing(false)
+}
 export function setRole(role) {
   const u = currentUser(); if (!u) return
   u.role = role; save()
@@ -838,29 +862,47 @@ export function placeOrder({ address, etaDays = 4 }) {
       if (linked) { linked.qty = p.stock; linked.updatedAt = Date.now() }
     }
   })
-  stores.forEach((sid) => { const s = storeById(sid); if (s) notify(s.owner, 'New order ' + id, u.name + ' ne ' + moneyPlain(total) + ' ka order kiya', '#/dashboard') })
+  stores.forEach((sid) => { const s = storeById(sid); if (s) notify(s.owner, 'New order ' + id, u.name + ' ne ' + moneyPlain(total) + ' ka order kiya', '#/dashboard', { id: 'order-' + id + '-owner-' + sid }) })
   state.cart = []; save(); return order
 }
 
 export function advanceOrder(id) {
-  const o = orderById(id); if (!o) return
-  if (o.status >= ORDER_STEPS.length - 1) return
-  o.status += 1
-  o.timeline.push({ step: o.status, at: Date.now(), note: ORDER_STEPS[o.status] })
-  if (o.status === 4) o.etaDays = 0
-  notify(o.user, 'Order ' + o.id + ' · ' + ORDER_STEPS[o.status], 'Aapka order aage barh gaya hai.', '#/track/' + o.id)
-  save()
-}
-export function cancelOrder(id, reason) {
   const order = orderById(id)
-  if (!order || order.status >= 2 || order.status === 5) return null
-  order.status = 5
-  order.cancelReason = String(reason || 'Store could not fulfil this customized order').trim()
-  order.timeline.push({ step: 5, at: Date.now(), note: 'Cancelled by store: ' + order.cancelReason })
-  notify(order.user, 'Order ' + order.id + ' cancelled', order.cancelReason, '#/track/' + order.id)
+  return order ? updateOrderStatus(order.id, Math.min(ORDER_STEPS.length - 1, order.status + 1)) : null
+}
+export function moveOrderStatus(id, step) {
+  const order = orderById(id)
+  if (!order || order.status === ORDER_CANCELLED_STEP || step < 0 || step >= ORDER_STEPS.length) return null
+  return updateOrderStatus(order.id, step)
+}
+function updateOrderStatus(id, status) {
+  const order = orderById(id)
+  if (!order || order.status === ORDER_CANCELLED_STEP || order.status === status) return order
+  order.status = status
+  order.timeline.push({ step: status, at: Date.now(), note: ORDER_STEPS[status] })
+  if (status === ORDER_STEPS.length - 1) order.etaDays = 0
+  const storeId = order.stores?.[0] || order.items?.[0]?.store
+  notify(order.user, 'Order ' + order.id + ' · ' + ORDER_STEPS[status], 'Aapka order status update ho gaya: ' + ORDER_STEPS[status] + '.', '#/track/' + order.id, { id: 'order-' + order.id + '-status-' + status, storeId })
+  const store = storeById(storeId)
+  if (store) notify(store.owner, 'Order ' + order.id + ' · ' + ORDER_STEPS[status], 'Aapne order ' + order.id + ' ka status update kiya: ' + ORDER_STEPS[status] + '.', '#/dashboard', { id: 'order-' + order.id + '-status-owner-' + status, storeId })
   save()
   return order
 }
+export function cancelOrder(id, reason, cancelledBy = 'store') {
+  const order = orderById(id)
+  if (!order || order.status === ORDER_CANCELLED_STEP) return null
+  order.status = ORDER_CANCELLED_STEP
+  order.cancelReason = String(reason || 'Store could not fulfil this customized order').trim()
+  order.timeline.push({ step: 5, at: Date.now(), note: 'Cancelled by ' + cancelledBy + ': ' + order.cancelReason })
+  const storeId = order.stores?.[0] || order.items?.[0]?.store
+  notify(order.user, 'Order ' + order.id + ' cancelled', order.cancelReason, '#/track/' + order.id, { id: 'order-' + order.id + '-cancelled-customer', storeId })
+  const store = storeById(storeId)
+  if (store && cancelledBy === 'customer') notify(store.owner, 'Order ' + order.id + ' cancelled', 'Customer ne order cancel kar diya: ' + order.cancelReason, '#/dashboard', { id: 'order-' + order.id + '-cancelled-owner', storeId })
+  if (store && cancelledBy === 'store') notify(order.user, 'Order ' + order.id + ' cancelled by store', 'Store ne order cancel kar diya: ' + order.cancelReason, '#/track/' + order.id, { id: 'order-' + order.id + '-cancelled-customer-notice', storeId })
+  save()
+  return order
+}
+export const orderNotifications = (order) => state.notifications.filter((notification) => notification.id.startsWith('order-' + order.id + '-'))
 
 export function sendMessage({ productId, storeId, from, text }) {
   let t = state.threads.find((x) => x.product === productId && x.store === storeId && x.customer === from)

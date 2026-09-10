@@ -29,7 +29,7 @@ export async function ordersPage() {
               <a class="btn btn-sm btn-ghost" href="#/track/${o.id}">${icon('truck', '', 14)} Track</a>
             </div>
           </div>
-          <div class="progress" style="margin-top:14px"><i style="width:${(o.status / 4) * 100}%"></i></div>
+          <div class="progress" style="margin-top:14px"><i style="width:${o.status === ORDER_CANCELLED_STEP ? 100 : (o.status / 4) * 100}%"></i></div>
           <div class="row" style="margin-top:14px;gap:8px;flex-wrap:wrap">
             ${o.items.map((i) => `<img src="${esc(i.image)}" alt="" title="${esc(i.title)}" style="width:46px;height:46px;border-radius:13px;object-fit:cover">`).join('')}
             ${o.etaDays ? `<span class="tiny muted" style="margin-left:8px">Expected in ${o.etaDays} day${o.etaDays > 1 ? 's' : ''}</span>` : '<span class="tiny muted" style="margin-left:8px">Delivered</span>'}
@@ -38,6 +38,28 @@ export async function ordersPage() {
     </div>
   </div>`
 }
+
+const watchOrderChanges = (params, query, root) => {
+  const getSignature = () => JSON.stringify({
+    id: params.id || query.id || '',
+    statuses: myOrders().map((order) => `${order.id}:${order.status}`).join('|'),
+  })
+  let signature = getSignature()
+  root._orderRefreshTimer = setInterval(async () => {
+    try {
+      await syncPull()
+      const next = getSignature()
+      if (next !== signature) {
+        signature = next
+        await renderRoute()
+      }
+    } catch (error) {
+      console.error('Order status refresh failed:', error)
+    }
+  }, 5000)
+}
+
+ordersPage.mount = watchOrderChanges
 
 export async function trackPage(params, query) {
   const id = params.id || query.id || ''
@@ -64,13 +86,13 @@ export async function trackPage(params, query) {
       ${searchBox}
       ${u && myOrders().length ? `<div style="margin-top:34px;max-width:760px;margin-inline:auto;text-align:left">
         <b class="h4">Recent orders</b>
-        <div class="wrap-flex" style="margin-top:12px">${myOrders().slice(0, 5).map((x) => `<a class="chip" href="#/track/${x.id}">${x.id} · ${ORDER_STEPS[x.status]}</a>`).join('')}</div>
+        <div class="wrap-flex" style="margin-top:12px">${myOrders().slice(0, 5).map((x) => `<a class="chip" href="#/track/${x.id}">${x.id} · ${x.status === ORDER_CANCELLED_STEP ? 'Cancelled' : ORDER_STEPS[x.status]}</a>`).join('')}</div>
       </div>` : ''}
     </div>`
   }
 
   const isOwner = ownerStores.some((sid) => o.stores?.includes(sid))
-  const eta = o.status === 4 ? 'Delivered' : `Arriving in ~${o.etaDays} day${o.etaDays === 1 ? '' : 's'}`
+  const eta = o.status === ORDER_CANCELLED_STEP ? 'Cancelled' : o.status === 4 ? 'Delivered' : `Arriving in ~${o.etaDays} day${o.etaDays === 1 ? '' : 's'}`
   return `
   <div class="wrap" style="padding-top:30px">
     <div class="row-between" style="flex-wrap:wrap;gap:14px">
@@ -86,17 +108,19 @@ export async function trackPage(params, query) {
         <div class="row-between" style="flex-wrap:wrap;gap:12px">
           <div>
             <div class="small muted">Current status</div>
-            <div class="h3" style="margin-top:4px">${ORDER_STEPS[o.status]}</div>
+            <div class="h3" style="margin-top:4px">${o.status === ORDER_CANCELLED_STEP ? 'Cancelled' : ORDER_STEPS[o.status]}</div>
           </div>
           <div style="text-align:right">
             <div class="small muted">Estimated</div>
             <div class="h4" style="margin-top:4px">${eta}</div>
           </div>
         </div>
-        <div class="progress" style="margin:18px 0 26px"><i style="width:${(o.status / 4) * 100}%"></i></div>
+        <div class="progress" style="margin:18px 0 26px"><i style="width:${o.status === ORDER_CANCELLED_STEP ? 100 : (o.status / 4) * 100}%"></i></div>
         ${orderTimeline(o)}
         ${o.status === 5 ? `<div class="divider"></div><p class="small" style="color:var(--red)"><b>Cancelled:</b> ${esc(o.cancelReason || '')}</p>` : ''}
-        ${isOwner && o.status < 2 ? `<div class="divider"></div><div class="row-between"><span class="small muted">Store owner: status update karein</span><button class="btn btn-sm btn-primary" data-owner-advance="${o.id}"><span>Advance status</span> ${icon('arrow', '', 13)}</button></div>` : ''}
+        ${isOwner && o.status !== 5 && o.status < 4 ? `<div class="divider"></div><div class="row-between"><span class="small muted">Store owner: status update karein</span><button class="btn btn-sm btn-danger" data-owner-cancel="${o.id}">Cancel order</button></div>` : ''}
+        ${!isOwner && o.status !== 5 && o.status < 4 ? `<div class="divider"></div><div class="row-between"><span class="small muted">Order cancel kar sakte hain</span><button class="btn btn-sm btn-danger" data-customer-cancel="${o.id}">Cancel order</button></div>` : ''}
+        ${o.status === 5 ? `<div class="divider"></div><p class="small" style="color:var(--red)"><b>Order cancelled — status update locked</b></p>` : ''}
       </div>
 
       <div class="stack">
@@ -125,6 +149,7 @@ export async function trackPage(params, query) {
 }
 
 trackPage.mount = (params, query, root) => {
+  watchOrderChanges(params, query, root)
   const go = () => {
     const v = root.querySelector('#track-in')?.value.trim().toUpperCase()
     if (!v) return toast('Order ID likhein', 'err')

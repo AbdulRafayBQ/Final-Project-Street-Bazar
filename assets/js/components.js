@@ -112,8 +112,9 @@ export function reviewItem(r) {
 }
 
 export function orderTimeline(order) {
-  const pct = (order.status / (ORDER_STEPS.length - 1)) * 100
-  const items = ORDER_STEPS.map((step, i) => {
+  const steps = order.status === 5 ? [...ORDER_STEPS, 'Cancelled'] : ORDER_STEPS
+  const pct = order.status === 5 ? 100 : (order.status / (ORDER_STEPS.length - 1)) * 100
+  const items = steps.map((step, i) => {
     const entry = order.timeline.find((t) => t.step === i)
     const cls = i < order.status ? 'done' : i === order.status ? 'done now' : 'pending'
     return `<div class="tl-item ${cls}">

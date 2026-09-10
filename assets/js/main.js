@@ -39,6 +39,7 @@ function applyThemePreference(themeName = localStorage.getItem('street-bazar-the
 
 function renderHeader() {
   const u = currentUser()
+  const initializing = authInitializing
   const hasStore = Boolean(u && myStores().length)
   const head = $('#site-header')
   const liked = likedProducts()
@@ -64,12 +65,19 @@ function renderHeader() {
         ${u && u.role === 'admin' ? `<a href="#/admin" data-path="/admin">Admin</a>` : ''}
       </nav>
 
+      <div class="hd-search">
+        <span>${icon('search', '', 17)}</span>
+        <input class="input" id="header-product-search" type="search" placeholder="Search products..." autocomplete="off" aria-label="Search products">
+        <div class="search-results" id="header-product-results" hidden></div>
+      </div>
       <div class="hd-actions">
         <button class="theme-toggle" id="theme-toggle" aria-label="Toggle theme">${document.body.classList.contains('dark-theme') ? icon('sun', '', 16) : icon('moon', '', 16)}</button>
         <a class="icon-btn" href="#/wishlist" title="Wishlist">${icon('heart', '', 18)}<span class="cart-count" data-wishlist-count style="display:${liked.length ? 'grid' : 'none'};background:var(--magenta)">${liked.length}</span></a>
         <button class="icon-btn desktop-only" id="btn-bell" title="Notifications">${icon('bell', '', 18)}${unreadNotis() ? '<span class="dot"></span>' : ''}</button>
         <a class="icon-btn" href="#/cart" title="Cart">${icon('cart', '', 18)}<span class="cart-count" data-cart-count style="display:${cartCount() ? 'grid' : 'none'}">${cartCount()}</span></a>
-        ${u ? `
+        ${initializing ? `
+          <div class="auth-header-skeleton" aria-label="Authentication loading"><span></span><span></span></div>
+        ` : u ? `
           <button id="btn-user" class="row" style="gap:8px;background:none;border:0;padding:0" title="Account">
             ${avatar(u)}
           </button>` : `
@@ -95,6 +103,21 @@ function renderHeader() {
   })
 
   $('#btn-ai')?.addEventListener('click', () => import('./pages/home.js').then((m) => m.openAIScan()))
+  const searchInput = $('#header-product-search')
+  const searchResults = $('#header-product-results')
+  searchInput?.addEventListener('input', () => {
+    const query = searchInput.value.trim().toLowerCase()
+    if (!query) { searchResults.hidden = true; searchResults.innerHTML = ''; return }
+    const matches = state.products
+      .filter((product) => product.status === 'active' && product.title.toLowerCase().includes(query) && liveStores().some((store) => store.id === product.store))
+      .slice(0, 6)
+    searchResults.innerHTML = matches.length
+      ? matches.map((product) => `<a href="#/product/${product.id}" class="search-result"><span>${esc(product.title)}</span><b>${money(product.price)}</b></a>`).join('')
+      : '<div class="search-empty">No products found</div>'
+    searchResults.hidden = false
+  })
+  searchInput?.addEventListener('focus', () => { if (searchInput.value.trim()) searchInput.dispatchEvent(new Event('input')) })
+  searchResults?.addEventListener('click', () => { searchResults.hidden = true })
 
   $('#btn-bell')?.addEventListener('click', openNotifications)
   $('#btn-user')?.addEventListener('click', openUserMenu)
@@ -128,12 +151,12 @@ function openNotifications() {
   $('#btn-bell').insertAdjacentElement('afterend', wrap)
   wrap.style.top = '54px'
   wrap.querySelector('#read-all')?.addEventListener('click', () => {
-    list.forEach((n) => { n.read = true })
+    list.forEach((n) => { n.read = true; syncNotification(n).catch((error) => console.error('Notification read sync failed:', error)) })
     save(); wrap.remove(); renderHeader(); toast('Notifications cleared')
   })
   wrap.querySelectorAll('[data-noti]').forEach((a) => a.addEventListener('click', () => {
     const n = myNotifications().find((x) => x.id === a.dataset.noti)
-    if (n) { n.read = true; save() }
+    if (n) { n.read = true; save(); syncNotification(n).catch((error) => console.error('Notification read sync failed:', error)); renderHeader() }
     wrap.remove()
   }))
 }
@@ -504,7 +527,9 @@ function titleFor(path) {
 let syncTimer
 window.addEventListener('street-bazar-state-changed', () => {
   clearTimeout(syncTimer)
-  syncTimer = setTimeout(() => syncPush().catch((error) => console.error('Automatic Supabase sync failed:', error)), 700)
+  syncTimer = setTimeout(() => syncPush().catch((error) => {
+    if (!/Session expire ho gayi|Authentication required/i.test(error.message)) console.error('Automatic Supabase sync failed:', error)
+  }), 700)
 })
 
 async function restoreGoogleSession() {
@@ -531,17 +556,10 @@ async function restoreGoogleSession() {
         code_verifier: verifier,
       })
       sessionStorage.removeItem('street-bazar-google-verifier')
-      await syncPull()
-      const existing = state.users.find((user) => user.id === result.user.id)
-      if (existing) Object.assign(existing, result.user)
-      else state.users.push(result.user)
-      state.session = result.user.id
-      setRole(result.user.role)
-      save()
+      applyAuthenticatedUser(result.user)
       const next = sessionStorage.getItem('street-bazar-google-next') || '#/'
       sessionStorage.removeItem('street-bazar-google-next')
       window.history.replaceState({}, document.title, `${location.pathname}${next}`)
-      await renderRoute()
     } catch (error) {
       sessionStorage.removeItem('street-bazar-google-verifier')
       sessionStorage.setItem('street-bazar-google-error', error.message)
@@ -558,35 +576,65 @@ async function restoreGoogleSession() {
   }
   try {
     const result = await authRequest('oauth', { access_token: accessToken })
-    await syncPull()
-    const existing = state.users.find((user) => user.id === result.user.id)
-    if (existing) Object.assign(existing, result.user)
-    else state.users.push(result.user)
-    state.session = result.user.id
-    setRole(result.user.role)
-    save()
+    applyAuthenticatedUser(result.user)
     const next = sessionStorage.getItem('street-bazar-google-next') || '#/'
     sessionStorage.removeItem('street-bazar-google-next')
     window.history.replaceState({}, document.title, `${location.pathname}${next}`)
-    await renderRoute()
   } catch (error) {
-    console.error('Google session restore failed:', error)
+    sessionStorage.setItem('street-bazar-google-error', error.message)
+    window.location.hash = '#/auth'
   }
 }
 
+function applyAuthenticatedUser(user) {
+  const existing = state.users.find((item) => item.id === user.id)
+  if (existing) Object.assign(existing, user)
+  else state.users.push(user)
+  state.session = user.id
+  setRole(user.role)
+  save()
+}
+
+async function restoreStoredSession() {
+  const token = sessionStorage.getItem('street-bazar-access-token') || localStorage.getItem('street-bazar-access-token')
+  if (!token) {
+    state.session = null
+    save()
+    return
+  }
+  const result = await authRequest('oauth', { access_token: token })
+  applyAuthenticatedUser(result.user)
+}
+
 async function boot() {
+  setAuthInitializing(true)
+  $('#loader')?.classList.remove('done')
+  $('#app')?.classList.add('is-booting', 'auth-initializing')
   renderHeader()
   renderFooter()
   renderMobileNav()
   bindGlobals()
   startRouter()
   renderFloatingAIWidget()
-  syncPull().then(() => {
+  try {
+    await restoreGoogleSession()
+    await restoreStoredSession()
+  } catch (error) {
+    console.error('Authentication initialization failed:', error)
+    state.session = null
+    save()
+  }
+  try {
+    await syncPull()
+  } catch (error) {
+    console.error('Initial Supabase data sync failed:', error)
+  } finally {
+    setAuthInitializing(false)
     renderHeader()
     renderFooter()
     renderMobileNav()
-    renderRoute()
-  }).catch((error) => console.error('Initial Supabase sync failed:', error))
+    await renderRoute()
+  }
   const googleError = sessionStorage.getItem('street-bazar-google-error')
   if (googleError) {
     sessionStorage.removeItem('street-bazar-google-error')
@@ -600,9 +648,8 @@ async function boot() {
     app?.classList.remove('is-booting')
     setTimeout(() => loader?.remove(), 400)
   }
-  if (document.readyState === 'complete') setTimeout(hide, 200)
-  else window.addEventListener('load', () => setTimeout(hide, 200))
-  setTimeout(hide, 800)
+  if (document.readyState === 'complete') hide()
+  else window.addEventListener('load', hide, { once: true })
 }
 
 restoreGoogleSession()

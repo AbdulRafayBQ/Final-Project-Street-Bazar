@@ -1,7 +1,7 @@
 /* Street Bazar — Create / Edit Store wizard with live interface preview */
 
 import { icon, esc, money, toast, modal, closeModal, readFile, readImage, themeStyle, spinner } from '../ui.js'
-import { THEME_PRESETS, FONT_PAIRS, STORE_TYPES, CATEGORIES, createStore, updateStore, storeById, currentUser, allCategories, isPakistanPhone } from '../store.js'
+import { THEME_PRESETS, FONT_PAIRS, STORE_TYPES, CATEGORIES, createStore, updateStore, deleteStore, storeById, currentUser, allCategories, isPakistanPhone } from '../store.js'
 import { navigate } from '../router.js'
 import { syncStore } from '../db.js'
 
@@ -14,7 +14,7 @@ function blank() {
     name: '', tagline: '', type: 'home', city: '', address: '', description: '',
     ownerPhone: '', cnic: '', cnicFront: '', cnicBack: '', personalAddress: '',
     logo: '', banner: '', themeId: 'bazaar',
-    theme: { ...THEME_PRESETS[0] },
+    theme: { ...THEME_PRESETS[0], categoryColor: THEME_PRESETS[0].primary, followColor: THEME_PRESETS[0].primary, followTextColor: '#FFFFFF' },
     categories: [], socials: { instagram: '', whatsapp: '', tiktok: '', facebook: '', youtube: '' },
     sale: { text: '', until: '' },
   }
@@ -26,7 +26,7 @@ export async function createStorePage(params) {
     name: editing.name, tagline: editing.tagline, type: editing.type, city: editing.city, address: editing.address,
     description: editing.description, logo: editing.logo, banner: editing.banner,
     ownerPhone: editing.ownerPhone || '', cnic: editing.cnic || '', cnicFront: editing.cnicFront || '', cnicBack: editing.cnicBack || '', personalAddress: editing.personalAddress || '',
-    themeId: editing.theme?.id || 'bazaar', theme: { ...editing.theme },
+    themeId: editing.theme?.id || 'bazaar', theme: { categoryColor: editing.theme?.categoryColor || editing.theme?.primary || '#16110D', followColor: editing.theme?.followColor || editing.theme?.primary || '#16110D', followTextColor: editing.theme?.followTextColor || '#FFFFFF', ...editing.theme },
     categories: [...(editing.categories || [])], socials: { instagram: '', whatsapp: '', tiktok: '', facebook: '', youtube: '', ...(editing.socials || {}) },
     sale: editing.sale ? { text: editing.sale.text, until: new Date(editing.sale.until).toISOString().slice(0, 10) } : { text: '', until: '' },
   } : blank()
@@ -48,7 +48,6 @@ export async function createStorePage(params) {
     <div class="steps" style="margin-top:26px" data-steps>
       ${STEPS.map((s, i) => `<div class="step ${i === 0 ? 'active' : ''}" data-step="${i}"><span class="num">${i + 1}</span>${s}</div>${i < STEPS.length - 1 ? '<span class="step-line"></span>' : ''}`).join('')}
     </div>
-
     <div style="display:grid;grid-template-columns:1.05fr .95fr;gap:26px;align-items:start" class="cs-grid">
       <div class="panel" data-form></div>
       <div style="position:sticky;top:calc(var(--header-h) + 16px)">
@@ -74,7 +73,7 @@ createStorePage.mount = (params, query, root) => {
     const pair = FONT_PAIRS.find((f) => f.id === t.fontPair) || FONT_PAIRS[0]
     preview.innerHTML = `
       <div class="store-page ${t.dark ? 'dark' : ''}" style="margin:0;border-radius:0;border:0;box-shadow:none;${themeStyle(t)};--st-d:${pair.d};--st-b:${pair.b}">
-        <div class="store-hero" style="min-height:150px">
+        <div class="store-hero" style="min-height:${Number(t.coverHeight || 230)}px">
           <img class="bg" src="${esc(draft.banner || './images/banner-fashion.png')}" alt="" onerror="this.src='./images/banner-fashion.png'">
           <div class="store-hero-in" style="padding:16px">
             <span class="store-logo" style="width:60px;height:60px;font-size:20px">${draft.logo ? `<img src="${esc(draft.logo)}" alt="">` : esc((draft.name || 'SB').slice(0, 2).toUpperCase())}</span>
@@ -89,7 +88,7 @@ createStorePage.mount = (params, query, root) => {
         </div>
         <div style="padding:14px">
           <div class="wrap-flex" style="margin-bottom:12px">
-            ${(draft.categories.length ? draft.categories : ['Your category']).slice(0, 4).map((c) => `<span class="chip static tiny">${esc(c)}</span>`).join('')}
+            ${(draft.categories.length ? draft.categories : ['Your category']).slice(0, 4).map((c) => `<span class="chip static tiny" style="background:${esc(t.categoryColor || t.primary)};border-color:${esc(t.categoryColor || t.primary)};color:#fff">${esc(c)}</span>`).join('')}
           </div>
           <div class="grid grid-auto-sm">
             ${['./images/p-kurta.png', './images/p-cover.png', './images/p-chai.png'].map((img, i) => `
@@ -187,6 +186,9 @@ createStorePage.mount = (params, query, root) => {
         <div class="field"><span class="label">Primary colour</span><input type="color" data-color="primary" value="${draft.theme.primary}" style="width:100%;height:46px;border-radius:12px;border:1px solid var(--line);background:#fff"></div>
         <div class="field"><span class="label">Accent colour</span><input type="color" data-color="accent" value="${draft.theme.accent}" style="width:100%;height:46px;border-radius:12px;border:1px solid var(--line);background:#fff"></div>
         <div class="field"><span class="label">Background</span><input type="color" data-color="bg" value="${draft.theme.bg}" style="width:100%;height:46px;border-radius:12px;border:1px solid var(--line);background:#fff"></div>
+        <div class="field"><span class="label">Category colour</span><input type="color" data-color="categoryColor" value="${draft.theme.categoryColor || draft.theme.primary}" style="width:100%;height:46px;border-radius:12px;border:1px solid var(--line);background:#fff"></div>
+        <div class="field"><span class="label">Follow button</span><input type="color" data-color="followColor" value="${draft.theme.followColor || draft.theme.primary}" style="width:100%;height:46px;border-radius:12px;border:1px solid var(--line);background:#fff"></div>
+        <div class="field"><span class="label">Follow text</span><input type="color" data-color="followTextColor" value="${draft.theme.followTextColor || '#FFFFFF'}" style="width:100%;height:46px;border-radius:12px;border:1px solid var(--line);background:#fff"></div>
       </div>
        <div class="field" style="margin-top:16px"><span class="label">Font pair</span>
         <div class="grid grid-2" style="gap:10px;margin-top:8px">
@@ -203,6 +205,9 @@ createStorePage.mount = (params, query, root) => {
        <div class="grid grid-2" style="gap:14px;margin-top:16px">
         <div class="field"><span class="label">Corner style — <span data-radius-val>${draft.theme.radius}px</span></span>
           <input type="range" min="4" max="28" value="${draft.theme.radius}" data-radius style="width:100%;accent-color:var(--marigold)">
+        </div>
+        <div class="field"><span class="label">Cover height — <span data-cover-height-val>${draft.theme.coverHeight || 230}px</span></span>
+          <input type="range" min="180" max="380" value="${draft.theme.coverHeight || 230}" data-cover-height style="width:100%;accent-color:var(--marigold)">
         </div>
       </div>
       <label class="switch" style="margin-top:16px"><input type="checkbox" data-dark ${draft.theme.dark ? 'checked' : ''}><span class="track"></span><span><b>Dark store theme</b><br><span class="tiny muted">Raat ke vibe ke liye — text automatically adjust hota hai.</span></span></label>`,
@@ -268,6 +273,11 @@ createStorePage.mount = (params, query, root) => {
     stepEls.forEach((el, i) => {
       el.classList.toggle('active', i === step)
       el.classList.toggle('done', i < step)
+    })
+    form.querySelector('[data-cover-height]')?.addEventListener('input', (e) => {
+      draft.theme.coverHeight = Number(e.target.value)
+      form.querySelector('[data-cover-height-val]').textContent = e.target.value + 'px'
+      renderPreview()
     })
     bindForm()
     form.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
@@ -437,7 +447,13 @@ createStorePage.mount = (params, query, root) => {
       navigate('#/store/' + storeById(params.id).slug)
     } else {
       const s = createStore(data)
-      try { await syncStore(s) } catch (error) { done(); toast('Store request submit nahi ho saki: ' + error.message, 'err'); return }
+      try { await syncStore(s) } catch (error) {
+        deleteStore(s.id)
+        done()
+        toast('Store request submit nahi ho saki: ' + error.message, 'err')
+        if (/Session expire|Authentication required/i.test(error.message)) navigate('#/auth?redirect=%23%2Fcreate-store')
+        return
+      }
       done()
       toast('Store created. Wait for approval from Street Bazar, then your store will go live.', 'ok')
       navigate('#/store/' + s.slug)

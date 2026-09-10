@@ -21,7 +21,7 @@ const hideInternalDetails = (text) => {
 }
 
 /* ---------------- real API ---------------- */
-async function api(system, user, maxTokens = 800, image = '') {
+async function api(system, user, maxTokens = 450, image = '') {
   const res = await fetch('/api/ai', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -32,7 +32,7 @@ async function api(system, user, maxTokens = 800, image = '') {
   return data.text || ''
 }
 
-async function think(kind, system, offline, label = '', maxTokens = 800) {
+async function think(kind, system, offline, label = '', maxTokens = 450) {
   logAI(kind, label || kind)
   if (isAIConnected()) {
     try {
@@ -193,7 +193,7 @@ export async function genProductCopy({ rough, category, storeName, tone, price, 
       const tags = genTags({ title, category })
       return `TITLE: ${title}\nDESCRIPTION: ${desc}\nTAGS: ${tags.join(', ')}`
     },
-    rough || image
+    rough || image, 550
   )
   const title = /TITLE:\s*(.+)/i.exec(result.text)?.[1]?.trim() || genTitle({ seed: rough, category })
   const description = /DESCRIPTION:\s*([\s\S]*?)(?=\nTAGS:|$)/i.exec(result.text)?.[1]?.trim() || genDescription({ title, category, storeName, tone, price })

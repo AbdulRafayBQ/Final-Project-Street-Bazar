@@ -6,7 +6,8 @@ import { storeBySlug, storeProducts, storeReviews, currentUser, myStores, isFoll
 import { syncThread, syncNotification } from '../db.js'
 
 export async function storePage(params) {
-  const s = storeBySlug(params.slug) || null
+  const s = storeBySlug(params.slug)
+  if (s?.status === 'deleted') return `<section class="sec"><div class="wrap"><div class="empty"><h3 class="h3">Store nahi mila</h3><p class="muted">Ye store ab available nahi.</p><div style="margin-top:16px"><a class="btn btn-primary" href="#/dukanien"><span>Explore stores</span></a></div></div></div></section>`
   if (!s) return `<section class="sec"><div class="wrap"><div class="empty"><h3 class="h3">Store nahi mila</h3><p class="muted">Ye store exist nahi karta ya hata diya gaya hai.</p><div style="margin-top:16px"><a class="btn btn-primary" href="#/explore"><span>Explore stores</span></a></div></div></div></section>`
 
   const u = currentUser()
@@ -24,7 +25,7 @@ export async function storePage(params) {
   return `
   <div class="wrap">
     <div class="store-page ${s.theme?.dark ? 'dark' : ''}" style="${themeStyle(s.theme)}${fontCSS}">
-      <div class="store-hero">
+      <div class="store-hero" style="min-height:${Number(s.theme?.coverHeight || 230)}px">
         <img class="bg" src="${esc(s.banner || './images/banner-fashion.png')}" alt="${esc(s.name)}" onerror="this.src='./images/banner-fashion.png'">
         <div class="store-hero-in">
           <span class="store-logo">${s.logo ? `<img src="${esc(s.logo)}" alt="">` : esc(s.name.slice(0, 2).toUpperCase())}</span>
@@ -44,7 +45,7 @@ export async function storePage(params) {
             </div>
           </div>
           <div class="row" style="gap:9px;flex-wrap:wrap">
-            <button class="btn ${following ? 'btn-ghost' : 'btn-grad'} follow-btn ${following ? 'on' : ''}" data-follow="${s.id}">${following ? icon('check', '', 16) + ' Following' : icon('plus', '', 16) + ' <span>Follow store</span>'}</button>
+            <button class="btn ${following ? 'btn-ghost' : 'follow-btn'} follow-btn ${following ? 'on' : ''}" data-follow="${s.id}" style="${following ? '' : `background:${esc(s.theme?.followColor || s.theme?.primary || '#16110D')};color:${esc(s.theme?.followTextColor || '#fff')};border-color:${esc(s.theme?.followColor || s.theme?.primary || '#16110D')}`}">${following ? icon('check', '', 16) + ' Following' : icon('plus', '', 16) + ' <span>Follow store</span>'}</button>
             ${isOwner ? `
               <a class="btn btn-ghost" href="#/edit-store/${s.id}">${icon('edit', '', 15)} Edit</a>
               <a class="btn btn-ghost" href="#/add-product/${s.id}">${icon('plus', '', 15)} Product</a>
@@ -63,8 +64,8 @@ export async function storePage(params) {
       <div style="padding:clamp(16px,3vw,26px)">
         <div data-panel="products">
           ${s.categories?.length ? `<div class="chip-row" style="margin-bottom:18px" data-store-cats>
-            <button class="chip active" data-scat="">All</button>
-            ${s.categories.map((c) => `<button class="chip" data-scat="${esc(c)}">${esc(c)}</button>`).join('')}
+            <button class="chip active" data-scat="" aria-pressed="true">All <span class="cat-check">${icon('check', '', 12)}</span></button>
+            ${s.categories.map((c) => `<button class="chip" data-scat="${esc(c)}" aria-pressed="false" style="background:${esc(s.theme?.categoryColor || s.theme?.primary || '#16110D')};border-color:${esc(s.theme?.categoryColor || s.theme?.primary || '#16110D')};color:#fff">${esc(c)} <span class="cat-check">${icon('check', '', 12)}</span></button>`).join('')}
           </div>` : ''}
           <div class="grid grid-auto" data-product-grid>
             ${products.length ? products.map(productCard).join('') : `<div class="empty" style="grid-column:1/-1"><div class="ic">${icon('box', '', 28)}</div><h3 class="h3">Abhi koi product nahi</h3><p class="muted">${isOwner ? 'Pehla product add karein — AI se description bhi likhwa sakte hain.' : 'Jaldi hi kuch naya aayega. Follow kar lein!'}</p>${isOwner ? `<div style="margin-top:16px"><a class="btn btn-primary" href="#/add-product/${s.id}"><span>Add product</span></a></div>` : ''}</div>`}
@@ -153,7 +154,11 @@ storePage.mount = (params, query, root) => {
   }
   reveal(grid)
   root.querySelectorAll('[data-store-cats] .chip').forEach((b) => b.addEventListener('click', () => {
-    root.querySelectorAll('[data-store-cats] .chip').forEach((x) => x.classList.toggle('active', x === b))
+    root.querySelectorAll('[data-store-cats] .chip').forEach((x) => {
+      const selected = x === b
+      x.classList.toggle('active', selected)
+      x.setAttribute('aria-pressed', String(selected))
+    })
     const cat = String(b.dataset.scat || '').trim().toLowerCase()
     const list = storeProducts(s.id).filter((p) => !cat || (p.categories || []).some((value) => String(value).trim().toLowerCase() === cat))
     renderProducts(list)

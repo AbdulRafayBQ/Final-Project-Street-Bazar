@@ -6,7 +6,7 @@ import { assistantReply } from '../ai.js'
 export async function home() {
   const stores = liveStores()
   const sales = saleStores()
-  const saleProducts = state.products.filter((p) => p.status !== 'hidden' && p.compareAt && p.compareAt > p.price && storeById(p.store)?.status === 'live').slice(0, 6)
+  const saleProducts = state.products.filter((p) => p.status === 'active' && p.sale?.temporary && p.sale.until > Date.now() && p.compareAt > p.price && storeById(p.store)?.status === 'live').sort(() => Math.random() - 0.5).slice(0, 6)
 
   const actionCards = [
     { title: 'Start Your Store', desc: 'Create your online store in just 5 minutes', icon: 'store', color: '#EF4444', bg: '#FEE2E2', href: '#/create-store' },
@@ -194,11 +194,11 @@ home.mount = (p, q, root) => {
   if (!carousel) return
   const storeSlides = saleStores().map((store) => ({ kind: 'store', store }))
   const productSlides = state.products
-    .filter((product) => product.status !== 'hidden' && product.compareAt && product.compareAt > product.price && storeById(product.store)?.status === 'live')
+    .filter((product) => product.status === 'active' && product.sale?.temporary && product.sale.until > Date.now() && product.compareAt > product.price && storeById(product.store)?.status === 'live')
     .map((product) => ({ kind: 'product', product, store: storeById(product.store) }))
   const slides = [...storeSlides, ...productSlides]
   if (!slides.length) return
-  let index = 0
+  let index = Math.floor(Math.random() * slides.length)
   const paint = () => {
     const slide = slides[index % slides.length]
     const isProduct = slide.kind === 'product'
@@ -221,7 +221,10 @@ home.mount = (p, q, root) => {
     index += 1
   }
   paint()
-  root._saleTimer = setInterval(paint, 4500)
+  root._saleTimer = setInterval(() => {
+    index = (index + 1 + Math.floor(Math.random() * Math.max(1, slides.length - 1))) % slides.length
+    paint()
+  }, 4500)
 }
 
 export function openAIScan() {

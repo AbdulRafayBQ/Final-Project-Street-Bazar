@@ -28,7 +28,7 @@ alter table stores add column if not exists cnic_back text;
 create table if not exists products (
   id text primary key, store_id text references stores(id), title text, description text,
   price numeric, compare_at numeric, media jsonb, categories text[], tags text[],
-  stock int default 0, sku text, customizable jsonb, wholesale jsonb,
+  stock int default 0, sku text, sale jsonb, customizable jsonb, wholesale jsonb,
   delivery_charge numeric default 0, home_delivery_charge numeric default 0, outside_delivery_charge numeric default 0,
   sales int default 0, status text default 'active', created_at timestamptz default now()
 );
@@ -56,10 +56,16 @@ create table if not exists warehouse_items (
  updated_at timestamptz default now()
 );
 alter table warehouse_items add column if not exists image_url text;
+alter table products add column if not exists sale jsonb;
 create table if not exists app_state (
   key text primary key,
   payload jsonb not null,
   updated_at timestamptz default now()
+);
+create table if not exists deletion_logs (
+  id uuid primary key default gen_random_uuid(), item_type text not null, item_id text not null,
+  item_name text not null, owner_id uuid, reason text not null, deleted_by uuid,
+  deleted_at timestamptz default now()
 );
 
 alter table users enable row level security;
@@ -89,7 +95,7 @@ const controller = new AbortController()
 const timeout = setTimeout(() => controller.abort(), 30000)
 let res
 try {
-  const token = sessionStorage.getItem('street-bazar-access-token')
+  const token = sessionStorage.getItem('street-bazar-access-token') || localStorage.getItem('street-bazar-access-token')
   res = await fetch(path, { ...options, signal: controller.signal, headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}), ...(options.headers || {}) } })
 } catch (error) {
   if (error.name === 'AbortError') throw new Error('Server response timed out. Please try again.')
@@ -98,18 +104,34 @@ try {
   clearTimeout(timeout)
 }
 const data = await res.json().catch(() => ({}))
-if (!res.ok) throw new Error(data.error || `API ${res.status}`)
+if (!res.ok) {
+  if (res.status === 401) {
+    sessionStorage.removeItem('street-bazar-access-token')
+    localStorage.removeItem('street-bazar-access-token')
+    state.session = null
+    save()
+    throw new Error('Session expire ho gayi. Dobara login karein.')
+  }
+  const error = new Error(data.error || `API ${res.status}`)
+  if (data.code) error.code = data.code
+  throw error
+}
 return data
 }
 
 export async function authRequest(action, payload) {
 const result = await api('/api/auth', { method: 'POST', body: JSON.stringify({ action, ...payload }) })
-if (result.access_token) sessionStorage.setItem('street-bazar-access-token', result.access_token)
+if (result.access_token) {
+  sessionStorage.setItem('street-bazar-access-token', result.access_token)
+  localStorage.setItem('street-bazar-access-token', result.access_token)
+}
 return result
 }
 
 export async function syncPush() {
 if (syncingPromise) return syncingPromise
+const token = sessionStorage.getItem('street-bazar-access-token') || localStorage.getItem('street-bazar-access-token')
+if (!state.session || !token) return
 syncing = true
 syncingPromise = (async () => {
  try {
@@ -128,7 +150,7 @@ syncingPromise = (async () => {
       ...(logo && !String(logo).startsWith('data:') ? { logo } : {}),
       ...(banner && !String(banner).startsWith('data:') ? { banner } : {}),
     })),
-    products: products.map((product) => ({
+    products: products.filter((product) => !(product.media || []).some((media) => String(media.url || '').startsWith('data:'))).map((product) => ({
       ...product,
       media: (product.media || []).map(({ url, ...media }) => ({
         ...media,
@@ -172,6 +194,10 @@ export async function syncProduct(product) {
   save()
 }
 
+export async function syncOrder(order) {
+  return api('/api/data', { method: 'POST', body: JSON.stringify({ action: 'order', order }) })
+}
+
 export async function syncStore(store) {
   await api('/api/data', { method: 'POST', body: JSON.stringify({ action: 'store', store }) })
   state.settings.lastSync = Date.now()
@@ -192,6 +218,18 @@ export async function syncNotification(notification) {
 
 export async function deleteRemote(table, id) {
   await api('/api/data', { method: 'DELETE', body: JSON.stringify({ table, id }) })
+}
+
+export async function adminStatus(itemType, id, status) {
+  return api('/api/data', { method: 'POST', body: JSON.stringify({ action: 'admin-status', itemType, id, status }) })
+}
+
+export async function adminDelete(itemType, id, reason) {
+  return api('/api/data', { method: 'POST', body: JSON.stringify({ action: 'admin-delete', itemType, id, reason }) })
+}
+
+export async function ownerDelete(itemType, id) {
+  return api('/api/data', { method: 'POST', body: JSON.stringify({ action: 'owner-delete', itemType, id }) })
 }
 
 export async function syncPull() {

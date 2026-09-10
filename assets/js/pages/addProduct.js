@@ -131,6 +131,7 @@ addProductPage.mount = (params, query, root) => {
   const editing = params.pid ? productById(params.pid) : null
   const warehouseDraft = query.warehouseId ? state.warehouse?.find((item) => item.id === query.warehouseId) : null
   let media = editing?.media ? [...editing.media.map((m) => ({ ...m }))] : warehouseDraft?.image ? [{ type: 'image', url: warehouseDraft.image }] : []
+  let saleTemporary = editing?.sale?.temporary !== false
   let options = editing?.customizable?.options ? JSON.parse(JSON.stringify(editing.customizable.options)) : [{ name: 'Size', choices: [{ label: 'M', delta: 0 }, { label: 'L', delta: 0 }] }]
   let tiers = editing?.wholesale?.tiers ? [...editing.wholesale.tiers] : [{ qty: 12, price: 0 }]
   if (warehouseDraft) {
@@ -140,6 +141,14 @@ addProductPage.mount = (params, query, root) => {
   }
 
   bindMediaPicker(root.querySelector('#p-media'), media, (m) => { media = m; paintPreview() })
+  const compareInput = root.querySelector('#p-compare')
+  const saleOptions = root.querySelector('#sale-options')
+  compareInput?.addEventListener('input', () => { saleOptions.hidden = !(Number(compareInput.value) > Number(root.querySelector('#p-price').value)) })
+  root.querySelectorAll('[data-sale-mode]').forEach((button) => button.addEventListener('click', () => {
+    saleTemporary = button.dataset.saleMode === 'temporary'
+    root.querySelectorAll('[data-sale-mode]').forEach((item) => item.classList.toggle('active', item === button))
+    saleOptions.querySelector('[data-sale-until-wrap]').hidden = !saleTemporary
+  }))
 
   /* ---- AI ---- */
   const aiOut = root.querySelector('#ai-out')
@@ -359,6 +368,7 @@ addProductPage.mount = (params, query, root) => {
       categories: [category],
       tags: root.querySelector('#p-tags').value.split(',').map((t) => t.trim()).filter(Boolean),
       media: media.length ? media : [{ type: 'image', url: './images/p-kurta.png' }],
+      sale: compareAt > price ? { temporary: saleTemporary, until: saleTemporary ? (root.querySelector('#p-sale-until').value ? new Date(root.querySelector('#p-sale-until').value).getTime() : Date.now() + 7 * 86400000) : null } : null,
       wholesale: { on: wsOn.checked, tiers: wsOn.checked ? tiers : [] },
       deliveryCharge: Number(root.querySelector('#p-outside-delivery').value) || 0,
       homeDeliveryCharge: Number(root.querySelector('#p-home-delivery').value) || 0,

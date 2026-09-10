@@ -6,10 +6,52 @@ const authKey = () => process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPAB
 
 const googleAccountFor = async (email) => {
   if (!email || !process.env.SUPABASE_SERVICE_ROLE_KEY) return false
-  const users = await supabaseRequest(`/auth/v1/admin/users?filter=${encodeURIComponent(email)}`, {}, process.env.SUPABASE_SERVICE_ROLE_KEY)
-  const list = Array.isArray(users) ? users : users.users || []
-  const match = list.find((item) => String(item.email || '').toLowerCase() === email.toLowerCase())
-  return Boolean(match?.identities?.some((identity) => identity.provider === 'google'))
+  try {
+    const profiles = await supabaseRequest(`/rest/v1/users?select=id,email&email=eq.${encodeURIComponent(email)}&limit=1`, {}, process.env.SUPABASE_SERVICE_ROLE_KEY)
+    const profileId = profiles[0]?.id
+    if (profileId) {
+      const user = await supabaseRequest(`/auth/v1/admin/users/${encodeURIComponent(profileId)}`, {}, process.env.SUPABASE_SERVICE_ROLE_KEY)
+      const providers = [
+        ...(user.identities || []).map((identity) => identity.provider),
+        user.app_metadata?.provider,
+        ...(user.app_metadata?.providers || []),
+      ].filter(Boolean)
+      if (providers.some((provider) => String(provider).toLowerCase() === 'google')) return true
+    }
+  } catch {
+    // Fall through to the paginated Auth admin lookup when a profile is stale.
+  }
+  for (let page = 1; page <= 20; page += 1) {
+    const users = await supabaseRequest(`/auth/v1/admin/users?page=${page}&per_page=1000`, {}, process.env.SUPABASE_SERVICE_ROLE_KEY)
+    const list = Array.isArray(users) ? users : users.users || []
+    const match = list.find((item) => String(item.email || '').toLowerCase() === email.toLowerCase())
+    if (match) {
+      const providers = [
+        ...(match.identities || []).map((identity) => identity.provider),
+        match.app_metadata?.provider,
+        ...(match.app_metadata?.providers || []),
+      ].filter(Boolean)
+      return providers.some((provider) => String(provider).toLowerCase() === 'google')
+    }
+    if (list.length < 1000) break
+  }
+  return false
+}
+const googleConflict = (res) => json(res, 409, {
+  code: 'google_email_conflict',
+  error: 'This email is already registered with Google. Please continue with Google to log in.',
+})
+const registeredConflict = (res) => json(res, 409, {
+  code: 'email_already_registered',
+  error: 'This email is already registered. Please sign in or use Forgot password.',
+})
+const existingProfileFor = async (email) => {
+  const rows = await supabaseRequest(`/rest/v1/users?select=id,email&email=eq.${encodeURIComponent(email)}&limit=1`)
+  return rows[0] || null
+}
+const removeAuthUser = async (id) => {
+  if (!id || !process.env.SUPABASE_SERVICE_ROLE_KEY) return
+  await supabaseRequest(`/auth/v1/admin/users/${encodeURIComponent(id)}`, { method: 'DELETE' }, process.env.SUPABASE_SERVICE_ROLE_KEY)
 }
 
 const supabaseRequest = async (path, options = {}, requestKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_ANON_KEY || process.env.SUPABASE_PUBLISHABLE_KEY) => {
@@ -42,8 +84,8 @@ export default async function handler(req, res) {
   try {
     const { action, name, password, token, access_token, code, code_verifier, type = 'signup', role = 'customer' } = req.body || {}
     const normalizedEmail = String(req.body?.email || '').trim().toLowerCase()
-    if (['signup', 'login'].includes(action) && await googleAccountFor(normalizedEmail)) {
-      return json(res, 409, { error: 'Is email par Google account bana hua hai. Sirf Continue with Google use karein.' })
+    if (action === 'signup' && await googleAccountFor(normalizedEmail)) {
+      return googleConflict(res)
     }
     if (action === 'oauth' && !access_token) return json(res, 400, { error: 'Google session is missing' })
     if (action === 'oauth_code' && (!code || !code_verifier)) return json(res, 400, { error: 'Google verification is incomplete' })
@@ -90,10 +132,16 @@ export default async function handler(req, res) {
     } else if (action === 'signup') {
       auth = await supabaseRequest('/auth/v1/signup', {
         method: 'POST',
-        body: JSON.stringify({ email: normalizedEmail, password, data: { name, role } }),
+        body: JSON.stringify({ email: normalizedEmail, password, data: { name, role: 'customer' } }),
       }, authKey())
+      if (auth.user?.identities?.some((identity) => identity.provider === 'google')) {
+        return googleConflict(res)
+      }
       if (auth.user && Array.isArray(auth.user.identities) && auth.user.identities.length === 0) {
-        return json(res, 409, { error: 'Is email par account pehle se registered hai. Sign in ya Forgot password use karein.' })
+        return (await googleAccountFor(normalizedEmail)) ? googleConflict(res) : registeredConflict(res)
+      }
+      if (auth.user?.email_confirmed_at && !auth.access_token) {
+        return (await googleAccountFor(normalizedEmail)) ? googleConflict(res) : registeredConflict(res)
       }
     } else if (action === 'login') {
       auth = await supabaseRequest('/auth/v1/token?grant_type=password', {
@@ -109,29 +157,59 @@ export default async function handler(req, res) {
       if (action === 'signup') return json(res, 200, { pending_verification: true, email: normalizedEmail, name, role })
       throw new Error(`Supabase returned no user (${Object.keys(auth || {}).join(', ') || 'empty response'}). This email may already be registered, or the Auth anon key/project URL do not belong to the same Supabase project.`)
     }
+    if (['oauth', 'oauth_code'].includes(action)) {
+      const existingProfile = await existingProfileFor(normalizedEmail)
+      if (existingProfile && existingProfile.id !== user.id) {
+        try {
+          await removeAuthUser(user.id)
+        } catch (cleanupError) {
+          console.error('Conflicting OAuth user cleanup failed:', cleanupError.message)
+        }
+        return json(res, 409, {
+          code: 'email_account_conflict',
+          error: 'This email is already registered with email and password. Please sign in with your password instead.',
+        })
+      }
+    }
     if (action === 'signup' && (!auth.access_token || !user.email_confirmed_at)) {
       return json(res, 200, { pending_verification: true, email: normalizedEmail, name, role })
     }
     const adminEmails = (process.env.ADMIN_EMAILS || '').split(',').map((item) => item.trim().toLowerCase()).filter(Boolean)
-    const assignedRole = adminEmails.includes(String(user.email || normalizedEmail).toLowerCase()) ? 'admin' : (role === 'owner' ? 'owner' : 'customer')
+    const assignedRole = adminEmails.includes(String(user.email || normalizedEmail).toLowerCase()) ? 'admin' : 'customer'
+    const existingProfileRows = await supabaseRequest(`/rest/v1/users?select=id,name,email,role,avatar&email=eq.${encodeURIComponent(user.email || normalizedEmail)}&limit=1`)
+    const existingProfile = existingProfileRows[0]
     const profile = {
-      id: user.id,
-      name: name || user.user_metadata?.name || normalizedEmail.split('@')[0],
+      id: existingProfile?.id || user.id,
+      name: existingProfile?.name || name || user.user_metadata?.name || normalizedEmail.split('@')[0],
       email: user.email,
-      role: assignedRole,
-      avatar: user.user_metadata?.avatar || '',
+      role: existingProfile?.role || assignedRole,
+      avatar: existingProfile?.avatar || user.user_metadata?.avatar || '',
       created_at: user.created_at,
     }
     let profileSaved = false
-    try {
-      await supabaseRequest('/rest/v1/users?on_conflict=id', {
-        method: 'POST',
-        headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
-        body: JSON.stringify(profile),
-      })
+    if (existingProfile) {
       profileSaved = true
-    } catch (profileError) {
-      console.error('Supabase profile write failed after successful auth:', profileError.message)
+    } else {
+      try {
+        await supabaseRequest('/rest/v1/users?on_conflict=email', {
+          method: 'POST',
+          headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
+          body: JSON.stringify(profile),
+        })
+        profileSaved = true
+      } catch (profileError) {
+        // If the unique constraint still fires (e.g. a race), try an upsert via PATCH on the email match.
+        try {
+          await supabaseRequest(`/rest/v1/users?email=eq.${encodeURIComponent(profile.email)}`, {
+            method: 'PATCH',
+            headers: { Prefer: 'return=minimal' },
+            body: JSON.stringify(profile),
+          })
+          profileSaved = true
+        } catch (patchError) {
+          console.error('Supabase profile PATCH fallback failed:', patchError.message)
+        }
+      }
     }
     return json(res, 200, { user: profile, access_token: auth.access_token || null, profile_saved: profileSaved })
   } catch (error) {

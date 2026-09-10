@@ -47,10 +47,11 @@ create table if not exists products (
   id text primary key, store_id text references stores(id), title text,
   description text, price numeric, compare_at numeric, media jsonb,
   categories text[], tags text[], stock int default 0, sku text,
-  customizable jsonb, wholesale jsonb, delivery_charge numeric default 0, sales int default 0,
+  sale jsonb, customizable jsonb, wholesale jsonb, delivery_charge numeric default 0, sales int default 0,
   status text default 'active', created_at timestamptz default now()
 );
 alter table products add column if not exists delivery_charge numeric default 0;
+alter table products add column if not exists sale jsonb;
 
 create table if not exists reviews (
   id text primary key, product_id text, store_id text, user_id uuid references users(id),
@@ -114,6 +115,17 @@ create table if not exists app_state (
   updated_at timestamptz default now()
 );
 
+create table if not exists deletion_logs (
+  id uuid primary key default gen_random_uuid(),
+  item_type text not null,
+  item_id text not null,
+  item_name text not null,
+  owner_id uuid references users(id),
+  reason text not null,
+  deleted_by uuid references users(id),
+  deleted_at timestamptz default now()
+);
+
 alter table users enable row level security;
 alter table profiles enable row level security;
 alter table stores enable row level security;
@@ -126,6 +138,7 @@ alter table cart_items enable row level security;
 alter table saved_products enable row level security;
 alter table warehouse_items enable row level security;
 alter table app_state enable row level security;
+alter table deletion_logs enable row level security;
 
 -- Optional one-time fresh-start reset. Run manually in Supabase SQL Editor.
 -- This removes marketplace data but keeps authentication accounts.

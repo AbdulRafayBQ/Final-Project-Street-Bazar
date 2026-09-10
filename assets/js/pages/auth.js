@@ -114,33 +114,23 @@ authPage.mount = (params, query, root) => {
         <div class="field"><span class="label">Email</span><input class="input" id="au-email" type="email" placeholder="you@email.com"></div>
         <div class="field"><span class="label">Password</span><div class="password-wrap"><input class="input" id="au-pass" type="password" placeholder="6+ characters"><button type="button" class="password-toggle" data-password-toggle>Show</button></div></div>
         <label class="terms-check"><input type="checkbox" id="au-terms"> <span>I agree to the <a href="#/terms">Terms & Conditions</a> and Privacy Policy.</span></label>
-        <div class="field"><span class="label">I am joining as</span>
-          <div class="seg" style="width:100%" data-role>
-            <button class="active" data-role-v="customer" style="flex:1">${icon('user', '', 14)} Customer</button>
-            <button data-role-v="owner" style="flex:1">${icon('store', '', 14)} Store owner</button>
-          </div>
-        </div>
         <button class="btn btn-grad btn-lg btn-block" id="au-go"><span>Create account</span> ${icon('arrow', '', 16)}</button>
         <button class="btn btn-ghost btn-lg btn-block" data-google-auth>${icon('google', '', 17)} Continue with Google</button>
       </div>`,
   }
 
-  let role = 'customer'
   let pendingSignup = null
   const paint = () => {
     body.innerHTML = pendingSignup
       ? `<h2 class="h3">Verify your email</h2><p class="muted small" style="margin:8px 0 18px">Email par aaya verification code enter karein (${esc(pendingSignup.email)}).</p><div class="stack"><input class="input" id="au-code" inputmode="numeric" pattern="[0-9]*" maxlength="10" placeholder="Verification code"><button class="btn btn-grad btn-lg btn-block" id="au-verify">Verify & continue</button><button class="btn btn-ghost" id="au-back">Back</button></div>`
       : forms[mode]()
     root.querySelectorAll('[data-auth-tabs] button').forEach((b) => b.classList.toggle('active', b.dataset.mode === mode))
-    root.querySelectorAll('[data-role] button').forEach((b) => b.classList.toggle('active', b.dataset.roleV === role))
-    root.querySelectorAll('[data-role] button').forEach((b) => b.addEventListener('click', () => { role = b.dataset.roleV; paint() }))
     body.querySelector('[data-password-toggle]')?.addEventListener('click', (e) => {
       const input = body.querySelector('#au-pass')
       input.type = input.type === 'password' ? 'text' : 'password'
       e.currentTarget.textContent = input.type === 'password' ? 'Show' : 'Hide'
     })
-    body.querySelector('[data-google-auth], #google-auth')?.addEventListener('click', async (event) => {
-      const button = event.currentTarget
+    const continueWithGoogle = async (button) => {
       button.disabled = true
       try {
         const oauthRedirect = `${location.origin}${location.pathname}`
@@ -155,7 +145,8 @@ authPage.mount = (params, query, root) => {
         button.disabled = false
         toast(error.message, 'err')
       }
-    })
+    }
+    body.querySelector('[data-google-auth], #google-auth')?.addEventListener('click', (event) => continueWithGoogle(event.currentTarget))
     body.querySelector('#au-verify')?.addEventListener('click', async (e) => {
       const btn = spinner(e.currentTarget)
       try {
@@ -224,9 +215,9 @@ authPage.mount = (params, query, root) => {
           if (!name) throw new Error('Apna naam likhein')
           if (pass.length < 6) throw new Error('Password kam se kam 6 characters ka ho')
           if (!body.querySelector('#au-terms').checked) throw new Error('Terms & Conditions accept karein')
-          const result = await authRequest('signup', { name, email, password: pass, role })
+          const result = await authRequest('signup', { name, email, password: pass })
           if (result.pending_verification) {
-            pendingSignup = { email, name, role, password: pass }
+            pendingSignup = { email, name, password: pass }
             btn(); paint(); toast('Verification code email par bhej diya gaya', 'ok'); return
           }
           const u = result.user
@@ -236,11 +227,16 @@ authPage.mount = (params, query, root) => {
           state.session = u.id
           save()
           btn(); toast('Account ban gaya 🎉', 'ok')
-          if (role === 'owner') { navigate('#/create-store'); return }
+
         }
         navigate(redirect)
       } catch (err) {
-        btn(); toast(err.message, 'err')
+        btn()
+        if (err.code === 'google_email_conflict') {
+          body.insertAdjacentHTML('afterbegin', `<div class="panel" data-google-conflict style="margin-bottom:16px;border-color:var(--accent)"><b>This email is already registered with Google.</b><p class="small muted" style="margin-top:6px">Please continue with Google to log in. No duplicate account was created.</p><button class="btn btn-grad btn-block" data-google-conflict-login style="margin-top:12px">${icon('google', '', 16)} Continue with Google</button></div>`)
+          body.querySelector('[data-google-conflict-login]')?.addEventListener('click', (event) => continueWithGoogle(event.currentTarget))
+        }
+        toast(err.message, 'err')
       }
     })
   }
