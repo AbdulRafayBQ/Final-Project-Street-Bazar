@@ -652,7 +652,7 @@ async function boot() {
   else window.addEventListener('load', hide, { once: true })
 }
 
-boot()
+boot();
 /* =========================================================
    STREET BAZAR — GLOBAL SCROLL & MOTION EFFECTS
    ========================================================= */
