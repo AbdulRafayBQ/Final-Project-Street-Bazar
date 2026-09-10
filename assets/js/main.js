@@ -1,7 +1,7 @@
 /* Street Bazar — app shell, routing & global interactions (vanilla JS) */
 
-import { $, $$, icon, esc, num, toast, modal, closeModal, avatar, timeAgo } from './ui.js'
-import { state, currentUser, myStores, cartCount, logout, myNotifications, unreadNotis, toggleLike, toggleFollow, productById, addToCart, save, unreadThreadCount, setRole, likedProducts, authInitializing, setAuthInitializing } from './store.js'
+import { $, $$, icon, esc, num, money, toast, modal, closeModal, avatar, timeAgo } from './ui.js'
+import { state, currentUser, myStores, liveStores, cartCount, logout, myNotifications, unreadNotis, toggleLike, toggleFollow, productById, addToCart, save, unreadThreadCount, setRole, likedProducts, authInitializing, setAuthInitializing } from './store.js'
 import { route, setNotFound, startRouter, onRender, navigate, renderRoute } from './router.js'
 import { authRequest, syncPull, syncPush, syncFollow, syncNotification } from './db.js'
 
@@ -42,7 +42,6 @@ function renderHeader() {
   const initializing = authInitializing
   const hasStore = Boolean(u && myStores().length)
   const head = $('#site-header')
-  const liked = likedProducts()
   head.className = 'site-header'
   head.innerHTML = `
     <div class="wrap hd">
@@ -51,9 +50,10 @@ function renderHeader() {
         <span class="logo-wordmark"><span>Street</span> <b>Bazar</b></span>
       </a>
 
-      <div class="hd-search desktop-only" style="position:relative;margin:0 10px;flex:1;max-width:280px">
-        <input class="input" id="hd-search-in" placeholder="Search products, stores..." style="padding:6px 12px 6px 32px;font-size:12.5px;border-radius:20px;width:100%;height:35px;background:var(--paper-2)">
-        <span style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--muted);pointer-events:none;display:flex">${icon('search', '', 14)}</span>
+      <div class="hd-search">
+        <span>${icon('search', '', 17)}</span>
+        <input class="input" id="header-product-search" type="search" placeholder="Search products..." autocomplete="off" aria-label="Search products">
+        <div class="search-results" id="header-product-results" hidden></div>
       </div>
 
       <nav class="nav" data-nav>
@@ -65,14 +65,8 @@ function renderHeader() {
         ${u && u.role === 'admin' ? `<a href="#/admin" data-path="/admin">Admin</a>` : ''}
       </nav>
 
-      <div class="hd-search">
-        <span>${icon('search', '', 17)}</span>
-        <input class="input" id="header-product-search" type="search" placeholder="Search products..." autocomplete="off" aria-label="Search products">
-        <div class="search-results" id="header-product-results" hidden></div>
-      </div>
       <div class="hd-actions">
         <button class="theme-toggle" id="theme-toggle" aria-label="Toggle theme">${document.body.classList.contains('dark-theme') ? icon('sun', '', 16) : icon('moon', '', 16)}</button>
-        <a class="icon-btn" href="#/wishlist" title="Wishlist">${icon('heart', '', 18)}<span class="cart-count" data-wishlist-count style="display:${liked.length ? 'grid' : 'none'};background:var(--magenta)">${liked.length}</span></a>
         <button class="icon-btn desktop-only" id="btn-bell" title="Notifications">${icon('bell', '', 18)}${unreadNotis() ? '<span class="dot"></span>' : ''}</button>
         <a class="icon-btn" href="#/cart" title="Cart">${icon('cart', '', 18)}<span class="cart-count" data-cart-count style="display:${cartCount() ? 'grid' : 'none'}">${cartCount()}</span></a>
         ${initializing ? `
@@ -87,16 +81,6 @@ function renderHeader() {
       </div>
     </div>`
 
-  const searchIn = $('#hd-search-in')
-  if (searchIn) {
-    searchIn.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') {
-        const q = searchIn.value.trim()
-        if (q) navigate('#/explore?q=' + encodeURIComponent(q))
-      }
-    })
-  }
-
   $('#theme-toggle')?.addEventListener('click', () => {
     const next = document.body.classList.contains('dark-theme') ? 'light' : 'dark'
     applyThemePreference(next)
@@ -105,6 +89,14 @@ function renderHeader() {
   $('#btn-ai')?.addEventListener('click', () => import('./pages/home.js').then((m) => m.openAIScan()))
   const searchInput = $('#header-product-search')
   const searchResults = $('#header-product-results')
+  searchInput?.addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter') return
+    const q = searchInput.value.trim()
+    if (q) {
+      searchResults.hidden = true
+      navigate('#/explore?q=' + encodeURIComponent(q))
+    }
+  })
   searchInput?.addEventListener('input', () => {
     const query = searchInput.value.trim().toLowerCase()
     if (!query) { searchResults.hidden = true; searchResults.innerHTML = ''; return }
