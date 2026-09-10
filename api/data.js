@@ -174,14 +174,17 @@ export default async function handler(req, res) {
   try {
     if (req.method === 'GET') {
       const actor = await authenticate(req)
-      const [stateRows, storeRows, productRows, threadRows, followRows, userRows] = await Promise.all([
+      const [stateRows, storeRows, productRows, threadRows, followRows, userRows, deletionRows] = await Promise.all([
         request('/rest/v1/app_state?select=payload&key=eq.global&limit=1'),
         request('/rest/v1/stores?select=*'),
         request('/rest/v1/products?select=*'),
         request('/rest/v1/threads?select=*'),
         request('/rest/v1/follows?select=*'),
         request('/rest/v1/users?select=*').catch(() => []),
+        request('/rest/v1/deletion_logs?select=item_type,item_id').catch(() => []),
       ])
+      const deletedStoreIds = new Set((deletionRows || []).filter((row) => row.item_type === 'store').map((row) => row.item_id))
+      const deletedProductIds = new Set((deletionRows || []).filter((row) => row.item_type === 'product').map((row) => row.item_id))
       const rawPayload = stateRows[0]?.payload || {}
       const activeUserIds = new Set((userRows || []).map((u) => u.id))
       // Filter out users from app_state that no longer exist in Supabase users table
