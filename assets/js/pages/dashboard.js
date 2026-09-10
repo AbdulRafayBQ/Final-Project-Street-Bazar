@@ -343,7 +343,6 @@ function initOwnerMessenger(root, panelName) {
   const firstBtn = panel.querySelector('[data-owner-thread]')
   if (firstBtn) openThread(firstBtn.dataset.ownerThread)
 }
-}
 
 function openSaleEditor(storeId) {
   const s = storeById(storeId)

@@ -429,7 +429,7 @@ adminPage.mount = (params, query, root) => {
     })
   }))
 
-  root.querySelectorAll('[data-toggle-store]').forEach((b) => b.addEventListener('click', () => {
+  root.querySelectorAll('[data-toggle-store]').forEach((b) => b.addEventListener('click', async () => {
     const s = storeById(b.dataset.toggleStore)
     const nextStatus = s.status === 'live' ? 'hidden' : 'live'
     setBusy(b, true)

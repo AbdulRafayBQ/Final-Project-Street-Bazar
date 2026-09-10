@@ -652,7 +652,6 @@ async function boot() {
   else window.addEventListener('load', hide, { once: true })
 }
 
-restoreGoogleSession()
 boot()
 /* =========================================================
    STREET BAZAR — GLOBAL SCROLL & MOTION EFFECTS
