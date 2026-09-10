@@ -1,0 +1,76 @@
+/* ============================================================
+   STREET BAZAR — Professional icon polish & micro-animations
+   Loaded after styles.css + theme.css
+   ============================================================ */
+
+/* crisp icon rendering */
+.ic {
+  display: inline-block;
+  flex: none;
+  vertical-align: middle;
+}
+
+/* ---------- micro-interactions ---------- */
+
+/* buttons: icon nudges forward on hover */
+.btn:hover svg.ic,
+.icon-btn:hover svg.ic {
+  transform: translateX(1.5px);
+  transition: transform .22s var(--ease);
+}
+.btn-grad svg.ic { filter: drop-shadow(0 1px 2px rgba(0,0,0,.18)); }
+
+/* bell ring animation when a dot appears (new notification) */
+#btn-bell .dot {
+  animation: bell-ding 2.4s ease-in-out infinite;
+}
+@keyframes bell-ding {
+  0%, 92%, 100% { transform: none; }
+  6%  { transform: rotate(-16deg); }
+  12% { transform: rotate(13deg); }
+  18% { transform: rotate(-9deg); }
+  24% { transform: rotate(6deg); }
+  30% { transform: rotate(-3deg); }
+}
+
+/* cart nudge when count changes (browser re-paints children) */
+.cart-count { transition: transform .3s var(--ease-out), background .3s; }
+.cart-count:not(:empty) { animation: pop-in .35s var(--ease-out); }
+
+/* heart / star toggles — beat on activation */
+.pcard-fav.on svg.ic,
+.follow-btn.on svg.ic,
+.stars svg.ic.fill { animation: heart-beat .5s var(--ease-out); }
+@keyframes heart-beat {
+  0% { transform: scale(1); }
+  35% { transform: scale(1.35); }
+  70% { transform: scale(.9); }
+  100% { transform: scale(1); }
+}
+
+/* arrow icons slide slightly on button hover */
+a[href] .ic-arrow,
+.btn:hover svg.ic[class*="arrow"] { transform: translateX(2px); }
+
+/* star rating empty state */
+.stars svg.ic.off { opacity: .55; }
+
+/* spin for refresh/downloads */
+.ic-spin, svg.ic.spin { animation: spin 1s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* loading spinner on buttons */
+.spin { border: 2px solid rgba(255,255,255,.25); border-top-color: #fff; border-radius: 50%; width: 13px; height: 13px; flex: none; }
+
+/* keep icons square-aligned inside colored tiles */
+.action-card-ic { display: grid; place-items: center; width: 52px; height: 52px; border-radius: 15px; }
+.action-card-ic svg { width: 26px; height: 26px; }
+
+/* social brand icons stay crisp */
+.socials svg.ic, .socials a svg { width: 18px; height: 18px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .ic-spin, svg.ic.spin, .cart-count:not(:empty),
+  .pcard-fav.on svg.ic, .stars svg.ic.fill,
+  #btn-bell .dot { animation: none !important; }
+}

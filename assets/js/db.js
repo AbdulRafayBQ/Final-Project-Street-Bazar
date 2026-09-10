@@ -160,6 +160,12 @@ try {
 }
 }
 
+export async function syncOrder(order) {
+  await api('/api/data', { method: 'POST', body: JSON.stringify({ action: 'order', order }) })
+  state.settings.lastSync = Date.now()
+  save()
+}
+
 export async function syncProduct(product) {
   await api('/api/data', { method: 'POST', body: JSON.stringify({ action: 'product', product }) })
   state.settings.lastSync = Date.now()
@@ -189,23 +195,33 @@ export async function deleteRemote(table, id) {
 }
 
 export async function syncPull() {
-const remote = await api('/api/data')
-if (!remote) return
-const session = state.session
-const mergeById = (remoteItems, localItems) => {
-  const incoming = Array.isArray(remoteItems) ? remoteItems : []
-  const localOnly = (Array.isArray(localItems) ? localItems : []).filter((item) => !incoming.some((row) => row.id === item.id))
-  return [...incoming, ...localOnly]
-}
-Object.assign(state, remote, {
-  users: mergeById(remote.users, state.users),
-  stores: mergeById(remote.stores, state.stores),
-  products: mergeById(remote.products, state.products),
-  threads: mergeById(remote.threads, state.threads),
-  follows: mergeById(remote.follows, state.follows),
-  session,
-})
-save()
+  const remote = await api('/api/data')
+  if (!remote) return
+  const session = state.session
+  const currentUser = state.users.find((u) => u.id === session)
+  const isAdminUser = currentUser?.role === 'admin'
+
+  const mergeById = (remoteItems, localItems) => {
+    const incoming = Array.isArray(remoteItems) ? remoteItems : []
+    const localOnly = (Array.isArray(localItems) ? localItems : []).filter((item) => !incoming.some((row) => row.id === item.id))
+    return [...incoming, ...localOnly]
+  }
+
+  // If remote users list is authoritative (e.g. for admin), use remote users directly
+  const nextUsers = Array.isArray(remote.users) && (isAdminUser || remote.users.length > 0)
+    ? remote.users
+    : mergeById(remote.users, state.users)
+
+  Object.assign(state, remote, {
+    users: nextUsers,
+    stores: mergeById(remote.stores, state.stores),
+    products: mergeById(remote.products, state.products),
+    threads: mergeById(remote.threads, state.threads),
+    follows: mergeById(remote.follows, state.follows),
+    orders: mergeById(remote.orders, state.orders),
+    session,
+  })
+  save()
 }
 
 export const testConnection = async () => { try { await api('/api/data'); return true } catch { return false } }

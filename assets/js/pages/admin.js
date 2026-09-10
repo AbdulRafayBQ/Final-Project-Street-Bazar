@@ -1,6 +1,6 @@
 /* Street Bazar — Admin panel */
 
-import { icon, esc, money, num, timeAgo, toast, confirmBox, modal, closeModal } from '../ui.js'
+import { icon, esc, money, num, timeAgo, toast, confirmBox, modal, closeModal, storeAvatar } from '../ui.js'
 import { statCard } from '../components.js'
 import { state, currentUser, setRole, storeById, storeProducts, productById, userById, updateStore, deleteStore, updateProduct, deleteProduct, deleteOrder, notify, liveStores, pendingStores, lowStock } from '../store.js'
 import { isAIConnected, isConnected, deleteRemote, syncProduct, syncStore, syncPull } from '../db.js'
@@ -181,6 +181,7 @@ const views = {
           <td>${num(s.followers)}</td>
           <td><span class="badge ${s.status === 'live' ? 'badge-live' : s.status === 'pending' ? 'badge-pending' : 'badge-rejected'}">${s.status}</span></td>
           <td><div class="row" style="gap:6px">
+            <button class="btn btn-sm btn-ghost" data-view-owner="${s.id}" title="View owner & CNIC details">${icon('shield', '', 13)} Owner Details</button>
             <button class="btn btn-sm btn-ghost" data-toggle-store="${s.id}">${s.status === 'live' ? 'Unpublish' : 'Publish'}</button>
             <button class="btn btn-sm btn-danger" data-del-store="${s.id}">Delete</button>
           </div></td>
@@ -331,6 +332,76 @@ adminPage.mount = (params, query, root) => {
       toast('Product request rejected')
       navigate('#/admin?tab=product-requests')
     }, 'Reject product')
+  }))
+
+  root.querySelectorAll('[data-view-owner]').forEach((b) => b.addEventListener('click', () => {
+    const s = storeById(b.dataset.viewOwner)
+    if (!s) return
+    const owner = userById(s.owner)
+    modal({
+      title: `${icon('shield', '', 18)} Store Owner & Verification Details`,
+      wide: true,
+      body: `
+        <div class="stack" style="gap:16px">
+          <div class="panel" style="background:var(--paper-2);box-shadow:none;padding:16px">
+            <div class="row" style="gap:14px">
+              ${storeAvatar(s, 'md')}
+              <div>
+                <b class="h4">${esc(s.name)}</b>
+                <div class="tiny muted">${esc(s.city || 'No city')} · Store Type: <b>${esc(s.type || 'standard')}</b></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="grid grid-2" style="gap:14px">
+            <div class="panel" style="padding:14px">
+              <h4 class="small" style="font-weight:700;margin-bottom:8px">Owner Account</h4>
+              <div class="stack tiny" style="gap:6px">
+                <div><span class="muted">Name:</span> <b>${esc(owner?.name || '—')}</b></div>
+                <div><span class="muted">Email:</span> <b>${esc(owner?.email || '—')}</b></div>
+                <div><span class="muted">Role:</span> <b>${esc(owner?.role || 'owner')}</b></div>
+                <div><span class="muted">Phone (Registered):</span> <b>${esc(s.ownerPhone || 'Not provided')}</b></div>
+              </div>
+            </div>
+
+            <div class="panel" style="padding:14px">
+              <h4 class="small" style="font-weight:700;margin-bottom:8px">CNIC & Personal Details</h4>
+              <div class="stack tiny" style="gap:6px">
+                <div><span class="muted">CNIC Number:</span> <b style="letter-spacing:0.5px">${esc(s.cnic || 'Not provided')}</b></div>
+                <div><span class="muted">Personal Address:</span> <b>${esc(s.personalAddress || 'Not provided')}</b></div>
+                <div><span class="muted">Store Status:</span> <span class="badge ${s.status === 'live' ? 'badge-live' : s.status === 'pending' ? 'badge-pending' : 'badge-rejected'}">${s.status}</span></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="panel" style="padding:16px">
+            <h4 class="small" style="font-weight:700;margin-bottom:12px">CNIC Document Scans</h4>
+            <div class="grid grid-2" style="gap:16px">
+              <div>
+                <span class="tiny muted" style="display:block;margin-bottom:6px">Front Side:</span>
+                ${s.cnicFront ? `
+                  <a href="${esc(s.cnicFront)}" target="_blank" rel="noopener" style="display:block;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:#f5f5f5">
+                    <img src="${esc(s.cnicFront)}" alt="CNIC Front" style="width:100%;height:180px;object-fit:contain;display:block">
+                  </a>
+                  <div class="tiny center muted" style="margin-top:4px">Click image to view full size</div>
+                ` : '<div class="empty tiny muted" style="padding:20px;background:var(--paper-2);border-radius:10px">Front photo not uploaded</div>'}
+              </div>
+
+              <div>
+                <span class="tiny muted" style="display:block;margin-bottom:6px">Back Side:</span>
+                ${s.cnicBack ? `
+                  <a href="${esc(s.cnicBack)}" target="_blank" rel="noopener" style="display:block;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:#f5f5f5">
+                    <img src="${esc(s.cnicBack)}" alt="CNIC Back" style="width:100%;height:180px;object-fit:contain;display:block">
+                  </a>
+                  <div class="tiny center muted" style="margin-top:4px">Click image to view full size</div>
+                ` : '<div class="empty tiny muted" style="padding:20px;background:var(--paper-2);border-radius:10px">Back photo not uploaded</div>'}
+              </div>
+            </div>
+          </div>
+        </div>
+      `,
+      foot: `<button class="btn btn-ghost" data-close>Close</button>`,
+    })
   }))
 
   root.querySelectorAll('[data-toggle-store]').forEach((b) => b.addEventListener('click', () => {

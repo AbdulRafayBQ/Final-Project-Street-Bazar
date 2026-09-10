@@ -29,7 +29,68 @@ export async function home() {
   ]
 
   return `
-  <section class="sec" style="padding-top:20px;padding-bottom:16px">
+  <section class="sec hero-band" style="padding-top:20px;padding-bottom:10px">
+    <div class="wrap">
+      <div class="hero-shell">
+        <div class="hero-copy reveal">
+          <span class="kicker">Your local bazaar, online</span>
+          <h1 class="h1">Discover brilliant finds from <span class="grad-text">Pakistan’s</span> favorite sellers</h1>
+          <p class="lead">Shop from home-based brands, trusted stores, and curated deals designed for a faster, friendlier buying experience.</p>
+          <div class="hero-actions">
+            <a class="btn btn-grad" href="#/explore"><span>Shop now</span>${icon('arrow', '', 14)}</a>
+            <a class="btn btn-ghost" href="#/create-store"><span>Start selling</span></a>
+          </div>
+          <div class="hero-stats">
+            <div>
+              <strong>1.2k+</strong>
+              <span>Daily picks</span>
+            </div>
+            <div>
+              <strong>240+</strong>
+              <span>Live stores</span>
+            </div>
+            <div>
+              <strong>4.9/5</strong>
+              <span>Customer love</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="hero-visual reveal">
+          <div class="floating-badge badge badge-sale">${icon('sparkles', '', 12)} New drops</div>
+          <div class="hero-panel">
+            <div class="mini-product-card main-card">
+              <img src="./images/banner-fashion.png" alt="Featured product" />
+              <div class="mini-product-body">
+                <span class="mini-tag">Trending</span>
+                <h3>Handcrafted home decor</h3>
+                <div class="mini-row">
+                  <strong>Rs 3,999</strong>
+                  <span>Free delivery</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="mini-product-card small-card">
+              <div class="mini-icon">${icon('star', '', 18)}</div>
+              <div>
+                <small>Top store</small>
+                <b>Home Nest</b>
+              </div>
+            </div>
+
+            <div class="mini-product-card stat-card">
+              <small>Conversion</small>
+              <strong>+28%</strong>
+              <div class="mini-progress"><span></span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="sec" style="padding-top:16px;padding-bottom:16px">
     <div class="wrap">
       <div class="action-cards-grid">
         ${actionCards.map(c => `

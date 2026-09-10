@@ -1,7 +1,7 @@
 /* Street Bazar — app shell, routing & global interactions (vanilla JS) */
 
 import { $, $$, icon, esc, num, toast, modal, closeModal, avatar, timeAgo } from './ui.js'
-import { state, currentUser, myStores, cartCount, logout, myNotifications, unreadNotis, toggleLike, toggleFollow, productById, addToCart, save, unreadThreadCount, setRole } from './store.js'
+import { state, currentUser, myStores, cartCount, logout, myNotifications, unreadNotis, toggleLike, toggleFollow, productById, addToCart, save, unreadThreadCount, setRole, likedProducts } from './store.js'
 import { route, setNotFound, startRouter, onRender, navigate, renderRoute } from './router.js'
 import { authRequest, syncPull, syncPush, syncFollow, syncNotification } from './db.js'
 
@@ -15,6 +15,7 @@ import { dashboardPage, warehousePage } from './pages/dashboard.js'
 import { messagesPage } from './pages/messages.js'
 import { storesPage } from './pages/stores.js'
 import { cartPage, orderSuccessPage } from './pages/cart.js'
+import { wishlistPage } from './pages/wishlist.js'
 import { ordersPage, trackPage } from './pages/orders.js'
 import { authPage } from './pages/auth.js'
 import { adminPage } from './pages/admin.js'
@@ -23,10 +24,24 @@ import { termsPage } from './pages/terms.js'
 import { assistantReply, aiStatusText } from './ai.js'
 
 /* ---------------- header ---------------- */
+function applyThemePreference(themeName = localStorage.getItem('street-bazar-theme') || 'dark') {
+  const isDark = themeName === 'dark'
+  document.body.classList.toggle('dark-theme', isDark)
+  localStorage.setItem('street-bazar-theme', themeName)
+
+  const toggle = $('#theme-toggle')
+  if (toggle) {
+    toggle.innerHTML = isDark ? icon('sun', '', 16) : icon('moon', '', 16)
+    toggle.setAttribute('title', isDark ? 'Switch to light mode' : 'Switch to dark mode')
+    toggle.setAttribute('aria-label', isDark ? 'Switch to light mode' : 'Switch to dark mode')
+  }
+}
+
 function renderHeader() {
   const u = currentUser()
   const hasStore = Boolean(u && myStores().length)
   const head = $('#site-header')
+  const liked = likedProducts()
   head.className = 'site-header'
   head.innerHTML = `
     <div class="wrap hd">
@@ -34,6 +49,11 @@ function renderHeader() {
         <img src="./images/logo.png" alt="" style="height:48px;width:auto;object-fit:contain">
         <span class="logo-wordmark"><span>Street</span> <b>Bazar</b></span>
       </a>
+
+      <div class="hd-search desktop-only" style="position:relative;margin:0 10px;flex:1;max-width:280px">
+        <input class="input" id="hd-search-in" placeholder="Search products, stores..." style="padding:6px 12px 6px 32px;font-size:12.5px;border-radius:20px;width:100%;height:35px;background:var(--paper-2)">
+        <span style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--muted);pointer-events:none;display:flex">${icon('search', '', 14)}</span>
+      </div>
 
       <nav class="nav" data-nav>
         <a href="#/" data-path="/">Home</a>
@@ -45,6 +65,8 @@ function renderHeader() {
       </nav>
 
       <div class="hd-actions">
+        <button class="theme-toggle" id="theme-toggle" aria-label="Toggle theme">${document.body.classList.contains('dark-theme') ? icon('sun', '', 16) : icon('moon', '', 16)}</button>
+        <a class="icon-btn" href="#/wishlist" title="Wishlist">${icon('heart', '', 18)}<span class="cart-count" data-wishlist-count style="display:${liked.length ? 'grid' : 'none'};background:var(--magenta)">${liked.length}</span></a>
         <button class="icon-btn desktop-only" id="btn-bell" title="Notifications">${icon('bell', '', 18)}${unreadNotis() ? '<span class="dot"></span>' : ''}</button>
         <a class="icon-btn" href="#/cart" title="Cart">${icon('cart', '', 18)}<span class="cart-count" data-cart-count style="display:${cartCount() ? 'grid' : 'none'}">${cartCount()}</span></a>
         ${u ? `
@@ -56,6 +78,21 @@ function renderHeader() {
         ${u ? `<button class="icon-btn menu-btn" id="btn-menu" aria-label="Menu">${icon('menu', '', 18)}</button>` : ''}
       </div>
     </div>`
+
+  const searchIn = $('#hd-search-in')
+  if (searchIn) {
+    searchIn.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        const q = searchIn.value.trim()
+        if (q) navigate('#/explore?q=' + encodeURIComponent(q))
+      }
+    })
+  }
+
+  $('#theme-toggle')?.addEventListener('click', () => {
+    const next = document.body.classList.contains('dark-theme') ? 'light' : 'dark'
+    applyThemePreference(next)
+  })
 
   $('#btn-ai')?.addEventListener('click', () => import('./pages/home.js').then((m) => m.openAIScan()))
 
@@ -118,9 +155,10 @@ function openUserMenu() {
     </div>
     <div class="divider" style="margin:6px 0"></div>
     <a class="dd-item" href="#/orders"><span class="ic">${icon('truck', '', 15)}</span><div><b>My orders</b><div class="tiny muted">Track with Order ID</div></div></a>
+    <a class="dd-item" href="#/wishlist"><span class="ic">${icon('heart', '', 15)}</span><div><b>My wishlist</b><div class="tiny muted">${likedProducts().length} saved items</div></div></a>
     <a class="dd-item" href="#/messages"><span class="ic">${icon('chat', '', 15)}</span><div><b>Messages</b><div class="tiny muted">Stores aur products se chats</div></div></a>
     ${hasStore || u.role === 'admin' ? `<a class="dd-item" href="#/dashboard"><span class="ic">${icon('store', '', 15)}</span><div><b>Owner dashboard</b><div class="tiny muted">Stores, products, inbox</div></div></a>` : `<a class="dd-item" href="#/create-store"><span class="ic">${icon('plus', '', 15)}</span><div><b>Start selling</b><div class="tiny muted">Create your store</div></div></a>`}
-    <a class="dd-item" href="#/foryou"><span class="ic">${icon('heart', '', 15)}</span><div><b>For You feed</b><div class="tiny muted">Naye drops from followed stores</div></div></a>
+    <a class="dd-item" href="#/foryou"><span class="ic">${icon('sparkles', '', 15)}</span><div><b>For You feed</b><div class="tiny muted">Naye drops from followed stores</div></div></a>
     ${u.role === 'admin' ? `<a class="dd-item" href="#/settings"><span class="ic">${icon('settings', '', 15)}</span><div><b>Settings</b><div class="tiny muted">AI, Supabase and server settings</div></div></a>` : ''}
     ${u.role === 'admin' ? `<a class="dd-item" href="#/admin"><span class="ic">${icon('shield', '', 15)}</span><div><b>Admin panel</b><div class="tiny muted">Requests, users, orders</div></div></a>` : ''}
     <div class="divider" style="margin:6px 0"></div>
@@ -137,7 +175,7 @@ function openMobileMenu() {
     title: 'Menu',
     body: `<div class="stack">
       ${[
-        ['#/', 'Home', 'home'], ['#/explore', 'Bazaar Products', 'box'], ['#/dukanien', 'Explore Dukanien', 'store'], ['#/foryou', 'For You', 'heart'],
+        ['#/', 'Home', 'home'], ['#/explore', 'Bazaar Products', 'box'], ['#/dukanien', 'Explore Dukanien', 'store'], ['#/wishlist', 'Wishlist (' + likedProducts().length + ')', 'heart'], ['#/foryou', 'For You', 'sparkles'],
         ['#/cart', 'Cart (' + cartCount() + ')', 'cart'], ['#/orders', 'My orders & tracking', 'truck'], ['#/messages', 'Messages', 'chat'],
         ...(u && !hasStore ? [['#/create-store', 'Start selling', 'store']] : []),
         ...(hasStore || u?.role === 'admin' ? [['#/dashboard', 'Owner dashboard', 'layers']] : []),
@@ -300,9 +338,25 @@ function renderFloatingAIWidget() {
       typing.remove()
       const aiMsg = document.createElement('div')
       aiMsg.className = 'msg ai'
-      const resultCards = (res.matches || []).map((match) => `<a class="ai-result" href="${esc(match.href)}"><b>${esc(match.title)}</b><span>${esc(match.store)} · Rs ${Number(match.price || 0).toLocaleString('en-PK')}</span></a>`).join('')
-      aiMsg.innerHTML = `<div class="who">Bazar AI</div><div class="ai-copy">${esc(res.text).replace(/\n/g, '<br>')}</div>${resultCards ? `<div class="ai-results">${resultCards}</div>` : ''}<div class="time">Just now</div>`
+      const resultCards = (res.matches || []).map((match) => `
+        <a class="ai-result-card" href="${esc(match.href)}" data-close-ai>
+          <div class="ai-card-img">
+            <img src="${esc(match.image || './images/p-kurta.png')}" alt="${esc(match.title)}" onerror="this.src='./images/p-kurta.png'">
+          </div>
+          <div class="ai-card-info">
+            <span class="ai-card-store">${esc(match.store)}</span>
+            <b class="ai-card-title">${esc(match.title)}</b>
+            <div class="ai-card-bottom">
+              <span class="ai-card-price">Rs ${Number(match.price || 0).toLocaleString('en-PK')}</span>
+              <span class="ai-card-btn">View ${icon('arrow', '', 12)}</span>
+            </div>
+          </div>
+        </a>`).join('')
+      aiMsg.innerHTML = `<div class="who">Bazar AI</div><div class="ai-copy">${esc(res.text).replace(/\n/g, '<br>')}</div>${resultCards ? `<div class="ai-results-grid">${resultCards}</div>` : ''}<div class="time">Just now</div>`
       msgs.appendChild(aiMsg)
+      aiMsg.querySelectorAll('[data-close-ai]').forEach((a) => a.addEventListener('click', () => {
+        if (window.innerWidth < 768) panel.style.display = 'none'
+      }))
     } catch (e) {
       typing.remove()
       const errMsg = document.createElement('div')
@@ -373,6 +427,11 @@ function updateCartBadges() {
     el.textContent = cartCount()
     el.style.display = cartCount() ? 'grid' : 'none'
   })
+  $$('[data-wishlist-count]').forEach((el) => {
+    const count = likedProducts().length
+    el.textContent = count
+    el.style.display = count ? 'grid' : 'none'
+  })
 }
 
 /* ---------------- routes ---------------- */
@@ -381,6 +440,7 @@ route('/explore', explore)
 route('/dukanien', storesPage)
 route('/stores', storesPage)
 route('/foryou', foryou)
+route('/wishlist', wishlistPage)
 route('/store/:slug', storePage)
 route('/product/:id', productPage)
 route('/create-store', createStorePage)
@@ -427,6 +487,7 @@ function titleFor(path) {
   if (path.startsWith('/explore')) return 'Explore the bazaar · Street Bazar'
   if (path.startsWith('/dukanien') || path.startsWith('/stores')) return 'Explore Dukanien · Street Bazar'
   if (path.startsWith('/foryou')) return 'For You · Street Bazar'
+  if (path.startsWith('/wishlist')) return 'My Wishlist · Street Bazar'
   if (path.startsWith('/cart')) return 'Cart · Street Bazar'
   if (path.startsWith('/track') || path.startsWith('/orders')) return 'Track order · Street Bazar'
   if (path.startsWith('/create-store') || path.startsWith('/edit-store')) return 'Create your store · Street Bazar'
@@ -577,6 +638,12 @@ boot()
       header.classList.toggle('scrolled', scrollTop > 30)
     }
 
+    const backTop = document.querySelector('#back-to-top')
+
+    if (backTop) {
+      backTop.classList.toggle('show', scrollTop > 420)
+    }
+
     ticking = false
   }
 
@@ -588,6 +655,12 @@ boot()
     }
 
   }, { passive: true })
+
+  const backTopBtn = document.querySelector('#back-to-top')
+
+  backTopBtn?.addEventListener('click', () => {
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  })
 
   updateScrollEffects()
 

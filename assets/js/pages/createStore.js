@@ -110,7 +110,11 @@ createStorePage.mount = (params, query, root) => {
       <h3 class="h3">Store basics</h3>
       <p class="muted small" style="margin:8px 0 20px">Ye details store page par publicly dikhegi.</p>
       <div class="stack">
-        <div class="field"><span class="label">Store name *</span><input class="input" data-f="name" value="${esc(draft.name)}" placeholder="e.g. Noor Attire"></div>
+        <div class="field" data-field="name">
+          <span class="label">Store name *</span>
+          <input class="input" data-f="name" value="${esc(draft.name)}" placeholder="e.g. Noor Attire">
+          <div class="field-error-msg" style="display:none;color:var(--red);font-size:11px;margin-top:4px">Store name is required</div>
+        </div>
         <div class="field"><span class="label">Tagline</span><input class="input" data-f="tagline" value="${esc(draft.tagline)}" placeholder="Ek line mein batao kya bechte ho"></div>
         <div class="field">
           <span class="label">Store type * — kaise chalate hain?</span>
@@ -130,14 +134,38 @@ createStorePage.mount = (params, query, root) => {
         <h4 class="h4">Owner verification (admin ke liye private)</h4>
         <p class="tiny muted">CNIC aur personal details public nahi hongi. Admin approval ke liye zaroori hain.</p>
         <div class="grid grid-2" style="gap:12px;margin-top:10px">
-          <div class="field"><span class="label">Owner phone *</span><input class="input" data-f="ownerPhone" value="${esc(draft.ownerPhone)}" type="tel" required inputmode="numeric" maxlength="11" placeholder="03XXXXXXXXX"></div>
-          <div class="field"><span class="label">CNIC *</span><input class="input" data-f="cnic" value="${esc(draft.cnic)}" inputmode="numeric" maxlength="15" placeholder="42123-4356789-4"></div>
+          <div class="field" data-field="ownerPhone">
+            <span class="label">Owner phone *</span>
+            <input class="input" data-f="ownerPhone" value="${esc(draft.ownerPhone)}" type="tel" required inputmode="numeric" maxlength="11" placeholder="03XXXXXXXXX">
+            <div class="field-error-msg" style="display:none;color:var(--red);font-size:11px;margin-top:4px">Owner phone 11 digits (03XXXXXXXXX) is required</div>
+          </div>
+          <div class="field" data-field="cnic">
+            <span class="label">CNIC *</span>
+            <input class="input" data-f="cnic" value="${esc(draft.cnic)}" inputmode="numeric" maxlength="15" placeholder="42123-4356789-4">
+            <div class="field-error-msg" style="display:none;color:var(--red);font-size:11px;margin-top:4px">Valid CNIC is required (42123-4356789-4)</div>
+          </div>
         </div>
         <div class="grid grid-2" style="gap:12px">
-          <div class="field"><span class="label">CNIC front photo *</span><input class="input" type="file" id="cnic-front-in" accept="image/*"><div class="tiny muted">${draft.cnicFront ? 'Front photo uploaded' : 'Upload front side'}</div>${draft.cnicFront ? `<img src="${esc(draft.cnicFront)}" alt="CNIC front preview" style="display:block;width:180px;height:110px;object-fit:contain;background:#f5f5f5;border-radius:8px;margin-top:8px">` : ''}</div>
-          <div class="field"><span class="label">CNIC back photo *</span><input class="input" type="file" id="cnic-back-in" accept="image/*"><div class="tiny muted">${draft.cnicBack ? 'Back photo uploaded' : 'Upload back side'}</div>${draft.cnicBack ? `<img src="${esc(draft.cnicBack)}" alt="CNIC back preview" style="display:block;width:180px;height:110px;object-fit:contain;background:#f5f5f5;border-radius:8px;margin-top:8px">` : ''}</div>
+          <div class="field" data-field="cnicFront">
+            <span class="label">CNIC front photo *</span>
+            <input class="input" type="file" id="cnic-front-in" accept="image/*">
+            <div class="tiny muted">${draft.cnicFront ? 'Front photo uploaded' : 'Upload front side'}</div>
+            ${draft.cnicFront ? `<img src="${esc(draft.cnicFront)}" alt="CNIC front preview" style="display:block;width:180px;height:110px;object-fit:contain;background:#f5f5f5;border-radius:8px;margin-top:8px">` : ''}
+            <div class="field-error-msg" style="display:none;color:var(--red);font-size:11px;margin-top:4px">CNIC front photo is required</div>
+          </div>
+          <div class="field" data-field="cnicBack">
+            <span class="label">CNIC back photo *</span>
+            <input class="input" type="file" id="cnic-back-in" accept="image/*">
+            <div class="tiny muted">${draft.cnicBack ? 'Back photo uploaded' : 'Upload back side'}</div>
+            ${draft.cnicBack ? `<img src="${esc(draft.cnicBack)}" alt="CNIC back preview" style="display:block;width:180px;height:110px;object-fit:contain;background:#f5f5f5;border-radius:8px;margin-top:8px">` : ''}
+            <div class="field-error-msg" style="display:none;color:var(--red);font-size:11px;margin-top:4px">CNIC back photo is required</div>
+          </div>
         </div>
-        <div class="field"><span class="label">Personal address *</span><textarea class="textarea" data-f="personalAddress" placeholder="Owner ka verification address">${esc(draft.personalAddress)}</textarea></div>
+        <div class="field" data-field="personalAddress">
+          <span class="label">Personal address *</span>
+          <textarea class="textarea" data-f="personalAddress" placeholder="Owner ka verification address">${esc(draft.personalAddress)}</textarea>
+          <div class="field-error-msg" style="display:none;color:var(--red);font-size:11px;margin-top:4px">Personal verification address is required</div>
+        </div>
         <div class="pill-note">${icon('info', '', 14)} Home business ho toh bhi store bilkul normal dikhega — sirf type badge alag hoga.</div>
       </div>`,
     design: () => `
@@ -340,6 +368,41 @@ createStorePage.mount = (params, query, root) => {
     form.querySelector('[data-see-interface]')?.addEventListener('click', seeInterface)
   }
 
+  const showFieldError = (fieldName, msg) => {
+    const fieldEl = form.querySelector(`[data-field="${fieldName}"]`)
+    if (!fieldEl) return
+    fieldEl.classList.add('has-error')
+    const input = fieldEl.querySelector('.input, .textarea, .select')
+    if (input) input.style.borderColor = 'var(--red)'
+    const errEl = fieldEl.querySelector('.field-error-msg')
+    if (errEl) {
+      if (msg) errEl.textContent = msg
+      errEl.style.display = 'block'
+    }
+  }
+
+  const clearFieldError = (fieldEl) => {
+    if (!fieldEl) return
+    fieldEl.classList.remove('has-error')
+    const input = fieldEl.querySelector('.input, .textarea, .select')
+    if (input) input.style.borderColor = ''
+    const errEl = fieldEl.querySelector('.field-error-msg')
+    if (errEl) errEl.style.display = 'none'
+  }
+
+  const validateBasics = () => {
+    let valid = true
+    if (!draft.name.trim()) { showFieldError('name', 'Store name is required'); valid = false }
+    if (!draft.ownerPhone.trim()) { showFieldError('ownerPhone', 'Owner phone number is required'); valid = false }
+    else if (!isPakistanPhone(draft.ownerPhone)) { showFieldError('ownerPhone', 'Phone number must be exactly 11 digits (03XXXXXXXXX)'); valid = false }
+    if (!draft.cnic.trim()) { showFieldError('cnic', 'CNIC is required'); valid = false }
+    else if (!/^\d{5}-\d{7}-\d$/.test(draft.cnic)) { showFieldError('cnic', 'CNIC must match 42123-4356789-4'); valid = false }
+    if (!draft.cnicFront) { showFieldError('cnicFront', 'CNIC front photo is required'); valid = false }
+    if (!draft.cnicBack) { showFieldError('cnicBack', 'CNIC back photo is required'); valid = false }
+    if (!draft.personalAddress.trim()) { showFieldError('personalAddress', 'Personal address is required'); valid = false }
+    return valid
+  }
+
   const seeInterface = () => {
     modal({
       title: `${icon('eye', '', 17)} Interface of your store`,
@@ -355,11 +418,10 @@ createStorePage.mount = (params, query, root) => {
   }
 
   const onPublish = async (e) => {
-    if (!draft.name.trim()) return toast('Store ka naam zaroori hai', 'err')
-    if (!isPakistanPhone(draft.ownerPhone)) return toast('Owner phone 11 digits ka hona chahiye (03XXXXXXXXX)', 'err')
-    if (!/^\d{5}-\d{7}-\d$/.test(draft.cnic)) return toast('CNIC is format mein likhein: 42123-4356789-4', 'err')
-    if (!draft.cnicFront || !draft.cnicBack) return toast('CNIC front aur back dono photos upload karein', 'err')
-    if (!draft.personalAddress.trim()) return toast('Personal address zaroori hai', 'err')
+    if (!validateBasics()) {
+      toast('Please complete all required verification fields in step 1', 'err')
+      step = 0; paint(); return
+    }
     const btn = e?.currentTarget || form.querySelector('[data-publish]')
     const done = btn ? spinner(btn) : () => {}
     await new Promise((r) => setTimeout(r, 650))
@@ -382,7 +444,13 @@ createStorePage.mount = (params, query, root) => {
     }
   }
 
-  root.querySelectorAll('[data-step]').forEach((el) => el.addEventListener('click', () => { step = Number(el.dataset.step); paint() }))
+  root.querySelectorAll('[data-step]').forEach((el) => el.addEventListener('click', () => {
+    if (step === 0 && Number(el.dataset.step) > 0 && !validateBasics()) {
+      toast('Please fill all required verification fields first', 'err')
+      return
+    }
+    step = Number(el.dataset.step); paint()
+  }))
   root.querySelector('[data-see-interface]').addEventListener('click', seeInterface)
 
   // step navigation buttons inside form
@@ -390,12 +458,9 @@ createStorePage.mount = (params, query, root) => {
     const next = e.target.closest('[data-next]')
     const prev = e.target.closest('[data-prev]')
     if (next) {
-      if (step === 0) {
-        if (!draft.name.trim()) return toast('Store ka naam zaroori hai', 'err')
-        if (!isPakistanPhone(draft.ownerPhone)) return toast('Owner phone 11 digits ka hona chahiye (03XXXXXXXXX)', 'err')
-        if (!/^\d{5}-\d{7}-\d$/.test(draft.cnic)) return toast('CNIC is format mein likhein: 42123-4356789-4', 'err')
-        if (!draft.cnicFront || !draft.cnicBack) return toast('CNIC front aur back dono photos upload karein', 'err')
-        if (!draft.personalAddress.trim()) return toast('Personal address zaroori hai', 'err')
+      if (step === 0 && !validateBasics()) {
+        toast('Please fill all required verification fields', 'err')
+        return
       }
       step = Math.min(STEPS.length - 1, step + 1); paint()
     }
@@ -407,7 +472,15 @@ createStorePage.mount = (params, query, root) => {
     ${step < STEPS.length - 1 ? `<button class="btn btn-primary" data-next><span>Continue</span> ${icon('arrow', '', 15)}</button>` : ''}
   </div>`
   const origPaint = paint
-  paint = () => { origPaint(); form.insertAdjacentHTML('beforeend', navBar()) }
+  paint = () => {
+    origPaint()
+    form.insertAdjacentHTML('beforeend', navBar())
+    form.querySelectorAll('.field').forEach((f) => {
+      f.querySelectorAll('.input, .textarea, .select').forEach((inp) => {
+        inp.addEventListener('input', () => clearFieldError(f))
+      })
+    })
+  }
 
   paint()
   renderPreview()

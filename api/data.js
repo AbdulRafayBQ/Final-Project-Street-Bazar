@@ -134,14 +134,21 @@ export default async function handler(req, res) {
   try {
     if (req.method === 'GET') {
       const actor = await authenticate(req)
-      const [stateRows, storeRows, productRows, threadRows, followRows] = await Promise.all([
+      const [stateRows, storeRows, productRows, threadRows, followRows, userRows] = await Promise.all([
         request('/rest/v1/app_state?select=payload&key=eq.global&limit=1'),
         request('/rest/v1/stores?select=*'),
         request('/rest/v1/products?select=*'),
         request('/rest/v1/threads?select=*'),
         request('/rest/v1/follows?select=*'),
+        request('/rest/v1/users?select=*').catch(() => []),
       ])
-      const payload = cleanPayload(stateRows[0]?.payload || {})
+      const rawPayload = stateRows[0]?.payload || {}
+      const activeUserIds = new Set((userRows || []).map((u) => u.id))
+      // Filter out users from app_state that no longer exist in Supabase users table
+      if (rawPayload.users && Array.isArray(rawPayload.users) && userRows && userRows.length) {
+        rawPayload.users = rawPayload.users.filter((u) => activeUserIds.has(u.id))
+      }
+      const payload = cleanPayload(rawPayload)
       const stores = (storeRows || []).map((s) => ({
         id: s.id, owner: s.owner_id, name: s.name, slug: s.slug, tagline: s.tagline,
         type: s.type, description: s.description, logo: s.logo, banner: s.banner,
@@ -159,7 +166,10 @@ export default async function handler(req, res) {
         price: p.price, compareAt: p.compare_at, media: p.media || [], categories: p.categories || [],
         tags: p.tags || [], stock: p.stock, sku: p.sku, customizable: p.customizable,
         wholesale: p.wholesale, deliveryCharge: p.delivery_charge,
-        homeDeliveryCharge: p.home_delivery_charge, outsideDeliveryCharge: p.outside_delivery_charge,
+        homeDeliveryCharge: p.home_delivery_charge ?? p.delivery_charge ?? 0,
+        outsideDeliveryCharge: p.outside_delivery_charge ?? p.delivery_charge ?? 0,
+        homeCityDeliveryDays: p.home_city_delivery_days || p.homeCityDeliveryDays || '1-2 days',
+        outOfCityDeliveryDays: p.out_of_city_delivery_days || p.outOfCityDeliveryDays || '3-5 days',
         sales: p.sales, status: p.status, createdAt: p.created_at,
       }))
       const visibleThreads = actor ? (threadRows || []).filter((t) => t.customer_id === actor.id || isAdmin(actor) || stores.some((s) => s.id === t.store_id && s.owner === actor.id)) : []
@@ -172,20 +182,30 @@ export default async function handler(req, res) {
       }))
       const followerCounts = follows.reduce((counts, follow) => counts.set(follow.store, (counts.get(follow.store) || 0) + 1), new Map())
       stores.forEach((store) => { store.followers = followerCounts.get(store.id) || 0 })
-      const merge = (local, remote) => [...remote, ...(local || []).filter((item) => !remote.some((row) => row.id === item.id))]
       const publicStores = stores.filter((store) => store.status === 'live')
       const publicProducts = products.filter((product) => publicStores.some((store) => store.id === product.store) && product.status === 'active')
+      const mappedDbUsers = (userRows || []).map((u) => ({
+        id: u.id, name: u.name, email: u.email, role: u.role || 'customer',
+        avatar: u.avatar || '', createdAt: u.created_at,
+      }))
       if (!actor) return json(res, 200, { stores: publicStores, products: publicProducts, follows: [], threads: [], users: [] })
       const visibleStores = isAdmin(actor) ? stores : stores.filter((store) => store.status === 'live' || store.owner === actor.id)
       const visibleProducts = products.filter((product) => visibleStores.some((store) => store.id === product.store) && (product.status === 'active' || isAdmin(actor) || visibleStores.some((store) => store.id === product.store && store.owner === actor.id)))
       const visibleNotifications = (payload.notifications || []).filter((notification) => notification.to === actor.id)
-      if (isAdmin(actor)) return json(res, 200, { ...payload, stores: visibleStores, products: visibleProducts, threads, follows })
+      if (isAdmin(actor)) {
+        return json(res, 200, {
+          ...payload,
+          users: mappedDbUsers.length ? mappedDbUsers : payload.users || [],
+          stores: visibleStores, products: visibleProducts, threads, follows,
+        })
+      }
       return json(res, 200, {
         version: payload.version, isDemo: false,
-        users: [actor.profile], notifications: visibleNotifications,
+        users: mappedDbUsers.length ? mappedDbUsers.filter((u) => u.id === actor.id || threads.some((t) => t.customer === u.id) || visibleStores.some((s) => s.owner === u.id)) : [actor.profile],
+        notifications: visibleNotifications,
         stores: visibleStores, products: visibleProducts, threads, follows,
         reviews: (payload.reviews || []).filter((review) => visibleProducts.some((product) => product.id === (review.product || review.product_id))),
-        orders: (payload.orders || []).filter((order) => order.user === actor.id || order.user_id === actor.id),
+        orders: (payload.orders || []).filter((order) => order.user === actor.id || order.user_id === actor.id || visibleStores.some((s) => (order.stores || order.store_ids || []).includes(s.id))),
         cart: (payload.cart || []).filter((item) => item.user === actor.id || item.user_id === actor.id),
         likes: (payload.likes || []).filter((like) => like.user === actor.id || like.user_id === actor.id),
         warehouse: (payload.warehouse || []).filter((item) => item.owner === actor.id || item.owner_id === actor.id),
@@ -253,7 +273,42 @@ export default async function handler(req, res) {
       const product = payload.product
       if (!product?.id) return json(res, 400, { error: 'Product data is required' })
       if (!await canOwnStore(actor, product.store || product.store_id)) return json(res, 403, { error: 'You can only submit products for your own store' })
-      await upsert('products', [{ id: product.id, store_id: product.store || product.store_id, title: product.title, description: product.description, price: product.price, compare_at: product.compareAt || product.compare_at, media: product.media, categories: product.categories, tags: product.tags, stock: product.stock, sku: product.sku, customizable: product.customizable, wholesale: product.wholesale, delivery_charge: product.deliveryCharge || 0, home_delivery_charge: product.homeDeliveryCharge ?? product.deliveryCharge ?? 0, outside_delivery_charge: product.outsideDeliveryCharge ?? product.deliveryCharge ?? 0, sales: product.sales, status: product.status, created_at: timestamp(product.createdAt || product.created_at) }])
+      await upsert('products', [{
+        id: product.id, store_id: product.store || product.store_id, title: product.title, description: product.description, price: product.price, compare_at: product.compareAt || product.compare_at, media: product.media, categories: product.categories, tags: product.tags, stock: product.stock, sku: product.sku, customizable: product.customizable, wholesale: product.wholesale, delivery_charge: product.deliveryCharge || 0, home_delivery_charge: product.homeDeliveryCharge ?? product.deliveryCharge ?? 0, outside_delivery_charge: product.outsideDeliveryCharge ?? product.deliveryCharge ?? 0,
+        home_city_delivery_days: product.homeCityDeliveryDays || '1-2 days',
+        out_of_city_delivery_days: product.outOfCityDeliveryDays || '3-5 days',
+        sales: product.sales, status: product.status, created_at: timestamp(product.createdAt || product.created_at)
+      }])
+      return json(res, 200, { ok: true })
+    }
+    if (payload.action === 'order') {
+      const order = payload.order
+      if (!order?.id) return json(res, 400, { error: 'Order data is required' })
+      const orderStores = order.stores || order.store_ids || []
+      const isStoreOwnerForOrder = await Promise.all(orderStores.map((sid) => canOwnStore(actor, sid))).then((res) => res.some(Boolean))
+      if (!isAdmin(actor) && order.user !== actor.id && order.user_id !== actor.id && !isStoreOwnerForOrder) {
+        return json(res, 403, { error: 'You cannot update this order' })
+      }
+      await safeUpsert('orders', [{
+        id: order.id,
+        user_id: order.user || order.user_id,
+        items: order.items,
+        total: order.total,
+        status: typeof order.status === 'number' ? order.status : String(order.status),
+        timeline: order.timeline,
+        eta: order.eta || (order.etaDays ? `${order.etaDays} days` : ''),
+        address: order.address,
+        store_ids: orderStores,
+        created_at: timestamp(order.createdAt || order.created_at || Date.now())
+      }])
+      // Update app_state global orders as well
+      const rows = await request('/rest/v1/app_state?select=payload&key=eq.global&limit=1')
+      const shared = rows[0]?.payload || {}
+      const existingOrders = shared.orders || []
+      const nextOrders = existingOrders.map((o) => o.id === order.id ? { ...o, ...order } : o)
+      if (!nextOrders.some((o) => o.id === order.id)) nextOrders.unshift(order)
+      shared.orders = nextOrders
+      await request('/rest/v1/app_state?on_conflict=key', { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify({ key: 'global', payload: shared }) })
       return json(res, 200, { ok: true })
     }
     if (payload.action === 'thread') {

@@ -45,6 +45,8 @@ export async function renderRoute() {
   if (!page || !view) return
   current = { path, params, query, pattern: match?.pattern }
 
+  const pageKey = match ? match.pattern.replace(/\/:[a-z]+/g, '').split('/').filter(Boolean).join('-').replace(/[^a-z0-9-]+/g, '') : '404'
+  view.dataset.page = pageKey || 'home'
   view.classList.remove('page-enter')
   void view.offsetWidth
   view.classList.add('page-enter')

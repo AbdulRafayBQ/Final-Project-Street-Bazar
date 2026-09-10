@@ -1,8 +1,9 @@
 /* Street Bazar — My orders & order tracking */
 
-import { icon, esc, money, num, timeAgo, toast, copyText } from '../ui.js'
+import { icon, esc, money, num, timeAgo, toast, copyText, spinner } from '../ui.js'
 import { orderTimeline } from '../components.js'
-import { myOrders, orderById, currentUser, userById, storeById, advanceOrder, ORDER_STEPS, myStores } from '../store.js'
+import { myOrders, orderById, currentUser, userById, storeById, advanceOrder, ORDER_STEPS, myStores, state } from '../store.js'
+import { syncOrder } from '../db.js'
 import { navigate } from '../router.js'
 
 export async function ordersPage() {
@@ -132,10 +133,20 @@ trackPage.mount = (params, query, root) => {
   root.querySelector('#track-go')?.addEventListener('click', go)
   root.querySelector('#track-in')?.addEventListener('keydown', (e) => { if (e.key === 'Enter') go() })
   root.querySelector('[data-copy-id]')?.addEventListener('click', (e) => copyText(e.currentTarget.dataset.copyId, 'Order ID'))
-  root.querySelector('[data-owner-advance]')?.addEventListener('click', (e) => {
-    advanceOrder(e.currentTarget.dataset.ownerAdvance)
-    toast('Status update ho gaya', 'ok')
-    navigate('#/track/' + e.currentTarget.dataset.ownerAdvance)
+  root.querySelector('[data-owner-advance]')?.addEventListener('click', async (e) => {
+    const id = e.currentTarget.dataset.ownerAdvance
+    const btn = spinner(e.currentTarget)
+    try {
+      advanceOrder(id)
+      const order = state.orders.find((o) => o.id === id)
+      if (order) await syncOrder(order).catch((err) => console.warn('Order sync note:', err))
+      toast('Status update ho gaya 🎉', 'ok')
+      navigate('#/track/' + id)
+    } catch (err) {
+      toast(err.message || 'Status update nahi ho saka', 'err')
+    } finally {
+      btn()
+    }
   })
 }
 

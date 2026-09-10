@@ -116,7 +116,7 @@ export async function foryou() {
       ${followed.length
         ? `${sectionHead({ kicker: 'New drops', title: 'Followed stores ke <span class="grad-text">naye products</span>', sub: 'Sabse recent listing pehle — jaise hi store kuch add kare, yahan dikhega.' })}
            <div class="grid grid-4 stagger">${fresh.slice(0, 8).map(productCard).join('')}</div>`
-        : `<div class="empty reveal"><div class="ic">${icon('store', '', 30)}</div><h3 class="h3">Abhi koi store follow nahi</h3><p class="muted">Kisi bhi store par "Follow" dabayein — uska har naya product yahan aayega.</p><div style="margin-top:18px"><a class="btn btn-grad" href="#/explore"><span>Explore stores</span> ${icon('arrow', '', 15)}</a></div></div>`}
+        : `<div class="empty reveal"><div class="ic">${icon('store', '', 30)}</div><h3 class="h3">Abhi koi store follow nahi</h3><p class="muted">Kisi bhi store par "Follow" dabayein — uska har naya product yahan aayega.</p><div style="margin-top:18px"><a class="btn btn-grad" href="#/dukanien"><span>Explore Dukanien</span> ${icon('arrow', '', 15)}</a></div></div>`}
     </div>
   </section>
 

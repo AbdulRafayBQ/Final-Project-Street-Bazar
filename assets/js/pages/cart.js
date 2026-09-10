@@ -18,13 +18,6 @@ export async function cartPage() {
   }
 
   const subtotal = cartTotal()
-  const storeCharges = [...new Set(items.map((item) => item.store))].reduce((total, sid) => {
-    const product = productById(items.find((item) => item.store === sid)?.product)
-    const charge = product ? deliveryChargeFor(product, '') : DELIVERY
-    return total + Math.max(0, charge)
-  }, 0)
-  const delivery = subtotal >= FREE_OVER ? 0 : storeCharges
-  const total = subtotal + delivery
   const u = currentUser()
   const byStore = items.reduce((acc, i) => { (acc[i.store] = acc[i.store] || []).push(i); return acc }, {})
 
@@ -62,19 +55,31 @@ export async function cartPage() {
         <h3 class="h4">Order summary</h3>
         <div style="margin-top:14px">
           <div class="sum-row"><span class="muted">Subtotal</span><b>${money(subtotal)}</b></div>
-          <div class="sum-row"><span class="muted">Delivery</span><b>${delivery ? money(delivery) : 'FREE 🎉'}</b></div>
-          <div class="sum-row total"><span>Total</span><span>${money(total)}</span></div>
+          <div class="sum-row"><span class="muted">Delivery</span><b id="c-delivery-val" style="font-size:13px;color:var(--muted)">Depends on your address</b></div>
+          <div class="sum-row total"><span>Total</span><span id="c-total-val">${money(subtotal)}</span></div>
         </div>
         ${subtotal < FREE_OVER ? `<div class="pill-note" style="margin-top:12px">${icon('truck', '', 14)} ${money(FREE_OVER - subtotal)} aur lein — delivery free ho jayegi.</div>` : ''}
 
         <div class="divider"></div>
         <h4 class="h4">Delivery details</h4>
         <div class="stack" style="margin-top:12px">
-          <input class="input" id="c-name" placeholder="Full name" value="${esc(u?.name || '')}">
-          <input class="input" id="c-phone" type="tel" required pattern="03[0-9]{9}" inputmode="numeric" maxlength="11" placeholder="Phone (03xx-xxxxxxx)">
-          <input class="input" id="c-city" placeholder="City">
-          <p class="tiny muted" id="c-delivery-note" style="margin-top:-6px">Delivery charges may differ depending on the cities.</p>
-          <textarea class="textarea" id="c-address" placeholder="Full address — house, street, area" style="min-height:80px"></textarea>
+          <div class="field" data-field="name">
+            <input class="input" id="c-name" placeholder="Full name *" value="${esc(u?.name || '')}">
+            <div class="field-error-msg" style="display:none;color:var(--red);font-size:11px;margin-top:4px">This field is required</div>
+          </div>
+          <div class="field" data-field="phone">
+            <input class="input" id="c-phone" type="tel" required pattern="03[0-9]{9}" inputmode="numeric" maxlength="11" placeholder="Phone (03xx-xxxxxxx) *">
+            <div class="field-error-msg" style="display:none;color:var(--red);font-size:11px;margin-top:4px">Valid 11-digit mobile number is required</div>
+          </div>
+          <div class="field" data-field="city">
+            <input class="input" id="c-city" placeholder="City (e.g. Lahore, Karachi, Islamabad) *">
+            <div class="field-error-msg" style="display:none;color:var(--red);font-size:11px;margin-top:4px">City is required to calculate delivery charges</div>
+            <p class="tiny muted" id="c-delivery-note" style="margin-top:4px">Enter your city to calculate delivery charges & time.</p>
+          </div>
+          <div class="field" data-field="address">
+            <textarea class="textarea" id="c-address" placeholder="Full address — house, street, area *" style="min-height:80px"></textarea>
+            <div class="field-error-msg" style="display:none;color:var(--red);font-size:11px;margin-top:4px">Street address is required</div>
+          </div>
           <select class="select" id="c-pay">
             <option>Cash on delivery</option>
             <option>JazzCash / EasyPaisa</option>
@@ -91,6 +96,34 @@ export async function cartPage() {
 
 cartPage.mount = (params, query, root) => {
   const repaint = () => { renderRoute() }
+  
+  const showFieldError = (fieldEl, msg) => {
+    if (!fieldEl) return
+    fieldEl.classList.add('has-error')
+    const input = fieldEl.querySelector('.input, .textarea, .select')
+    if (input) input.style.borderColor = 'var(--red)'
+    const errEl = fieldEl.querySelector('.field-error-msg')
+    if (errEl) {
+      if (msg) errEl.textContent = msg
+      errEl.style.display = 'block'
+    }
+  }
+
+  const clearFieldError = (fieldEl) => {
+    if (!fieldEl) return
+    fieldEl.classList.remove('has-error')
+    const input = fieldEl.querySelector('.input, .textarea, .select')
+    if (input) input.style.borderColor = ''
+    const errEl = fieldEl.querySelector('.field-error-msg')
+    if (errEl) errEl.style.display = 'none'
+  }
+
+  root.querySelectorAll('.field').forEach((field) => {
+    field.querySelectorAll('.input, .textarea, .select').forEach((inp) => {
+      inp.addEventListener('input', () => clearFieldError(field))
+    })
+  })
+
   root.querySelector('#c-phone')?.addEventListener('input', (e) => {
     e.target.value = e.target.value.replace(/\D/g, '').slice(0, 11)
   })
@@ -113,30 +146,76 @@ cartPage.mount = (params, query, root) => {
     repaint()
   }))
 
-  root.querySelector('#c-place')?.addEventListener('click', async (e) => {
-    if (!currentUser()) { toast('Order ke liye login zaroori hai', 'err'); return navigate('#/auth') }
-    const name = root.querySelector('#c-name').value.trim()
-    const phone = root.querySelector('#c-phone').value.trim()
-    const city = root.querySelector('#c-city').value.trim()
-    const line = root.querySelector('#c-address').value.trim()
-    if (!name || !phone || !line) return toast('Name, phone aur address bharein', 'err')
-    if (!isPakistanPhone(phone)) return toast('Phone number exactly 11 digits ka hona chahiye (03XXXXXXXXX)', 'err')
-    const btn = spinner(e.currentTarget)
-    await new Promise((r) => setTimeout(r, 800))
-    const order = placeOrder({ address: { name, phone, city, line }, etaDays: 4 })
-    btn()
-    toast('Order place ho gaya! ID: ' + order.id, 'ok')
-    navigate('#/order-success/' + order.id)
-  })
   const cityInput = root.querySelector('#c-city')
-  cityInput?.addEventListener('input', () => {
-    const city = cityInput.value.trim()
+  const deliveryVal = root.querySelector('#c-delivery-val')
+  const totalVal = root.querySelector('#c-total-val')
+  const noteEl = root.querySelector('#c-delivery-note')
+
+  const updateDeliverySummary = () => {
+    const city = cityInput?.value.trim() || ''
+    const subtotal = cartTotal()
+    if (!city) {
+      if (deliveryVal) {
+        deliveryVal.textContent = 'Depends on your address'
+        deliveryVal.style.color = 'var(--muted)'
+      }
+      if (totalVal) totalVal.textContent = money(subtotal)
+      if (noteEl) noteEl.textContent = 'Enter your city to calculate delivery charges & time.'
+      return
+    }
     const charge = [...new Set(state.cart.map((item) => item.store))].reduce((total, sid) => {
       const product = productById(state.cart.find((item) => item.store === sid)?.product)
       return total + (product ? deliveryChargeFor(product, city) : DELIVERY)
     }, 0)
-    const summary = root.querySelector('.sum-row:nth-of-type(2) b')
-    if (summary) summary.textContent = charge ? money(charge) : 'FREE 🎉'
+    const isFree = subtotal >= FREE_OVER
+    const finalDelivery = isFree ? 0 : charge
+
+    if (deliveryVal) {
+      deliveryVal.textContent = isFree ? 'FREE 🎉' : money(finalDelivery)
+      deliveryVal.style.color = isFree ? 'var(--emerald)' : 'var(--ink)'
+    }
+    if (totalVal) {
+      totalVal.textContent = money(subtotal + finalDelivery)
+    }
+    if (noteEl) {
+      noteEl.innerHTML = `<span style="color:var(--emerald);font-weight:600">✓ Delivery to ${esc(city)}: ${isFree ? 'FREE' : money(charge)}</span>`
+    }
+  }
+
+  cityInput?.addEventListener('input', updateDeliverySummary)
+  updateDeliverySummary()
+
+  root.querySelector('#c-place')?.addEventListener('click', async (e) => {
+    if (!currentUser()) { toast('Order ke liye login zaroori hai', 'err'); return navigate('#/auth') }
+    
+    let hasError = false
+    const nameField = root.querySelector('[data-field="name"]')
+    const phoneField = root.querySelector('[data-field="phone"]')
+    const cityField = root.querySelector('[data-field="city"]')
+    const addressField = root.querySelector('[data-field="address"]')
+
+    const name = root.querySelector('#c-name').value.trim()
+    const phone = root.querySelector('#c-phone').value.trim()
+    const city = root.querySelector('#c-city').value.trim()
+    const line = root.querySelector('#c-address').value.trim()
+
+    if (!name) { showFieldError(nameField, 'Full name is required'); hasError = true }
+    if (!phone) { showFieldError(phoneField, 'Phone number is required'); hasError = true }
+    else if (!isPakistanPhone(phone)) { showFieldError(phoneField, 'Phone number must be exactly 11 digits (03XXXXXXXXX)'); hasError = true }
+    if (!city) { showFieldError(cityField, 'City is required for delivery'); hasError = true }
+    if (!line) { showFieldError(addressField, 'Complete address is required'); hasError = true }
+
+    if (hasError) {
+      toast('Please fill all required fields correctly', 'err')
+      return
+    }
+
+    const btn = spinner(e.currentTarget)
+    await new Promise((r) => setTimeout(r, 800))
+    const order = placeOrder({ address: { name, phone, city, line }, etaDays: 3 })
+    btn()
+    toast('Order place ho gaya! ID: ' + order.id, 'ok')
+    navigate('#/order-success/' + order.id)
   })
 }
 

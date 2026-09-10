@@ -4,7 +4,7 @@ import { icon, esc, money, num, toast, modal, closeModal, timeAgo, spinner, conf
 import { statCard, emptyLogin } from '../components.js'
 import { state, myStores, storeById, storeProducts, storeOrders, storeRevenue, storeSales, currentUser, lowStock, productById, updateProduct, updateStore, deleteStore, advanceOrder, cancelOrder, addStock, storeThreads, threadById, markThreadRead, userById, save, ownerWarehouse, addWarehouseItem, updateWarehouseItem, deleteWarehouseItem } from '../store.js'
 import { genStockPlan } from '../ai.js'
-import { authRequest, syncThread, syncPull, syncNotification } from '../db.js'
+import { authRequest, syncThread, syncPull, syncNotification, syncOrder } from '../db.js'
 import { navigate, renderRoute } from '../router.js'
 
 export async function dashboardPage() {
@@ -128,12 +128,26 @@ export async function dashboardPage() {
 
 function ownerChatPanel(threads, panel, title, subtitle) {
   const grouped = [...new Map(threads.map((thread) => [thread.customer, threads.filter((item) => item.customer === thread.customer)])).values()]
+  const firstThread = grouped[0]?.[0]
   return `<div data-panel="${panel}" hidden><div class="row-between" style="margin-bottom:16px"><div><h3 class="h3">${title}</h3><p class="muted small">${subtitle}</p></div><span class="badge badge-soft">${grouped.length} customer${grouped.length === 1 ? '' : 's'}</span></div>
-    ${grouped.length ? `<div class="messenger-shell"><aside class="messenger-sidebar"><h3 class="h4">Customers</h3>${grouped.map((contactThreads) => {
-      const customer = userById(contactThreads[0].customer)
-      const last = contactThreads.flatMap((thread) => thread.messages).sort((a, b) => b.at - a.at)[0]
-      return `<button class="message-contact" data-reply="${contactThreads[0].id}">${avatar(customer || { name: 'Customer' }, 'sm')}<span class="preview"><b>${esc(customer?.name || 'Customer')}</b><span class="tiny muted">${esc(last?.text || 'New conversation')}</span></span><span class="tiny muted">${timeAgo(last?.at || Date.now())}</span></button>`
-    }).join('')}</aside><main class="messenger-main"><div class="empty" style="margin:auto"><p class="muted">Customer conversation open karne ke liye select karein.</p></div></main></div>` : `<div class="empty"><p class="muted">Abhi koi ${panel === 'store-chats' ? 'store' : 'product'} chat nahi.</p></div>`}
+    ${grouped.length ? `<div class="messenger-shell">
+      <aside class="messenger-sidebar"><h3 class="h4">Customers</h3>${grouped.map((contactThreads, idx) => {
+        const customer = userById(contactThreads[0].customer)
+        const last = contactThreads.flatMap((thread) => thread.messages).sort((a, b) => b.at - a.at)[0]
+        const hasUnread = contactThreads.some((t) => !t.readByOwner && !t.read)
+        return `<button class="message-contact ${idx === 0 ? 'active' : ''}" data-owner-thread="${contactThreads[0].id}" data-panel-type="${panel}">
+          ${avatar(customer || { name: 'Customer' }, 'sm')}
+          <span class="preview">
+            <b class="row-between"><span>${esc(customer?.name || 'Customer')}</span>${hasUnread ? '<span class="dot" style="background:var(--magenta);width:8px;height:8px;border-radius:50%"></span>' : ''}</b>
+            <span class="tiny muted">${esc(last?.text || 'New conversation')}</span>
+          </span>
+          <span class="tiny muted">${timeAgo(last?.at || Date.now())}</span>
+        </button>`
+      }).join('')}</aside>
+      <main class="messenger-main" data-owner-chat-main="${panel}">
+        <div class="empty" style="margin:auto"><p class="muted">Loading conversation…</p></div>
+      </main>
+    </div>` : `<div class="empty"><p class="muted">Abhi koi ${panel === 'store-chats' ? 'store' : 'product'} chat nahi.</p></div>`}
   </div>`
 }
 
@@ -159,6 +173,8 @@ dashboardPage.mount = (params, query, root) => {
     tabs.forEach((x) => x.classList.toggle('active', x === b))
     root.querySelectorAll('[data-panel]').forEach((pnl) => { pnl.hidden = pnl.dataset.panel !== b.dataset.tab })
     if (b.dataset.tab === 'warehouse') bindWarehouse(root, root.querySelector('[data-panel="warehouse"]'), myStores()[0].id)
+    if (b.dataset.tab === 'store-chats') initOwnerMessenger(root, 'store-chats')
+    if (b.dataset.tab === 'product-chats') initOwnerMessenger(root, 'product-chats')
   }))
 
   root.querySelectorAll('[data-toggle-hide]').forEach((b) => b.addEventListener('click', () => {
@@ -170,16 +186,45 @@ dashboardPage.mount = (params, query, root) => {
     navigate('#/dashboard')
   }))
 
-  root.querySelectorAll('[data-advance]').forEach((b) => b.addEventListener('click', () => {
-    advanceOrder(b.dataset.advance)
-    toast('Order status update ho gaya', 'ok')
-    navigate('#/dashboard')
-  }))
-  root.querySelectorAll('[data-cancel-order]').forEach((b) => b.addEventListener('click', () => {
-    modal({ title: 'Cancel order', body: '<textarea class="textarea" id="cancel-reason" placeholder="Customer ko reason batayein"></textarea>', foot: '<button class="btn btn-ghost" data-close>Back</button><button class="btn btn-danger" id="cancel-go">Cancel order</button>', onOpen: (el) => el.querySelector('#cancel-go').addEventListener('click', () => { const reason = el.querySelector('#cancel-reason').value.trim(); if (!reason) return toast('Reason likhna zaroori hai', 'err'); cancelOrder(b.dataset.cancelOrder, reason); closeModal(); toast('Customer ko cancellation notification bhej di', 'ok'); navigate('#/dashboard') }) })
+  root.querySelectorAll('[data-advance]').forEach((b) => b.addEventListener('click', async (e) => {
+    const btn = spinner(e.currentTarget)
+    try {
+      const id = b.dataset.advance
+      advanceOrder(id)
+      const order = state.orders.find((o) => o.id === id)
+      if (order) await syncOrder(order).catch((err) => console.warn('Order sync note:', err))
+      toast('Order status update ho gaya', 'ok')
+      navigate('#/dashboard')
+    } catch (err) {
+      toast(err.message || 'Status update nahi ho saka', 'err')
+    } finally {
+      btn()
+    }
   }))
 
-  root.querySelectorAll('[data-reply]').forEach((b) => b.addEventListener('click', () => openReply(b.dataset.reply)))
+  root.querySelectorAll('[data-cancel-order]').forEach((b) => b.addEventListener('click', () => {
+    modal({
+      title: 'Cancel order',
+      body: '<textarea class="textarea" id="cancel-reason" placeholder="Customer ko reason batayein"></textarea>',
+      foot: '<button class="btn btn-ghost" data-close>Back</button><button class="btn btn-danger" id="cancel-go">Cancel order</button>',
+      onOpen: (el) => el.querySelector('#cancel-go').addEventListener('click', async (e) => {
+        const reason = el.querySelector('#cancel-reason').value.trim()
+        if (!reason) return toast('Reason likhna zaroori hai', 'err')
+        const cancelBtn = spinner(e.currentTarget)
+        try {
+          const order = cancelOrder(b.dataset.cancelOrder, reason)
+          if (order) await syncOrder(order).catch((err) => console.warn('Order sync note:', err))
+          closeModal()
+          toast('Customer ko cancellation notification bhej di', 'ok')
+          navigate('#/dashboard')
+        } catch (err) {
+          toast(err.message || 'Cancel failed', 'err')
+        } finally {
+          cancelBtn()
+        }
+      })
+    })
+  }))
 
   root.querySelectorAll('[data-sale]').forEach((b) => b.addEventListener('click', () => openSaleEditor(b.dataset.sale)))
   root.querySelectorAll('[data-delete-store]').forEach((b) => b.addEventListener('click', () => {
@@ -209,55 +254,96 @@ dashboardPage.mount = (params, query, root) => {
   }))
 
   bindWarehouse(root, root.querySelector('[data-panel="warehouse"]'), myStores()[0].id)
-
+  initOwnerMessenger(root, 'store-chats')
+  initOwnerMessenger(root, 'product-chats')
 }
 
-function openReply(threadId) {
-  const th = threadById(threadId)
-  if (!th) return
-  state.notifications.filter((notification) => notification.to === currentUser()?.id && notification.link === '#/dashboard').forEach((notification) => { notification.read = true })
-  localStorage.setItem('street-bazar-v1', JSON.stringify(state))
-  window.dispatchEvent(new Event('street-bazar:notifications-changed'))
-  const store = storeById(th.store)
-  const product = productById(th.product)
-  th.readByOwner = true
-  th.read = true
-  syncThread(th).catch((error) => console.error('Owner read receipt sync failed:', error))
-  markThreadRead(threadId)
-  const who = userById(th.customer)?.name || 'Customer'
-  modal({
-      title: (product ? 'Product chat · ' : 'Store chat · ') + esc(who),
-      body: `<div class="chatbox" style="height:340px">
-          <div class="chat-head">${storeAvatar(store, 'sm')}<div style="flex:1"><b class="small">${esc(who)}</b><div class="sub">${product ? esc(product.title) : 'Store conversation'}</div></div></div>
-          <div class="chat-body" data-body>
-            ${th.messages.map((m) => `<div class="msg ${m.from === th.customer ? 'them' : 'me'}"><div class="who">${m.from === th.customer ? esc(who) : m.from === 'ai' ? 'Bazar AI' : 'You'}</div>${esc(m.text)}<div class="time">${timeAgo(m.at)}</div></div>`).join('')}
-          </div>
-          <div class="chat-foot"><input class="input" data-in placeholder="Type reply…"><button class="btn btn-primary" data-send>${icon('send', '', 15)}</button></div>
-        </div>`,
-      onOpen: (el) => {
-        const body = el.querySelector('[data-body]')
-        body.scrollTop = body.scrollHeight
-        const send = () => {
-          const v = el.querySelector('[data-in]').value.trim()
-          if (!v) return
-          th.messages.push({ from: currentUser().id, text: v, at: Date.now() })
-          th.read = true
-          th.readByCustomer = false
-          save()
-          syncThread(th).catch((error) => console.error('Owner reply sync failed:', error))
-          const notification = { id: 'n-' + Date.now(), to: th.customer, title: 'New reply from ' + (storeById(th.store)?.name || 'store'), body: v.slice(0, 80), at: Date.now(), read: false, link: '#/messages', storeId: th.store, threadId: th.id }
-          state.notifications.unshift(notification)
-          syncNotification(notification).catch((error) => console.error('Reply notification sync failed:', error))
-          el.querySelector('[data-in]').value = ''
-          const div = document.createElement('div')
-          div.className = 'msg me'
-          div.innerHTML = `<div class="who">You</div>${esc(v)}<div class="time">just now</div>`
-          body.appendChild(div); body.scrollTop = body.scrollHeight
-        }
-        el.querySelector('[data-send]').addEventListener('click', send)
-        el.querySelector('[data-in]').addEventListener('keydown', (e) => { if (e.key === 'Enter') send() })
-      },
+function initOwnerMessenger(root, panelName) {
+  const panel = root.querySelector(`[data-panel="${panelName}"]`)
+  if (!panel) return
+  const main = panel.querySelector(`[data-owner-chat-main="${panelName}"]`)
+  if (!main) return
+
+  const openThread = (threadId) => {
+    const th = threadById(threadId)
+    if (!th) return
+    state.notifications.filter((notification) => notification.to === currentUser()?.id && notification.link === '#/dashboard').forEach((notification) => { notification.read = true })
+    localStorage.setItem('street-bazar-v1', JSON.stringify(state))
+    window.dispatchEvent(new Event('street-bazar:notifications-changed'))
+
+    const store = storeById(th.store)
+    const product = productById(th.product)
+    th.readByOwner = true
+    th.read = true
+    syncThread(th).catch((error) => console.error('Owner read receipt sync failed:', error))
+    markThreadRead(threadId)
+
+    panel.querySelectorAll('[data-owner-thread]').forEach((btn) => btn.classList.toggle('active', btn.dataset.ownerThread === threadId))
+    const customer = userById(th.customer)
+    const who = customer?.name || 'Customer'
+
+    main.innerHTML = `<div class="chatbox" style="height:460px;display:flex;flex-direction:column">
+      <div class="chat-head" style="padding:12px 16px;border-bottom:1px solid var(--line)">
+        ${avatar(customer || { name: who }, 'sm')}
+        <div style="flex:1">
+          <b class="small">${esc(who)}</b>
+          <div class="sub">${product ? `<a href="#/product/${product.id}" target="_blank" style="color:var(--magenta)">${esc(product.title)}</a>` : esc(store?.name || 'Store Chat')}</div>
+        </div>
+        ${product ? `<span class="badge badge-soft">${money(product.price)}</span>` : ''}
+      </div>
+      <div class="chat-body" data-owner-body style="flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:10px">
+        ${th.messages.map((m) => {
+          const mine = m.from === currentUser()?.id
+          const ai = m.from === 'ai'
+          return `<div class="msg ${mine ? 'me' : ai ? 'ai' : 'them'}">
+            <div class="who">${mine ? 'You' : ai ? 'Bazar AI' : esc(who)}</div>
+            ${esc(m.text)}
+            <div class="time">${timeAgo(m.at)}</div>
+          </div>`
+        }).join('')}
+      </div>
+      <div class="chat-foot" style="padding:12px 14px;border-top:1px solid var(--line);display:flex;gap:10px">
+        <input class="input" data-owner-in placeholder="Type reply for ${esc(who)}…" style="flex:1">
+        <button class="btn btn-primary" data-owner-send>${icon('send', '', 15)} <span>Send</span></button>
+      </div>
+    </div>`
+
+    const body = main.querySelector('[data-owner-body]')
+    const input = main.querySelector('[data-owner-in]')
+    const sendBtn = main.querySelector('[data-owner-send]')
+    if (body) body.scrollTop = body.scrollHeight
+
+    const send = () => {
+      const v = input.value.trim()
+      if (!v) return
+      input.value = ''
+      th.messages.push({ from: currentUser().id, text: v, at: Date.now() })
+      th.read = true
+      th.readByCustomer = false
+      save()
+      syncThread(th).catch((error) => console.error('Owner reply sync failed:', error))
+      const notification = { id: 'n-' + Date.now(), to: th.customer, title: 'New reply from ' + (storeById(th.store)?.name || 'store'), body: v.slice(0, 80), at: Date.now(), read: false, link: '#/messages', storeId: th.store, threadId: th.id }
+      state.notifications.unshift(notification)
+      syncNotification(notification).catch((error) => console.error('Reply notification sync failed:', error))
+
+      const div = document.createElement('div')
+      div.className = 'msg me'
+      div.innerHTML = `<div class="who">You</div>${esc(v)}<div class="time">Just now</div>`
+      body.appendChild(div)
+      body.scrollTop = body.scrollHeight
+    }
+
+    sendBtn?.addEventListener('click', send)
+    input?.addEventListener('keydown', (e) => { if (e.key === 'Enter') send() })
+  }
+
+  panel.querySelectorAll('[data-owner-thread]').forEach((btn) => {
+    btn.addEventListener('click', () => openThread(btn.dataset.ownerThread))
   })
+
+  const firstBtn = panel.querySelector('[data-owner-thread]')
+  if (firstBtn) openThread(firstBtn.dataset.ownerThread)
+}
 }
 
 function openSaleEditor(storeId) {

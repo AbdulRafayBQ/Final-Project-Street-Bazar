@@ -551,9 +551,24 @@ export const lowStock = () => state.products.filter((p) => p.stock <= 8 && p.sta
 export function searchAll(q = '') {
   const s = q.toLowerCase().trim()
   if (!s) return { products: [], stores: [] }
-  const products = state.products.filter((p) =>
-    p.status === 'active' && storeById(p.store)?.status === 'live' && (p.title.toLowerCase().includes(s) || (p.tags || []).join(' ').toLowerCase().includes(s) || (p.categories || []).join(' ').toLowerCase().includes(s)))
-  const stores = liveStores().filter((st) => (st.name + ' ' + st.tagline + ' ' + (st.categories || []).join(' ')).toLowerCase().includes(s))
+  const words = s.split(/\s+/).filter(Boolean)
+  const products = state.products.filter((p) => {
+    if (p.status === 'hidden') return false
+    const store = storeById(p.store)
+    if (store && store.status !== 'live') return false
+    const haystack = `${p.title} ${(p.tags || []).join(' ')} ${(p.categories || []).join(' ')} ${p.description || ''} ${store?.name || ''}`.toLowerCase()
+    return words.every((word) => haystack.includes(word)) || words.some((word) => haystack.includes(word))
+  }).sort((a, b) => {
+    const hayA = `${a.title} ${(a.tags || []).join(' ')}`.toLowerCase()
+    const hayB = `${b.title} ${(b.tags || []).join(' ')}`.toLowerCase()
+    const matchA = words.filter((w) => hayA.includes(w)).length
+    const matchB = words.filter((w) => hayB.includes(w)).length
+    return matchB - matchA || b.sales - a.sales
+  })
+  const stores = liveStores().filter((st) => {
+    const haystack = `${st.name} ${st.tagline || ''} ${(st.categories || []).join(' ')} ${st.city || ''} ${st.description || ''}`.toLowerCase()
+    return words.every((word) => haystack.includes(word)) || words.some((word) => haystack.includes(word))
+  })
   return { products, stores }
 }
 
@@ -654,6 +669,8 @@ export function createProduct(data) {
     deliveryCharge: Number(data.deliveryCharge) || 0,
     homeDeliveryCharge: Number(data.homeDeliveryCharge ?? data.deliveryCharge) || 0,
     outsideDeliveryCharge: Number(data.outsideDeliveryCharge ?? data.deliveryCharge) || 0,
+    homeCityDeliveryDays: data.homeCityDeliveryDays || '1-2 days',
+    outOfCityDeliveryDays: data.outOfCityDeliveryDays || '3-5 days',
     sku: data.sku || '', customizable: data.customizable || { on: false, options: [] },
     wholesale: data.wholesale || { on: false, tiers: [] }, sales: 0, rating: 0,
     createdAt: Date.now(), status: 'pending',
@@ -675,6 +692,19 @@ export function deliveryChargeFor(product, city) {
   const home = String(store?.city || '').trim().toLowerCase()
   if (entered && home && entered === home) return Number(product.homeDeliveryCharge ?? product.deliveryCharge) || 0
   return Number(product.outsideDeliveryCharge ?? product.deliveryCharge) || 0
+}
+export function deliveryTimeFor(product, city) {
+  if (!product) return '2–5 days'
+  const store = storeById(product.store)
+  const entered = String(city || '').trim().toLowerCase()
+  const home = String(store?.city || '').trim().toLowerCase()
+  if (entered && home && entered === home) {
+    return product.homeCityDeliveryDays || '1-2 days'
+  }
+  if (entered) {
+    return product.outOfCityDeliveryDays || '3-5 days'
+  }
+  return null
 }
 export function updateProduct(id, data) {
   const p = productById(id); if (!p) return null

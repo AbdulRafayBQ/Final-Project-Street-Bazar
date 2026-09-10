@@ -56,20 +56,27 @@ export async function addProductPage(params) {
             <div class="field"><span class="label">Description</span><textarea class="textarea" id="p-desc" style="min-height:150px" placeholder="Features, material, delivery…">${esc(editing?.description || '')}</textarea></div>
             <div class="grid grid-3" style="gap:12px">
               <div class="field"><span class="label">Price (Rs) *</span><input class="input" id="p-price" type="number" min="0" value="${editing?.price || ''}" placeholder="1499"></div>
-              <div class="field"><span class="label">Compare-at</span><input class="input" id="p-compare" type="number" min="0" value="${editing?.compareAt || ''}" placeholder="1999"></div>
+              <div class="field"><span class="label">Compare-at (Rs)</span><input class="input" id="p-compare" type="number" min="0" value="${editing?.compareAt || ''}" placeholder="1999"></div>
               <div class="field"><span class="label">Stock *</span><input class="input" id="p-stock" type="number" min="0" value="${editing?.stock ?? ''}" placeholder="50"></div>
             </div>
-            <div class="grid grid-3" style="gap:12px">
-              <div class="field"><span class="label">Home city delivery (Rs)</span><input class="input" id="p-home-delivery" type="number" min="0" value="${editing?.homeDeliveryCharge ?? editing?.deliveryCharge ?? ''}" placeholder="150"></div>
-              <div class="field"><span class="label">Other cities delivery (Rs)</span><input class="input" id="p-outside-delivery" type="number" min="0" value="${editing?.outsideDeliveryCharge ?? editing?.deliveryCharge ?? ''}" placeholder="300"></div>
-              <div class="field"><span class="label">Customization extra price (Rs)</span><input class="input" id="p-custom-price" type="number" min="0" value="${editing?.customizable?.price || ''}" placeholder="500"></div>
+            <div class="grid grid-2" style="gap:12px">
+              <div class="field"><span class="label">Home city delivery charge (Rs) *</span><input class="input" id="p-home-delivery" type="number" min="0" value="${editing?.homeDeliveryCharge ?? editing?.deliveryCharge ?? 150}" placeholder="150"></div>
+              <div class="field"><span class="label">Other cities delivery charge (Rs) *</span><input class="input" id="p-outside-delivery" type="number" min="0" value="${editing?.outsideDeliveryCharge ?? editing?.deliveryCharge ?? 250}" placeholder="250"></div>
             </div>
             <div class="grid grid-2" style="gap:12px">
-              <div class="field"><span class="label">SKU (optional)</span><input class="input" id="p-sku" value="${esc(editing?.sku || '')}" placeholder="NA-KUR-01"></div>
-              <div class="field"><span class="label">Category *</span>
-                <select class="select" id="p-cat">${allCategories().map((c) => `<option ${editing?.categories?.includes(c) ? 'selected' : ''}>${c}</option>`).join('')}</select>
-              </div>
+              <div class="field"><span class="label">Home city delivery time *</span><input class="input" id="p-home-days" value="${esc(editing?.homeCityDeliveryDays || '1-2 days')}" placeholder="e.g. 1-2 days"></div>
+              <div class="field"><span class="label">Other cities delivery time *</span><input class="input" id="p-outside-days" value="${esc(editing?.outOfCityDeliveryDays || '3-5 days')}" placeholder="e.g. 3-5 days"></div>
             </div>
+            <div class="grid grid-2" style="gap:12px">
+              <div class="field"><span class="label">Category *</span>
+                <select class="select" id="p-cat">
+                  <option value="">-- Select Category * --</option>
+                  ${allCategories().map((c) => `<option value="${esc(c)}" ${editing?.categories?.includes(c) ? 'selected' : ''}>${esc(c)}</option>`).join('')}
+                </select>
+              </div>
+              <div class="field"><span class="label">SKU (optional)</span><input class="input" id="p-sku" value="${esc(editing?.sku || '')}" placeholder="NA-KUR-01"></div>
+            </div>
+            <div class="field"><span class="label">Customization extra price (Rs)</span><input class="input" id="p-custom-price" type="number" min="0" value="${editing?.customizable?.price || ''}" placeholder="500"></div>
             <div class="field"><span class="label">Tags (comma separated)</span><input class="input" id="p-tags" value="${esc((editing?.tags || []).join(', '))}" placeholder="handmade, leather, gift"></div>
           </div>
         </div>
@@ -252,35 +259,112 @@ addProductPage.mount = (params, query, root) => {
   root.querySelector('#p-store').addEventListener('change', paintPreview)
   paintPreview()
 
+  function showFieldError(inputEl, msg = 'This field is required') {
+    if (!inputEl) return
+    inputEl.classList.add('has-error')
+    const field = inputEl.closest('.field') || inputEl.parentElement
+    if (field) {
+      field.classList.add('has-field-error')
+      let err = field.querySelector('.field-error-msg')
+      if (!err) {
+        err = document.createElement('div')
+        err.className = 'field-error-msg'
+        err.style.cssText = 'color:var(--red);font-size:12px;margin-top:5px;font-weight:600;display:flex;align-items:center;gap:5px'
+        field.appendChild(err)
+      }
+      err.innerHTML = `${icon('alert', '', 12)} <span>${esc(msg)}</span>`
+      const clear = () => {
+        inputEl.classList.remove('has-error')
+        field.classList.remove('has-field-error')
+        err.remove()
+      }
+      inputEl.addEventListener('input', clear, { once: true })
+      inputEl.addEventListener('change', clear, { once: true })
+    }
+  }
+
+  function clearAllErrors() {
+    root.querySelectorAll('.has-error').forEach((el) => el.classList.remove('has-error'))
+    root.querySelectorAll('.has-field-error').forEach((el) => el.classList.remove('has-field-error'))
+    root.querySelectorAll('.field-error-msg').forEach((el) => el.remove())
+  }
+
   /* ---- publish ---- */
   root.querySelector('#p-publish').addEventListener('click', async (e) => {
-    const title = root.querySelector('#p-title').value.trim()
-    const price = Number(root.querySelector('#p-price').value)
-    const stock = Number(root.querySelector('#p-stock').value)
-    if (!title) return toast('Title zaroori hai', 'err')
-    if (!price) return toast('Price dalna zaroori hai', 'err')
-    if (root.querySelector('#p-stock').value === '') return toast('Stock likhein (0 bhi chalega)', 'err')
+    clearAllErrors()
+    const titleEl = root.querySelector('#p-title')
+    const priceEl = root.querySelector('#p-price')
+    const stockEl = root.querySelector('#p-stock')
+    const catEl = root.querySelector('#p-cat')
+    const homeDaysEl = root.querySelector('#p-home-days')
+    const outDaysEl = root.querySelector('#p-outside-days')
+
+    const title = titleEl.value.trim()
+    const price = Number(priceEl.value)
+    const stockStr = stockEl.value.trim()
+    const category = catEl.value.trim()
+    const homeCityDeliveryDays = homeDaysEl.value.trim() || '1-2 days'
+    const outOfCityDeliveryDays = outDaysEl.value.trim() || '3-5 days'
+
+    let hasErrors = false
+
+    if (!title) {
+      showFieldError(titleEl, 'Product title is required')
+      hasErrors = true
+    }
+    if (!price || price <= 0) {
+      showFieldError(priceEl, 'Valid product price is required')
+      hasErrors = true
+    }
+    if (stockStr === '') {
+      showFieldError(stockEl, 'Stock quantity is required (0 or more)')
+      hasErrors = true
+    }
+    if (!category) {
+      showFieldError(catEl, 'Please select a product category')
+      hasErrors = true
+    }
+    if (!homeDaysEl.value.trim()) {
+      showFieldError(homeDaysEl, 'Home city delivery time is required (e.g. 1-2 days)')
+      hasErrors = true
+    }
+    if (!outDaysEl.value.trim()) {
+      showFieldError(outDaysEl, 'Other cities delivery time is required (e.g. 3-5 days)')
+      hasErrors = true
+    }
+
+    if (hasErrors) {
+      const firstError = root.querySelector('.has-error')
+      if (firstError) firstError.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      return toast('Zaroori fields check karein aur fill karein', 'err')
+    }
+
+    const stock = Number(stockStr)
+
     if (wsOn.checked) {
       const validTiers = tiers.filter((tier) => tier.qty > 0 && tier.price > 0)
       if (!validTiers.length) return toast('Wholesale ke liye quantity aur price set karein', 'err')
       if (validTiers.some((tier) => tier.price >= price)) return toast('Wholesale price retail price se kam honi chahiye', 'err')
       tiers = validTiers.sort((a, b) => a.qty - b.qty)
     }
+
     const btn = spinner(e.currentTarget)
-    await new Promise((r) => setTimeout(r, 500))
+    await new Promise((r) => setTimeout(r, 400))
     const data = {
       store: root.querySelector('#p-store').value,
       title,
       description: root.querySelector('#p-desc').value.trim(),
       price, compareAt: Number(root.querySelector('#p-compare').value) || null,
       stock, sku: root.querySelector('#p-sku').value.trim(),
-      categories: [root.querySelector('#p-cat').value],
+      categories: [category],
       tags: root.querySelector('#p-tags').value.split(',').map((t) => t.trim()).filter(Boolean),
       media: media.length ? media : [{ type: 'image', url: './images/p-kurta.png' }],
       wholesale: { on: wsOn.checked, tiers: wsOn.checked ? tiers : [] },
       deliveryCharge: Number(root.querySelector('#p-outside-delivery').value) || 0,
       homeDeliveryCharge: Number(root.querySelector('#p-home-delivery').value) || 0,
       outsideDeliveryCharge: Number(root.querySelector('#p-outside-delivery').value) || 0,
+      homeCityDeliveryDays,
+      outOfCityDeliveryDays,
       customizable: { on: custOn.checked, price: custOn.checked ? (Number(root.querySelector('#p-custom-price').value) || 0) : 0, options: custOn.checked ? options.filter((o) => o.name && o.choices.length) : [] },
     }
     try {

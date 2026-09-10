@@ -2,7 +2,7 @@
 
 import { icon, esc, money, num, toast, timeAgo, closeModal, stars, modal, storeAvatar } from '../ui.js'
 import { productCard, reviewItem } from '../components.js'
-import { productById, storeOf, currentUser, isFollowing, addToCart, addReview, productReviews, ratingOf, storeProducts, likedProducts, toggleLike, state } from '../store.js'
+import { productById, storeOf, currentUser, isFollowing, addToCart, addReview, productReviews, ratingOf, storeProducts, likedProducts, toggleLike, state, deliveryChargeFor, deliveryTimeFor } from '../store.js'
 import { navigate } from '../router.js'
 import { bindChat } from './store.js'
 
@@ -74,8 +74,18 @@ export async function productPage(params) {
             ${p.compareAt ? `<span class="price-old" style="font-size:16px">${money(p.compareAt)}</span>` : ''}
             ${off ? `<span class="price-off">You save ${money(p.compareAt - p.price)}</span>` : ''}
           </div>
-          <div class="tiny muted" style="margin-top:8px">Delivery charges may differ depending on the cities.</div>
           <div data-wholesale-notice style="display:none;margin-top:10px;padding:8px 14px;font-size:13px;border-radius:10px;background:rgba(13,148,136,0.1);color:#0D9488;border:1px solid rgba(13,148,136,0.2)"></div>
+        </div>
+
+        <div class="delivery-calc-card panel" style="padding:14px 18px;background:var(--paper-2);border:1px solid var(--line);border-radius:14px;margin-top:4px">
+          <div class="row-between" style="flex-wrap:wrap;gap:6px">
+            <b class="small row" style="gap:6px">${icon('truck', '', 16)} <span>Estimated Delivery & Charges</span></b>
+            <span class="badge badge-soft tiny">${s?.city ? `Store city: ${esc(s.city)}` : 'Verified seller'}</span>
+          </div>
+          <div class="row" style="gap:8px;margin-top:10px">
+            <input class="input" id="p-calc-city" placeholder="Apna city enter karein (e.g. ${s?.city || 'Lahore'}, Karachi)..." style="font-size:13px;padding:8px 12px;border-radius:10px">
+          </div>
+          <div id="p-delivery-status" style="margin-top:10px;font-size:13px;line-height:1.6" class="stack tiny"></div>
         </div>
 
         ${p.customizable?.on ? `<div class="row" style="gap:8px;margin-top:16px"><button class="btn btn-sm btn-primary" data-product-mode="normal">Normal product</button><button class="btn btn-sm btn-ghost" data-product-mode="custom">Customize product</button></div>
@@ -115,7 +125,7 @@ export async function productPage(params) {
         </div>
 
         <div class="trust-row">
-          <div>${icon('truck', '', 15)} Delivery 2–5 days</div>
+          <div>${icon('truck', '', 15)} ${p.homeCityDeliveryDays ? `${p.homeCityDeliveryDays} (${s?.city || 'Home City'})` : 'Fast Delivery'}</div>
           <div>${icon('refresh', '', 15)} 7-day exchange</div>
           <div>${icon('shield', '', 15)} Verified store</div>
         </div>
@@ -323,6 +333,31 @@ productPage.mount = (params, query, root) => {
       },
     })
   })
+
+  // delivery calculator
+  const cityInput = root.querySelector('#p-calc-city')
+  const statusEl = root.querySelector('#p-delivery-status')
+  if (cityInput && statusEl) {
+    const updateDelivery = () => {
+      const city = cityInput.value.trim()
+      if (!city) {
+        statusEl.innerHTML = `
+          <div class="muted">📍 Delivery time & charges: <b style="color:var(--ink)">Depends on your address</b></div>
+          <div class="muted tiny" style="margin-top:2px">Home City (${esc(s?.city || 'Local')}): <b>${esc(p.homeCityDeliveryDays || '1–2 days')}</b> · Other cities: <b>${esc(p.outOfCityDeliveryDays || '3–5 days')}</b></div>
+        `
+        return
+      }
+      const days = deliveryTimeFor(p, city) || (p.outOfCityDeliveryDays || '3–5 days')
+      const charge = deliveryChargeFor(p, city)
+      const isHome = s?.city && city.toLowerCase() === s.city.toLowerCase()
+      statusEl.innerHTML = `
+        <div style="color:var(--emerald);font-weight:600">✓ ${esc(city)}: Estimated <b>${esc(days)}</b> delivery ${isHome ? '(Home City)' : '(Standard Shipping)'}</div>
+        <div class="muted tiny" style="margin-top:2px">Delivery Charges: <b style="color:var(--ink)">${charge > 0 ? money(charge) : 'Free Delivery'}</b></div>
+      `
+    }
+    updateDelivery()
+    cityInput.addEventListener('input', updateDelivery)
+  }
 
   // reviews
   root.querySelector('[data-write-review]')?.addEventListener('click', () => openReviewModal(p))

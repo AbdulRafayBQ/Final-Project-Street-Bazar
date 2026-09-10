@@ -233,54 +233,72 @@ export async function genCategorySuggestion({ rough, storeName }) {
 }
 
 export async function assistantReply({ question, history = [] }) {
-  const catalogProducts = state.products.filter((p) => p.status === 'active' && storeById(p.store)?.status === 'live' && !p.demo && !storeById(p.store)?.demo)
+  const catalogProducts = state.products.filter((p) => p.status !== 'hidden' && (!storeById(p.store) || storeById(p.store)?.status !== 'rejected'))
   const catalog = catalogProducts.map((p) => {
     const store = storeById(p.store)
     return `${p.title} | ${store?.name || 'Store'} | Rs ${p.price} | ${p.stock > 0 ? 'in stock' : 'out of stock'} | ${[...(p.categories || []), ...(p.tags || [])].join(', ')}`
   }).join('\n')
-  const liveStores = state.stores.filter((store) => !store.demo && store.status !== 'hidden').map((store) => `${store.name} | ${store.type || 'Store'} | ${store.city || ''} | ${store.description || ''}`).join('\n')
+  const liveStoresList = state.stores.filter((store) => store.status !== 'hidden' && store.status !== 'rejected').map((store) => `${store.name} | ${store.type || 'Store'} | ${store.city || ''} | ${store.description || ''}`).join('\n')
   const memory = history.slice(-6).map((item) => `${item.role === 'user' ? 'Customer' : 'You'}: ${item.text}`).join('\n')
-  const r = await think('assistant', { prompt: `You are a concise shopping assistant. Reply naturally in Roman Urdu/English. Answer only what the customer asked; do not add suggestions, recommendations, greetings, personal details, or technical/internal project information. Never mention databases, Supabase, APIs, backend systems, catalogs, live systems, or implementation. Keep replies to 1-2 short sentences. If the customer asks about a product and a matching item exists, give the matching item link through the app result cards. Recent conversation:\n${memory || '(first message)'}\nShopping information:\n${catalog || '(no matching shopping information)'}\nStores:\n${liveStores || '(no store information)'}`, user: question }, async () => {
+  const r = await think('assistant', { prompt: `You are a helpful Pakistani marketplace shopping assistant for Street Bazar. Reply warmly and concisely in Roman Urdu/English. Help customers find products, prices, and store information. Answer directly and keep replies to 1-2 friendly sentences. Never mention internal technical details, databases, or APIs. Conversation history:\n${memory || '(first message)'}\nAvailable products:\n${catalog || '(no products)'}\nStores:\n${liveStoresList || '(no stores)'}`, user: question }, async () => {
     const q = T(question).toLowerCase()
-    if (q.includes('sale') || q.includes('offer')) {
-      const list = state.stores.filter((s) => !s.demo && s.sale && s.sale.until > Date.now())
-      return list.length ? `${list.length} active sale${list.length === 1 ? '' : 's'} mil rahi hain.` : 'Filhaal koi live sale nahi hai.'
+    if (q.includes('sale') || q.includes('offer') || q.includes('deal') || q.includes('discount')) {
+      const list = state.stores.filter((s) => s.sale && s.sale.until > Date.now())
+      return list.length ? `${list.length} active sales chal rahi hain. Check out these popular items:` : 'Filhaal koi live sale banner nahi hai, lekin best budget picks neeche hain.'
     }
     if (q.includes('follow')) {
       const u = currentUser()
       const f = state.follows.filter((x) => x.user === u?.id)
-      return f.length ? 'Aap ' + f.length + ' stores follow kar rahe hain. Nayi listing For You feed mein show hoti hai.' : 'Abhi tak koi store follow nahi kiya. Explore se apne favourite store follow karein.'
+      return f.length ? `Aap ${f.length} stores follow kar rahe hain. Naye drops For You feed mein milenge.` : 'Explore Dukanien se apne pasandida stores follow karein.'
     }
-    if (q.includes('cheap') || q.includes('best price') || q.includes('budget')) {
-      const cheap = catalogProducts.filter((p) => p.stock > 0).sort((a, b) => a.price - b.price).slice(0, 3)
-      return cheap.length ? `${cheap.length} budget product${cheap.length === 1 ? '' : 's'} available hain.` : 'Is waqt budget mein product nahi mila.'
+    if (q.includes('cheap') || q.includes('best price') || q.includes('budget') || q.includes('sasta')) {
+      const cheap = catalogProducts.filter((p) => p.stock > 0).sort((a, b) => a.price - b.price).slice(0, 4)
+      return cheap.length ? `Yeh hamare best budget deals hain:` : 'Is waqt budget products search karein.'
     }
-    if (q.includes('track') || q.includes('order')) return 'Track page par Order ID (SB-XXXXXX) daliye — status, courier note aur expected delivery sab aa jayega.'
-    const words = q.split(/\s+/).filter((w) => w.length > 2 && !['under', 'price', 'chahiye', 'mujhe', 'please'].includes(w))
-    const maxPrice = Number(q.match(/(?:under|below|less than)\s*(?:rs\.?\s*)?(\d+)/)?.[1] || 0)
-    const candidates = catalogProducts.map((p) => {
-      const text = `${p.title} ${(p.tags || []).join(' ')} ${(p.categories || []).join(' ')}`.toLowerCase()
-      return { p, score: words.filter((word) => text.includes(word)).length + (maxPrice && p.price <= maxPrice ? 1 : 0) }
-    }).filter((entry) => entry.score > 0).sort((a, b) => b.score - a.score || (maxPrice ? Math.abs(a.p.price - maxPrice) - Math.abs(b.p.price - maxPrice) : 0))
-    const hit = candidates[0]?.p || searchAll(question).products.find((p) => !p.demo && !storeById(p.store)?.demo)
-    if (hit) return chatReply({ question, productId: hit.id, storeId: hit.store })
-    return catalogProducts.length ? 'Product ka naam, category ya budget batayein — main behtar option suggest kar dunga.' : 'Aap apni requirement, style ya budget batayein — main us hisaab se guide kar dunga.'
+    if (q.includes('track') || q.includes('order')) return 'Track page par apni Order ID (SB-XXXXXX) enter karein — live tracking mil jayegi.'
+    const searchRes = searchAll(question).products
+    if (searchRes.length) return `Yeh products aapke sawal ke mutabiq mile hain:`
+    return catalogProducts.length ? 'Aap jo product dhoond rahe hain, uske details aur matching items neeche hain:' : 'Aap apni pasand ya budget batayein — main guide kar dunga.'
   }, question, 220)
+
   const q = T(question).toLowerCase()
   const maxPrice = Number(q.match(/(?:under|below|less than|se kam|tak)\s*(?:rs\.?\s*)?(\d[\d,]*)/)?.[1]?.replace(/,/g, '') || 0)
-  const words = q.split(/\s+/).filter((word) => word.length > 2 && !['under', 'below', 'less', 'than', 'se', 'kam', 'tak', 'price', 'chahiye', 'mujhe', 'please', 'hai', 'koi'].includes(word))
-  const matches = catalogProducts.map((p) => {
-    const text = `${p.title} ${(p.tags || []).join(' ')} ${(p.categories || []).join(' ')}`.toLowerCase()
-    return { p, score: words.filter((word) => text.includes(word)).length + (maxPrice && p.price <= maxPrice ? 1 : 0) }
-  }).filter(({ p, score }) => score > 0 && (!maxPrice || p.price <= maxPrice)).sort((a, b) => b.score - a.score || a.p.price - b.p.price).slice(0, 6)
-  r.matches = matches.map(({ p }) => {
+  const words = q.split(/[\s,?.!]+/).filter((word) => word.length >= 2 && !['under', 'below', 'less', 'than', 'se', 'kam', 'tak', 'price', 'chahiye', 'mujhe', 'please', 'hai', 'koi', 'kya', 'aur', 'the', 'for', 'show', 'dikhayein', 'batao', 'bataiye', 'products', 'items'].includes(word))
+
+  let matches = catalogProducts.map((p) => {
+    const text = `${p.title} ${(p.tags || []).join(' ')} ${(p.categories || []).join(' ')} ${p.description || ''}`.toLowerCase()
+    let score = words.filter((word) => text.includes(word)).length * 2
+    if (maxPrice && p.price <= maxPrice) score += 1
+    return { p, score }
+  }).filter(({ p, score }) => score > 0 && (!maxPrice || p.price <= maxPrice)).sort((a, b) => b.score - a.score || a.p.price - b.p.price).slice(0, 6).map(({ p }) => p)
+
+  if (!matches.length) {
+    const fallbackSearches = searchAll(question).products
+    if (fallbackSearches.length) matches = fallbackSearches.slice(0, 6)
+  }
+  if (!matches.length && (q.includes('product') || q.includes('item') || q.includes('bazaar') || q.includes('shop') || q.includes('buy') || q.includes('kuch') || q.includes('dress') || q.includes('cloth') || q.includes('sale'))) {
+    matches = catalogProducts.slice(0, 4)
+  }
+
+  r.matches = matches.map((p) => {
     const store = storeById(p.store)
-    return { type: 'product', id: p.id, title: p.title, store: store?.name || 'Store', price: p.price, href: `#/product/${p.id}` }
+    const img = (p.media && p.media.find((m) => m.type === 'image')?.url) || p.media?.[0]?.url || './images/p-kurta.png'
+    return {
+      type: 'product',
+      id: p.id,
+      title: p.title,
+      store: store?.name || 'Street Bazar',
+      price: p.price,
+      compareAt: p.compareAt || null,
+      image: img,
+      stock: p.stock,
+      href: `#/product/${p.id}`,
+    }
   })
+
   const userGreeted = /^(hi|hello|hey|salam|assalam(?:u|o)?-?alaikum)\b/i.test(T(question).trim())
   r.text = hideInternalDetails(r.text)
   if (!userGreeted) r.text = r.text.replace(/^(?:walaikum\s+salam|assalam(?:u|o)?-?alaikum|salam|hello|hi|hey)[,!.\s]*(?:main\s+street\s+bazar[^.]*[.!]?|aapka\s+swagat[^.]*[.!]?|bataiye[^.]*[.!]?)/i, '').trim()
-  if (r.matches.length && !/product|store|available|mil|found/i.test(r.text)) r.text += ` ${r.matches.length} matching option${r.matches.length === 1 ? '' : 's'} neeche hain.`
   return r
 }
 
