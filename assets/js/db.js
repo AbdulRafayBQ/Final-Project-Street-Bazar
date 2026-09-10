@@ -188,11 +188,7 @@ export async function syncOrder(order) {
   save()
 }
 
-export async function syncProduct(product) {
-  await api('/api/data', { method: 'POST', body: JSON.stringify({ action: 'product', product }) })
-  state.settings.lastSync = Date.now()
-  save()
-}
+
 
 export async function syncOrder(order) {
   return api('/api/data', { method: 'POST', body: JSON.stringify({ action: 'order', order }) })
