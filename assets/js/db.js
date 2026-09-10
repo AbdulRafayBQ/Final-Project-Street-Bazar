@@ -194,6 +194,12 @@ export async function syncStore(store) {
   save()
 }
 
+export async function syncProduct(product) {
+  await api('/api/data', { method: 'POST', body: JSON.stringify({ action: 'product', product }) })
+  state.settings.lastSync = Date.now()
+  save()
+}
+
 export async function syncThread(thread) {
   await api('/api/data', { method: 'POST', body: JSON.stringify({ action: 'thread', thread }) })
 }
